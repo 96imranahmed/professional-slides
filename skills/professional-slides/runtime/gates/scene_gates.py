@@ -277,14 +277,18 @@ def gate_scene_void(slide_no, slide, findings):
     if "column" in void:
         measured.update(column=void["column"], columnInternalVoid=round(void["internalVoid"], 4), columnDeadBand=round(void["deadBand"], 4),
                         **({"plot": True} if void.get("plot") else {}))
+    # The repair names only what the page has not done: a roadmap whose points already sat beside it was told to set them
+    # there, and the author rebuilt for nothing.
+    beside = any(n.get("type") == "text" and str(n.get("role") or "").startswith(("list-", "commentary", "point"))
+                 and (n.get("frame") or {}).get("x", 0) > CANVAS_W * 0.55 for n in slide.get("nodes", []))
     findings.append(finding(
         slide_no, "SCENE_VOID", measured, void["threshold"],
         column_repair(void) if "column" in void else
         "A band of the page (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
         "with their detail, the chart at the frame's size - size tiles and cards to what they hold, start "
-        "the body under the title rather than centring it in air, set the commentary beside the exhibit "
-        "rather than under a strip of air, or merge the page with a neighbour. Do not stretch rows or pad "
-        "text to cover the band.".format(void["from"], void["to"]),
+        "the body under the title rather than centring it in air, {}or merge the page with a neighbour. Do not "
+        "stretch rows or pad text to cover the band.".format(void["from"], void["to"],
+            "" if beside else "set the commentary beside the exhibit rather than under a strip of air, "),
     ))
 
 

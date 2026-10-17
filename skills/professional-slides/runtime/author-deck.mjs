@@ -476,17 +476,23 @@ async function catalogueCommand(values, file, say) {
     return 0;
   }
   if (values.example !== undefined) {
-    // `<type>` prints every worked page of the type; `<type>/<form>` the page of one form.
-    const [type, form] = values.example.split("/");
+    // `<type>/<form>` prints that form's worked page, `<type>` one page a form, and a worked page's id that page: one JSON
+    // value on the output, the other worked pages of the form named on the error stream. Every variant printed in full ran a
+    // lookup table to six pages and 676 lines.
     const example = workedExamples();
-    const worked = example.pages.filter((p) => p.type === type && (!form || p.form === form));
+    const byId = example.pages.find((p) => p.id === values.example);
+    const [type, form] = byId ? [byId.type, byId.form] : values.example.split("/");
+    const all = byId ? [byId] : example.pages.filter((p) => p.type === type && (!form || p.form === form));
+    const worked = byId ? all : all.filter((p, at) => all.findIndex((q) => q.form === p.form) === at);
     if (!worked.length) {
       const forms = [...new Set(example.pages.filter((p) => p.type === type).map((p) => p.form))];
       console.error(form && forms.length ? `No worked example of "${type}/${form}"; ${type}'s worked forms: ${forms.join(", ")}`
         : `No worked example of "${type}"; types: ${[...new Set(example.pages.map((p) => p.type).filter(Boolean))].join(", ")}`);
       return 1;
     }
-    say(`[\n${worked.map((page) => withLimits(page, density).replace(/^/gm, " ")).join(",\n")}\n]`);
+    say(form || byId ? withLimits(worked[0], density) : `[\n${worked.map((page) => withLimits(page, density).replace(/^/gm, " ")).join(",\n")}\n]`);
+    const others = all.filter((p) => !worked.includes(p));
+    if (others.length) console.error(`Other worked pages: ${others.map((p) => `${p.id} (${p.form}${p.exhibit?.columns ? ", " + p.exhibit.columns.length + " columns" : ""})`).join(", ")} - \`--example <id>\` prints one.`);
     // A worked example types its numbers, having no insight log to draw them from; a deck that has one names the measure instead.
     if (worked.some((p) => p.exhibit || p.exhibits || p.metrics || p.kpi)) console.error("With measures in the insight log, write the numbers by reference: an exhibit's `series: [{ measure: \"<insight id>/<measure>\", name }]`, a figure's `measure`, or a `{{<insight id>/<measure>@<period or member> | 0.0}}` token in the copy.");
     return 0;
@@ -527,7 +533,7 @@ async function deckOnDisk({ dir, stem }) {
   return !onDisk ? "missing" : !onDisk.compiledFrom ? "unrecorded" : staleCompile(onDisk, dir) ? "stale" : "current";
 }
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--page <id>[,<id>...]]] [--fetch-assets] | --types | --schema [<type>[/<form>] | kinds | deck] | [<id>.pages.json] --limits [<type>[/<form>]] | --icons | [<id>.pages.json] --example <type>[/<form>] | [<id>.pages.json] --scaffold <type>[/<form>] [--id <page-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--page <id>[,<id>...]]] [--fetch-assets] | --types | --schema [<type>[/<form>] | kinds | deck] | [<id>.pages.json] --limits [<type>[/<form>]] | --icons | [<id>.pages.json] --example <type>[/<form>] | <worked-page-id> | [<id>.pages.json] --scaffold <type>[/<form>] [--id <page-id>]";
 
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { types: { type: "boolean" }, schema: { type: "string", bare: "" }, icons: { type: "boolean" }, limits: { type: "string", bare: "" },

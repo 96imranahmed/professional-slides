@@ -1099,7 +1099,7 @@
    "id": "f-ranking-range",
    "type": "ranking",
    "form": "range",
-   "commentary": "beside",
+   "commentary": "on-exhibit",
    "takeaway": false,
    "title": "The five methods value the Coast concession at £300m to £520m; our bid is £440m",
    "exhibit": {
@@ -1136,22 +1136,18 @@
       "value": 440,
       "label": "Our bid £440m"
      }
+    ],
+    "annotations": [
+     {
+      "category": "Discounted cash flow",
+      "text": "The method the board relies on most"
+     },
+     {
+      "category": "Asset base",
+      "text": "The walk-away floor: fleet and depots alone"
+     }
     ]
    },
-   "points": [
-    {
-     "lead": "Cash flow leads",
-     "text": "The discounted cash flow puts the concession at £410m to £520m on the timetable recast, the method the board relies on most."
-    },
-    {
-     "lead": "Market checks",
-     "text": "Trading multiples and the last four awards both bracket the bid, so it is neither the cheapest nor the dearest reading."
-    },
-    {
-     "lead": "A floor, not a price",
-     "text": "The asset base, at £300m to £360m, is what the fleet and depots fetch on their own, and sets the walk-away point."
-    }
-   ],
    "source": "Source: illustrative data for a fictional operator; synthetic"
   },
   {

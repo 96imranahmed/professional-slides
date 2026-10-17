@@ -168,14 +168,17 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     .map((reference) => ({ type: "line", role: "chart-reference-line", frame: { x: plot.x, y: yScale(reference.value), width: plot.width, height: 0 } })) : [];
   const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles, guides: [...underlay, ...overlay, ...valueRules] });
   const annotationPlacements = evidenceAnnotations.placements;
-  // An event's rule breaks at a callout set across it as it does at a value label: a callout beside its mark is placed
-  // after the rule and may stand across it (hb02's and sh01's on the BA retest ran through their callouts' words).
+  // A rule up the plot - an event's, or a reference value across a bar chart's rows - breaks at a callout set across it as
+  // it does at a value label: a callout beside its mark is placed after the rule and may stand across it (hb02's and sh01's
+  // on the BA retest ran through their callouts' words, and a range chart's walk-away callout through its £440m bid line).
   const callouts = evidenceAnnotations.nodes.filter((node) => ["annotation-surface", "annotation-text"].includes(node.role) && node.frame).map((node) => node.frame);
   if (callouts.length) for (let i = underlay.length - 1; i >= 0; i -= 1) {
     const rule = underlay[i], at = rule.data ?? {};
-    if (rule.role !== "chart-event-line" || ![at.x1, at.y1, at.y2].every(Number.isFinite) || !callouts.some((frame) => at.x1 >= frame.x - 2 && at.x1 <= frame.x + frame.width + 2)) continue;
+    if (!["chart-event-line", "chart-reference-line"].includes(rule.role) || ![at.x1, at.x2, at.y1, at.y2].every(Number.isFinite) || Math.abs(at.x1 - at.x2) > 0.5
+      || !callouts.some((frame) => at.x1 >= frame.x - 2 && at.x1 <= frame.x + frame.width + 2)) continue;
     const runs = ruleAround({ x1: at.x1, y1: Math.min(at.y1, at.y2), x2: at.x1, y2: Math.max(at.y1, at.y2) }, [], { boxes: callouts });
-    underlay.splice(i, 1, ...runs.map((run, segment) => linePrimitive({ id: `${rule.id}-${segment}`, role: "chart-event-line", ...run, style: rule.style })));
+    // A stub of rule left past the callout, shorter than a dash, says nothing and is left out.
+    underlay.splice(i, 1, ...runs.filter((run) => Math.abs(run.y2 - run.y1) >= 6).map((run, segment) => linePrimitive({ id: `${rule.id}-${segment}`, role: rule.role, ...run, style: rule.style, data: { ...at, ...run } })));
   }
   const overlaps = (a, b, padding = 4) => !(
     a.x + a.width + padding <= b.x

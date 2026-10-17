@@ -35,7 +35,7 @@ The titles a deck can prove depend on the data it has. Before writing them, read
       "members": ["A", "B", "C"], "values": [71, 64, 58] } }, "cite": ["benchmark"] } ] }
 ```
 
-A page then prints the numbers by reference - an exhibit's `series: [{ "measure": "i-scores/score", "name": "Score" }]`, or `{{i-scores/score@A | 0}}` in any text - and the runtime writes them, so a number is typed once. A number typed on a page that matches no recorded value is advised (`NUMBER_UNTRACED`). Cite each source once in the pages file's `sources` registry and name it on the page by key (`source: ["benchmark"]`); the footer line is written from it.
+A page then prints the numbers by reference - an exhibit's `series: [{ "measure": "i-scores/score", "name": "Score" }]`, or `{{i-scores/score@A | 0}}` in any text - and the runtime writes them, so a number is typed once. A number typed on a page that matches no recorded value is advised (`NUMBER_UNTRACED`). Cite each source once in the pages file's `sources` registry and name it on the page by key (`source: ["benchmark"]`); the footer line is written from it. The footer takes the fullest form that fits: `name` with its `status` in brackets, else `short` with it, else `short` alone - so a status shows only where there is room - and adds the publication `date` unless the name already gives that month and year. `retrieved` is kept in the notes, never the footer.
 
 ## Titles
 

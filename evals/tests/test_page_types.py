@@ -326,10 +326,11 @@ console.log(JSON.stringify({{ six: error(() => pie(['a','b','c','d','e','f'], [1
         # How many parts a pie shows and how many items a roadmap runs are the writer's.
         for key in ('two', 'small', 'three', 'four'):
             self.assertIsNone(result[key], key)
-        # An unmarked point is marked on its own figure - a percentage, an amount or a count, never a year.
+        # An unmarked point is marked on its own figure - a percentage, an amount, a quantity with its unit - never a year,
+        # and never a bare count, which read as a random accent ("7", "11") on the Spacebar run.
         self.assertEqual(result['one']['highlight'], '2.4m tonnes')
         self.assertIsNone(result['one'].get('advisories'))
-        self.assertEqual(result['figures'], ['2.4m', '1,400', '$1.2bn'])
+        self.assertEqual(result['figures'], ['2.4m', '$1.2bn'])
         self.assertIsNone(result['each'])
 
 
@@ -340,11 +341,13 @@ class PointFigureTests(unittest.TestCase):
 import {{ compilePage }} from '{KIT}';
 const page = {{ id: 'p', type: 'ranking', form: 'bar', commentary: 'beside', title: 'Scores',
   exhibit: {{ categories: ['GPT 6.1 Sol', 'Opus 5.5'], series: [{{ name: 'Score', values: [90, 77] }}] }},
-  points: ['Opus 5.5 scored 77 on 39.8 minutes', 'GPT 6.1 Sol scored 90 on 155 minutes'] }};
-console.log(JSON.stringify({{ named: compilePage(page, 0, {{ players: [{{ name: 'GPT 6.1 Sol' }}, {{ name: 'Opus 5.5' }}] }}).highlight, unnamed: compilePage(page, 0).highlight }}));
+  points: ['Opus 5.5 scored 77% on 39.8 minutes', 'GPT 6.1 Sol scored 90% on 155 minutes'] }};
+const bare = {{ ...page, points: ['Opus 5.5 scored 77 on 39.8 minutes', 'GPT 6.1 Sol scored 90 on 155 minutes'] }};
+console.log(JSON.stringify({{ named: compilePage(page, 0, {{ players: [{{ name: 'GPT 6.1 Sol' }}, {{ name: 'Opus 5.5' }}] }}).highlight, unnamed: compilePage(page, 0).highlight, bare: compilePage(bare, 0).highlight ?? null }}));
 ''')
-        self.assertEqual(result["named"], ["77", "90"])
-        self.assertEqual(result["unnamed"], ["5.5", "6.1"])  # undeclared, a name's digits are read as any others
+        self.assertEqual(result["named"], ["77%", "90%"])
+        self.assertEqual(result["unnamed"], ["77%", "90%"])  # a name's digits are a bare number, never marked
+        self.assertIn(result["bare"], (None, []))  # bare counts alone: the point stays unmarked
 
 
 class RerunGapsTests(unittest.TestCase):

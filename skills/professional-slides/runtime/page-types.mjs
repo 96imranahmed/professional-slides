@@ -640,14 +640,14 @@ export function accentTexts(page) {
 }
 
 // A point's own figure: its first quantity with a currency, a percentage or a
-// unit, else its first number that is not a year. In a point of evidence the
-// number is what the reader should see first, so an unmarked point is marked
-// on it (and a point with no figure is named, not refused).
+// unit. In a point of evidence that quantity is what the reader should see
+// first, so an unmarked point is marked on it. A bare count is not: the Spacebar
+// run's points lit "7" and "11" as random accents, so a point with no quantity
+// stays unmarked unless the page names its phrase.
 const FIGURE = /(?<![\p{L}\d.,])(?:US\$|A\$|[$£€¥]|(?:AED|USD|EUR|GBP|SAR|QAR)\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:million|billion|trillion|percentage points|bn|mn|m|k|pp|pts|x)(?![\p{L}\d])|%|×)?/gu;
 export function pointFigure(text) {
   const found = [...String(text ?? "").matchAll(FIGURE)].map((m) => m[0].trim()).filter((figure) => hasPhrase(text, figure));
-  const unit = found.find((figure) => /[%×$£€¥]|[a-z]$|^(?:AED|USD|EUR|GBP|SAR|QAR)/i.test(figure));
-  return unit ?? found.find((figure) => !/^(?:19|20)\d\d$/.test(figure)) ?? null;
+  return found.find((figure) => /[%×$£€¥]|[a-z]$|^(?:AED|USD|EUR|GBP|SAR|QAR)/i.test(figure)) ?? null;
 }
 
 /**
@@ -694,8 +694,11 @@ export function citationForms(keys, registry, { primary = null } = {}) {
   // When a source was read changes nothing about how its number reads: it is the registry's `retrieved`, which no form
   // prints - on a deck whose every source was retrieved one day, it was a third of every footer. When it was published
   // is its `date`, which every form prints.
+  // A name that already dates itself - "(Oct 2026)" against a printed 14 Oct 2026 - is not dated again: the Spacebar footers
+  // read "... (Oct 2026), 14 Oct 2026".
+  const datesItself = (name, date) => name.includes(date) || date.split(" ").slice(-2).every((part) => new RegExp(/^\d{4}$/.test(part) ? `\\b${part}\\b` : `\\b${part.slice(0, 3)}`, "i").test(name));
   const nameOf = (e, short, status) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name;
-    const date = sourceDate(e)?.printed, dated = date && !name.includes(date) ? `${name}, ${date}` : name;
+    const date = sourceDate(e)?.printed, dated = date && !datesItself(name, date) ? `${name}, ${date}` : name;
     return status && e.status ? `${dated} (${e.status})` : dated; };
   const named = (short, status, list = entries) => [...new Set(list.map((e) => nameOf(e, short, status)))];
   const brief = named(true, false), primaries = named(true, false, entries.slice(0, first.length));
@@ -1314,7 +1317,7 @@ export function describeTypes() {
     "`subtitle` - optional, and left out unless the deck the user gave as the style to follow sets a line under its titles: one line naming what the title leaves out - the measure and unit, the population, the period or the scope. Without one, the exhibit's heading carries the measure and unit.", "",
     "Numbers by reference - where the insight log records measures, a page names the measure and the runtime writes the number: an exhibit's `series: [{ measure: \"<insight id>/<measure>\", name }]` takes its categories, values, unit and basis from the measures; a metric, a `kpi`, a row block's `metric` or a fact-grid item is `{ measure, format, label }`; and `{{<insight id>/<measure>@<period or member> | 0.0}}` in any text prints that number. A number typed into text is traced to the measures the page rests on (NUMBER_UNTRACED, advised).", "",
     "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, short, url, status, date } }`), fitted by the runtime to the footer, the full list kept in the speaker notes.", "",
-    "`highlight` - the phrase from each point the reader should see first; a point left unmarked is marked on its own figure. A phrase the page writes nowhere an accent is drawn is set aside.", "",
+    "`highlight` - the phrase from each point the reader should see first; a point left unmarked is marked on its first quantity with a unit or currency (a bare count is left unmarked). A phrase the page writes nowhere an accent is drawn is set aside.", "",
     "`better` - on a metric, a table column, row or trend cell: the direction that is good news, \"up\" (the default) or \"down\" (a cost, churn, a wait).", "",
     "Refused at compile only where a page cannot be drawn: an unknown type, form, key or icon; data its form cannot read; more than its frame holds (the limits below); a total row left blank (TOTAL_ROW_BLANK). Fields a placement does not draw, callouts a form has no room for and a highlight that lands nowhere are set aside, and the page's advisories say so (PAGE_ADJUSTED).", "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words and a chart ${CALLOUTS_MAX} callouts (a bridge over commentary \`below\`, ${WATERFALL_BELOW_CALLOUTS}); a rail about ${railCapacity()} words; a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; a single column never stretches) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row.`, "",

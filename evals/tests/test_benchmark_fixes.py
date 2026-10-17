@@ -9,6 +9,7 @@ import base64
 import io
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,7 +17,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from node_probe import ROOT, run_node
+from node_probe import NODE, ROOT, RUNTIME, run_node
 
 sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates"))
 import page_gates  # noqa: E402
@@ -76,6 +77,48 @@ console.log(JSON.stringify({ unchosen: failed({ points: ['Sol led on research'] 
   onChart: failed({ commentary: 'on-exhibit', exhibit: { heading: 'Audit score', unit: 'points', categories: ['Sol', 'Opus'], series: [{ name: 'Score', values: [90, 77] }], annotations: [{ category: 'Sol', text: 'Led on research, memo and consistency' }] } }) }));
 """)
         self.assertEqual(result, {"unchosen": ["COMMENTARY_UNCHOSEN"], "asked": [], "onChart": []})
+
+
+class RunSnagTests(unittest.TestCase):
+    """What the 03c272f run's author met: a callout through a bid line, six variants for one example, a date printed
+    twice in every footer, and an empty-band repair telling it to do what the page already did."""
+
+    def test_a_reference_line_across_the_rows_gives_way_to_a_callout(self):
+        result = run_node(PRELUDE + """
+import { sceneDesignFindings } from './skills/professional-slides/runtime/validate-overlap.mjs';
+const props = { categories: ['Discounted cash flow', 'Trading multiples', 'Precedent awards', 'Bid ladder', 'Asset base'], low: [410, 380, 350, 420, 300], high: [520, 470, 500, 480, 360],
+  referenceLines: [{ value: 440, label: 'Our bid £440m' }], annotations: [{ category: 'Asset base', text: 'The walk-away floor: fleet and depots alone' }] };
+const { nodes } = draw('chart.range', props);
+const resolved = nodes.map((n) => ({ ...n, style: resolveStyle(n.style || {}) }));
+console.log(JSON.stringify({ findings: sceneDesignFindings({ slides: [{ id: 's', nodes: resolved }] }).filter((f) => f.severity === 'blocker').map((f) => f.code),
+  runs: nodes.filter((n) => n.role === 'chart-reference-line').length }));
+""")
+        self.assertEqual(result["findings"], [])
+        self.assertGreaterEqual(result["runs"], 1)
+
+    def test_one_example_a_form_and_a_footer_dated_once(self):
+        printed = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), "--example", "lookup/table"], capture_output=True, text=True)
+        self.assertEqual(json.loads(printed.stdout)["id"], "f-lookup-table")  # one page, not six
+        self.assertIn("--example <id>", printed.stderr)
+        result = run_node(PRELUDE + """
+import { citationForms } from './skills/professional-slides/runtime/page-types.mjs';
+const reg = { a: { name: 'Spacebar benchmark (Oct 2026)', date: '2026-10-14' }, b: { name: 'IAG results (Oct 2025)', date: '2026-10-14' } };
+console.log(JSON.stringify({ a: citationForms(['a'], reg)[0], b: citationForms(['b'], reg)[0] }));
+""")
+        self.assertEqual(result["a"], "Source: Spacebar benchmark (Oct 2026)")
+        self.assertEqual(result["b"], "Source: IAG results (Oct 2025), 14 Oct 2026")
+
+    def test_an_empty_band_repair_names_only_what_the_page_has_not_done(self):
+        def page(beside):
+            nodes = [{"type": "text", "id": "t", "role": "action-title", "frame": {"x": 60, "y": 40, "width": 1160, "height": 40}, "text": "A title", "style": {"fontSize": 24}},
+                     {"type": "rect", "id": "e", "role": "chart-mark", "frame": {"x": 60, "y": 140, "width": 700, "height": 280}, "style": {"fill": "#2251FF"}},
+                     {"type": "text", "id": "p", "role": "list-item", "frame": {"x": 900 if beside else 60, "y": 150 if beside else 430, "width": 300, "height": 60}, "text": "A point", "style": {"fontSize": 12}}]
+            found = []
+            page_gates.gate_scene_void(2, {"id": "p", "nodes": nodes}, found)
+            return [f["repair"] for f in found]
+        repairs = page(True)
+        self.assertTrue(repairs, "the band under a short exhibit is reported")
+        self.assertNotIn("set the commentary beside", repairs[0])
 
 
 class PeerColourTests(unittest.TestCase):
