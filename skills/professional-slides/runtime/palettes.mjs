@@ -13,7 +13,7 @@ export const PALETTES = Object.freeze({
       "color.chartSeries1": "#051C2C", "color.chartSeries2": "#2251FF", "color.chartSeries3": "#00A9F4",
       "color.chartSeries4": "#034B6F", "color.chartSeries5": "#99C4FF", "color.chartSeries6": "#B3D9F5",
       "font.display": "Georgia",
-      "style.titleWeight": "bold", "style.titleRule": "rule", "style.titleRuleLength": "content", "style.titleRuleColor": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "bold"
+      "style.titleWeight": "bold", "style.titleRule": "none", "style.titleRuleLength": "content", "style.titleRuleColor": "rule", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "zebra", "style.labelWeight": "bold"
     }
   },
   evergreen: {
@@ -24,7 +24,7 @@ export const PALETTES = Object.freeze({
       "color.componentPrimaryTint": "#E3F3EC", "color.surfaceMuted": "#F2F2F2",
       "color.chartSeries1": "#0E7A5E", "color.chartSeries2": "#5FB08F", "color.chartSeries3": "#9FD4BB",
       "color.chartSeries4": "#1F3A2E", "color.chartSeries5": "#7A7A7A", "color.chartSeries6": "#C9C9C9",
-      "style.titleWeight": "regular", "style.titleRule": "rule", "style.titleRuleLength": "short", "style.titleRuleColor": "accent", "line.titleRule": 4, "style.tagPlacement": "below-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold", "style.titleLead": "pipe"
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.titleRuleLength": "short", "style.titleRuleColor": "accent", "line.titleRule": 4, "style.tagPlacement": "below-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold", "style.titleLead": "pipe"
     }
   },
   crimson: {
@@ -35,7 +35,7 @@ export const PALETTES = Object.freeze({
       "color.componentPrimaryTint": "#FAE8E9", "color.surfaceMuted": "#F2F2F2", "color.chartComparator": "#BFBFBF",
       "color.chartSeries1": "#8C8C8C", "color.chartSeries2": "#CC0000", "color.chartSeries3": "#4D4D4D",
       "color.chartSeries4": "#BFBFBF", "color.chartSeries5": "#7A0000", "color.chartSeries6": "#E6E6E6",
-      "style.titleWeight": "regular", "style.titleRule": "rule", "style.titleRuleLength": "full", "style.titleRuleColor": "rule", "style.tagPlacement": "top-right", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.titleRuleLength": "full", "style.titleRuleColor": "rule", "style.tagPlacement": "top-right", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
   graphite: {
@@ -46,7 +46,7 @@ export const PALETTES = Object.freeze({
       "color.componentPrimaryTint": "#E8E8E8", "color.surfaceMuted": "#F2F2F2",
       "color.chartSeries1": "#86BC25", "color.chartSeries2": "#046A38", "color.chartSeries3": "#43B02A",
       "color.chartSeries4": "#0076A8", "color.chartSeries5": "#62B5E5", "color.chartSeries6": "#BBBCBC",
-      "style.titleWeight": "regular", "style.titleRule": "rule", "style.titleRuleLength": "content", "style.titleRuleColor": "ink", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.titleRuleLength": "content", "style.titleRuleColor": "ink", "style.tagPlacement": "above-title", "style.chartHeading": "text", "style.listMarker": "dot", "style.tableRows": "rules", "style.labelWeight": "bold"
     }
   },
   "toolkit": { label: "Toolkit", basis: "Neutral palette retained for component fixtures", colors: {} }

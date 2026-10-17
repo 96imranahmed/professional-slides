@@ -16,11 +16,11 @@ Ask the reader questions first (who reads the deck, what they already know, what
 | 2 | Which look? | `consulting`, `editorial`, `journal`, `keynote` | by the occasion, below | `design-systems.png` |
 | 3 | Colours: the subject's own, your brand's, or a named palette? | `subject`, `brand` (one or two hex colours), `system`, `midnight`, `evergreen`, `crimson`, `graphite` | `subject` | `palettes.png` |
 | 4 | How should pages show where the reader is? | `pills`, `label`, `breadcrumb`, `number-strip`, `side-rail`, `repeat-contents`, `none`, `auto` | `auto` | `trackers.png` |
-| 5 | Title treatment, and filled or open surfaces? | title: `system`, `rule`, `full`, `bar`, `band`, `block`, `tab`, `none`; surfaces: `reference`, `open` | `system`; `reference` | `title-treatments.png`, `surfaces.png` |
+| 5 | Title treatment (no line under the title unless the user's decks set one), and filled or open surfaces? | title: `system`, `rule`, `full`, `bar`, `band`, `block`, `tab`, `none`; surfaces: `reference`, `open` | `system`; `reference` | `title-treatments.png`, `surfaces.png` |
 
 | `design` | For | Frame |
 | --- | --- | --- |
-| `consulting` | boards, steering committees, diligence | white canvas, titles top-left over a thin rule, commentary beside the exhibit, numbered chapter panels |
+| `consulting` | boards, steering committees, diligence | white canvas, titles top-left with no rule under them, commentary beside the exhibit, numbered chapter panels |
 | `editorial` | pre-reads and narratives read alone | warm paper, large serif titles, wide margins, typographic cover and chapter pages |
 | `journal` | evidence-led briefings where the chart is the argument | red tab over short bold titles, the finding as a standfirst, tight margins |
 | `keynote` | decks presented to a room | titles reversed out of a colour block, larger type, colour-field and picture covers |

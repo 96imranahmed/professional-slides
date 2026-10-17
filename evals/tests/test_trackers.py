@@ -132,9 +132,8 @@ const slide=compileDeck({slides:[planned.spec]},REGISTRY).slides[0];
 const tracker=slide.nodes.find(n=>n.role==='tracker-compact-label'),title=slide.nodes.find(n=>n.role==='action-title');
 assert.ok(tracker.frame.y+tracker.frame.height<title.frame.y);
 assert.equal(tracker.data.sectionId,'B');
-assert.equal(slide.componentInstances.find(n=>n.component==='slide-chrome').variant,'with-line');
-const rule=slide.nodes.find(n=>n.role==='title-rule');
-assert.ok(tracker.frame.y+tracker.frame.height<rule.frame.y && title.frame.y+title.frame.height<rule.frame.y,'tracker and title sit above the rule');
+assert.equal(slide.componentInstances.find(n=>n.component==='slide-chrome').variant,'without-line');
+assert.ok(!slide.nodes.some(n=>n.role==='title-rule'),'no line under the title by default');
 assert.equal(planned.decision.tracker.selectedId,'B');
 console.log(JSON.stringify({accepted:true}));
 """)

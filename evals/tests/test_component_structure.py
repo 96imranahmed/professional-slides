@@ -340,9 +340,8 @@ const counts = deck.slides.map(s=>s.nodes.filter(n=>n.role==='title-rule').lengt
 assert.deepEqual(deck.slides[0].componentInstances.find(c=>c.id==='copy').frame,deck.slides[1].componentInstances.find(c=>c.id==='copy').frame);
 const chrome = compileDeck({slides:[{id:'chrome',chrome:{title:'Capacity limits growth'},composition:absolute({id:'empty',children:[]})}]},REGISTRY);
 const title = chrome.slides[0].nodes.find(n=>n.role==='action-title');
-// The default house (midnight) closes the title band with a rule, and a
-// one-line title is set down on it.
-assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'with-line');
+// The default house sets no line under the title (strong decks rarely do); a house that asks for one draws it.
+assert.equal(chrome.manifest.slides[0].componentInstances[0].variant,'without-line');
 assert.equal(chrome.manifest.slides[0].componentInstances[0].instanceId,title.data.componentInstance);
 assert.ok(chrome.manifest.slides[0].componentInstances.every(instance=>typeof instance.instanceId==='string'&&instance.instanceId.length>0));
 console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),chromeRules:chrome.slides[0].nodes.filter(n=>n.role==='title-rule').length,footerRules:chrome.slides[0].nodes.filter(n=>n.role==='footer-rule').length,titleAnchor:[title.frame.x,title.frame.y]}));
@@ -350,9 +349,9 @@ console.log(JSON.stringify({counts,decisions:decisions.map(d=>d.titleVariant),ch
         )
         self.assertEqual(result["counts"], [0, 1])
         self.assertEqual(result["decisions"], ["without-line", "with-line"])
-        self.assertEqual(result["chromeRules"], 1)  # the default house draws its title rule
+        self.assertEqual(result["chromeRules"], 0)  # the default house sets no line under the title
         self.assertEqual(result["footerRules"], 0)
-        self.assertEqual(result["titleAnchor"], [60, 80])  # a one-line title sits on the rule
+        self.assertEqual(result["titleAnchor"], [60, 44])  # with no rule, the title keeps the open band's top
 
     def test_title_rule_follows_measured_text_not_allocated_box(self):
         result = run_node(
