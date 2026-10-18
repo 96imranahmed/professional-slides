@@ -168,7 +168,8 @@ export async function renderSheets(outDirectory, { only, python = pythonBin(), .
   try {
     const jobs = plan.flatMap((sheet) => sheet.options.map((option, i) => ({ sheet, option, dir: path.join(work, `${sheet.id}-${i}`) })));
     // LibreOffice is the slow step and each render takes its own profile, so
-    // a few run side by side.
+    // a few run side by side; PowerPoint exports queue for the one app
+    // (emit/renderer_backends.py powerpoint_lock).
     const renders = await pool(jobs, Math.max(1, Math.min(4, os.cpus().length)), (job) => renderOption(job.option.answers, job.dir, python));
     const manifest = [];
     for (const sheet of plan) {

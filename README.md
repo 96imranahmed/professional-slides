@@ -70,7 +70,7 @@ A reference deck, website, or brand colours can guide the house style. [Design p
 
 ## Install and start
 
-Use Node 20.9+. The environment check identifies missing Python packages, LibreOffice, and poppler, and prints install commands and the recommended `RUNTIME_PYTHON`.
+Use Node 20.9+. The environment check identifies missing Python packages, a slide renderer, and poppler, and prints install commands and the recommended `RUNTIME_PYTHON`. Rendering prefers installed desktop PowerPoint on macOS and Windows; LibreOffice is the fallback and the Linux renderer. PowerPoint needs activation and local automation access. LibreOffice is optional when PowerPoint is available.
 
 ```bash
 git clone https://github.com/96imranahmed/professional-slides.git
@@ -83,6 +83,8 @@ After the environment check passes, the package is in `dist/professional-slides`
 
 - **Codex:** add that directory to a [local marketplace](https://developers.openai.com/plugins/build/plugins#build-your-own-curated-plugin-list), install its `professional-slides` entry, and invoke `$professional-slides`.
 - **Claude Code:** run `claude --plugin-dir dist/professional-slides`, then invoke `/professional-slides:professional-slides`.
+
+Set `PROFESSIONAL_SLIDES_RENDERER` to `auto` (default), `powerpoint`, or `libreoffice` to choose a renderer. Explicit selections never fall back; automatic mode records the renderer used and any failed attempts. Use `libreoffice` for jobs without a desktop session. All renderers verify the saved PPTX through the same checks.
 
 Keep outputs outside the installed plugin. See [setup](skills/professional-slides/SKILL.md#setup). Google Slides import needs its own visual check; inspect fonts, wrapping, crops, and charts after import.
 

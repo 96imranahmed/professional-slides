@@ -18,7 +18,7 @@ Design systems (`consulting`, `editorial`, `journal`, `keynote`) set a deck's pa
 
 ## What the runtime produces
 
-Node composes and measures the deck; Python and `python-pptx` write and read back the PowerPoint; LibreOffice renders it for inspection. Eligible charts are native PowerPoint charts with embedded workbooks; charts whose semantics need custom annotations, reference lines or icons remain editable grouped shapes. Meaning-bearing text, tables, diagrams and sources remain separately addressable in the saved deck. See the [runtime guide](skills/professional-slides/runtime/README.md).
+Node composes and measures the deck; Python and `python-pptx` write and read back the PowerPoint; desktop PowerPoint or LibreOffice renders it for inspection. Eligible charts are native PowerPoint charts with embedded workbooks; charts whose semantics need custom annotations, reference lines or icons remain editable grouped shapes. Meaning-bearing text, tables, diagrams and sources remain separately addressable in the saved deck. See the [runtime guide](skills/professional-slides/runtime/README.md).
 
 The output is PowerPoint. Google Slides is a downstream import the user makes; verify the imported deck separately, because the PowerPoint render does not establish font, wrapping, crop, chart or object-order fidelity there.
 
@@ -26,7 +26,7 @@ The output is PowerPoint. Google Slides is a downstream import the user makes; v
 
 This distribution contains one skill and its local runtime, references, examples and assets. It has no MCP server or connected app. The portable manifest is `plugin.json`; Codex and Claude Code compatibility manifests are included.
 
-Use Node 20.9 or newer. From this plugin directory, install the Python dependencies with `python3 -m pip install -r requirements.txt`. Full rendering needs LibreOffice (`soffice`) and poppler (`pdftoppm` and `pdftotext`). Run `node skills/professional-slides/runtime/doctor.mjs` and use the `RUNTIME_PYTHON` it recommends. Optional `@napi-rs/canvas` enables font measurements; bundled metrics are available without it.
+Use Node 20.9 or newer. From this plugin directory, install the Python dependencies with `python3 -m pip install -r requirements.txt`. Full rendering needs desktop PowerPoint or LibreOffice, plus poppler (`pdftoppm` and `pdftotext`). Automatic selection prefers installed PowerPoint on macOS and Windows, with LibreOffice as fallback; Linux uses LibreOffice. PowerPoint needs activation and local automation access. Set `PROFESSIONAL_SLIDES_RENDERER=libreoffice` for jobs without a desktop session, or choose `powerpoint` explicitly to require its renderer. Explicit selections never fall back. Run `node skills/professional-slides/runtime/doctor.mjs` and use the `RUNTIME_PYTHON` it recommends. Optional `@napi-rs/canvas` enables font measurements; bundled metrics are available without it.
 
 Follow the [skill process](skills/professional-slides/SKILL.md#the-process), resolving its commands from the skill directory. Write deck outputs to a task-owned directory outside the installed plugin.
 
