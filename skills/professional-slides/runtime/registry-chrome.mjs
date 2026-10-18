@@ -394,7 +394,7 @@ function renderSlideChrome({ id, frame, props }) {
   // the title, so the body starts a step lower to keep it off the content.
   const trackerGap = inRow || kicker.length ? tokenValue(token("space.3")) : 0;
   const floorTop = Math.max(CHROME.bodyTop + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
-  let contentTop = Math.max(floorTop, titleBottom + gap + trackerGap);
+  let contentTop = Math.max(floorTop, titleBottom + gap);
   if (ruled) {
     // The rule closes the title band at a fixed height, the gap above the
     // body, and the title and its standfirst sit on it: a one-line title

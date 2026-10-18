@@ -271,7 +271,7 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const revised = imported ? revisionChanges(spec, imported) : null;
   add(consistencyFindings(doc, insights, { spec, inventory: imported, changed: revised?.content ?? null }));
   const gates = composed.deck ? sceneGateFindings(composed.deck, python) : { ran: false, findings: [], advisories: [], reason: composed.error };
-  add([...gates.findings, ...gates.advisories]);
+  add(withFormLever([...gates.findings, ...gates.advisories], doc));
   if (composed.deck) add(sceneDesignFindings(composed.deck));
   const assets = baseDir ? await assetFindings(spec, baseDir) : { statement: null, findings: [] };
   add(assets.findings);
@@ -283,6 +283,25 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const failedIds = new Set([...failed, ...composing].map((f) => f.id).filter((id) => id !== undefined && id !== null).map(String));
   return { spec, deck: composed.deck ?? null, composed, complete, failed, failedIds, blocking: listed.filter(isBlocker), advisories: listed.filter((f) => !isBlocker(f)),
     gates: { ran: gates.ran, reason: gates.reason ?? null }, assets: assets.statement, revision: revisionStatement(spec, imported), readAsChanged: revised };
+}
+
+/**
+ * An empty band on a page whose form sets its items in rows of a count it publishes (`columns`: cards, tiles, panels a
+ * row) is first that count's to close: the run that built the Spacebar deck spent three of its four rounds on the
+ * generic advice before it found `columns`, which only `--schema parallel/cards` named.
+ */
+function withFormLever(found, doc) {
+  const byId = new Map([...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page?.id !== undefined && PAGE_TYPES[page.type]).map((page) => [String(page.id), page]));
+  return found.map((f) => {
+    const page = f.code === "SCENE_VOID" ? byId.get(String(f.id)) : null;
+    if (!page) return f;
+    const form = page.form ?? Object.keys(PAGE_TYPES[page.type].forms)[0];
+    let count;
+    try { count = formFields(page.type, form).exhibit?.columns; } catch { return f; }
+    if (typeof count !== "string" || !/^(int|\d+-\d+)\b/.test(count)) return f;
+    const set = page.exhibit?.columns === undefined ? "it is set by the runtime" : `it is ${page.exhibit.columns}`;
+    return { ...f, repair: `On a ${page.type}/${form} page the band is closed first by \`exhibit.columns\` (${count.replace(/^int - /, "")}; ${set}): fewer a row stand taller and take the height, more a row take the width. ${f.repair}` };
+  });
 }
 
 /**
@@ -493,6 +512,8 @@ async function catalogueCommand(values, file, say) {
       return 1;
     }
     say(form || byId ? withLimits(worked[0], density) : `[\n${worked.map((page) => withLimits(page, density).replace(/^/gm, " ")).join(",\n")}\n]`);
+    // The notes follow the page: read through one pipe, the error stream ran ahead of the page still being written.
+    await new Promise((resolve) => process.stdout.write("", resolve));
     const others = all.filter((p) => !worked.includes(p));
     if (others.length) console.error(`Other worked pages: ${others.map((p) => `${p.id} (${p.form}${p.exhibit?.columns ? ", " + p.exhibit.columns.length + " columns" : ""})`).join(", ")} - \`--example <id>\` prints one.`);
     // A worked example types its numbers, having no insight log to draw them from; a deck that has one names the measure instead.

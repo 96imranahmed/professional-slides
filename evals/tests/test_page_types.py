@@ -645,11 +645,14 @@ const divider = deck.slides.find((s) => s.nodes.some((n) => n.role === 'divider-
 const out = REGISTRY.get('takeaways').render({{ id: 't', frame: {{ x: 0, y: 0, width: 1280, height: 720 }}, props: {{ items: ['Short run: OpenAI is better placed for attention and distribution across its billion weekly users.', 'Capital: the larger raise and the higher mark belong to different firms.'] }} }}).nodes;
 const item = out.find((n) => n.role === 'takeaways-item');
 console.log(JSON.stringify({{ compiled: compilePage({{ id: 's1', kind: 'section', title: '01 / Demand' }}).title,
-  title: divider.nodes.find((n) => n.role === 'divider-title').text, numeral: divider.nodes.find((n) => n.role === 'divider-number')?.style.fontFamily.tokenId ?? null,
+  title: divider.nodes.find((n) => n.role === 'divider-title').text, paragraph: divider.nodes.filter((n) => n.role === 'divider-subtitle').length, numeral: divider.nodes.find((n) => n.role === 'divider-number')?.style.fontFamily.tokenId ?? null,
   runs: item.runs.map((r) => r.bold), bold: item.style.bold }}));
 """)
         self.assertEqual(result["compiled"], "Demand")
         self.assertEqual(result["title"], "Demand and market position")
+        # A divider is its numeral and title beside the contents, with no paragraph; a section's summary is its detail on
+        # the contents page (the user, of the BA dividers: they should not carry a paragraph).
+        self.assertEqual(result["paragraph"], 0)
         self.assertIn(result["numeral"], (None, "font.body"))
         self.assertEqual(result["runs"], [True, False])
         self.assertFalse(result["bold"])

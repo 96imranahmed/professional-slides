@@ -49,7 +49,7 @@ Each title states the finding, not the topic: the subject, what it did, and by h
 
 Match the verb to the evidence: a measured result *is*, a sensitivity *could reach*, an approved plan *will*. Where the evidence is thinner than the wording, narrow the claim - a segment, a period, a softer verb - and keep its direction; the limitation goes in a note (or the subtitle, where the deck uses them), not in place of the finding. Hedges (*may*, *potentially*, *various*, *considerations*) mark a finding not yet written: replace each with the measured fact.
 
-Structural pages keep their fixed heading: a contents page, a section divider, `Executive summary` or `Executive summary: <answer>`.
+Structural pages keep their fixed heading: a contents page, a section divider, `Executive summary` or `Executive summary: <answer>`. A section divider (`kind: "section"`) is its title and numeral beside the deck's contents, with no paragraph; a `summary` is printed only as the section's detail on the contents page.
 
 ## The executive summary
 
@@ -66,7 +66,7 @@ A summary carries the answer and the case for it, in four to six developed state
 
 ## Approve the storyline
 
-Show the user the titles in order, each with its page type and the data behind it, and ask for approval in one message. The user can reorder, cut, merge or add pages there, where it is cheap. Once approved, write each page once; change a title afterwards only when the evidence changes.
+Show the user the titles in order, each with its page type and the data behind it, and ask for approval in one message. A chart page lists its candidate charts, best first, and the one taken ([Drawing](drawing.md#pick-the-obvious-chart)); where the deck needs variety, take a page's next candidate, not a chart that draws its claim less directly. The user can reorder, cut, merge or add pages there, where it is cheap. Once approved, write each page once; change a title afterwards only when the evidence changes.
 
 ## Revising a deck
 

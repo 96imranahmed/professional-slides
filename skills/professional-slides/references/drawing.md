@@ -16,17 +16,20 @@ A page names its `type`; its `form` defaults to the type's first and its `commen
 
 Choose the chart a reader of this kind of document expects for this kind of claim. The obvious one is usually right: one scatter of runtime against score, one table of every category's scores, one waterfall for a change between two totals.
 
+For each page, name its candidates first: the charts below that draw its claim's comparison, best first. Take the best. Variety across the deck is settled among those candidates - a page takes its second candidate where the first would repeat its neighbour's - and never by a chart that is not one of them. Series compared over the same periods share one axis: "the Atlantic earned more than the Pacific every year" is two lines, or a line a region for each airline, not six panels of columns.
+
 | The reader's question | Draw | Type, form |
 | --- | --- | --- |
 | Which is larger, and by how much? | Sorted bars | `ranking`, `bar` |
 | How did a measure move over time? | A line; columns for a few periods | `trend`, `line` or `column` |
+| Did one group stay ahead of another over time? | Lines on one axis, a line a group | `trend`, `line` |
 | How did members of different sizes move against their own starting point? | Indexed lines, the base period at 100 | `trend`, `indexed` |
 | How does a total divide into parts, and how does the mix differ? | Stacked bars | `composition`, `stacked-bar` |
 | What makes up the change between two totals? | Waterfall | `bridge`, `waterfall` |
 | How do two measures move together? | Scatter; bubble for a third measure | `relationship`, `scatter` or `bubble` |
 | Exact values a reader looks up and compares | A table | `lookup`, `table` or `measure-table` |
 | Options judged against criteria | A scorecard | `scorecard`, `harvey`, `rag`, `check` |
-| Which of many series moved? | Small multiples | `panels`, `small-multiples`; `trend`, `sparklines` |
+| Which of many series moved, too many to share an axis? | Small multiples | `panels`, `small-multiples`; `trend`, `sparklines` |
 | How a system works: stages, flows, causes | A diagram | `mechanism`, `flow`, `process`, `tree` |
 | What happens when | A timeline or roadmap | `schedule`, `timeline`, `roadmap`, `gantt` |
 | A few numbers that carry the claim | Figures, with the exhibit that proves them | `numbers`, `hero-number`, `metric-strip`, `fact-grid` |
@@ -85,6 +88,8 @@ A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines
 ## What a page holds
 
 The frame sets hard limits - a chart's three callouts, a rail's eight lines, a pie's five parts, a labelled-rows page's five rows - and `--types` and `--limits <type>/<form>` print them. A page that does not fit is refused with what to change; a table past the rows a page holds continues on the next page with its header repeated (`PAGE_SPLITS`, advised). Text that overlaps, a heading that wraps where it should fit, type too small for its role or set where it cannot be read is refused at the build with the page and the element.
+
+A band of the page left empty is advised (`SCENE_VOID`). On cards, tiles and small multiples the first lever is the count a row, `exhibit.columns`: fewer a row stand taller and take the height, more a row take the width. Elsewhere, give the exhibit the height or move the commentary beside it.
 
 **Components without a page form.** Seven components are strips or bands that cannot fill a page; each reaches one as an exhibit of a `panels` page: `journey` (stages and their touchpoints) and `highlight-strip` (numbered findings) across a short row of a dashboard; `icon-trends`, `speech` and `status-list` beside the exhibit they explain; `logo-collage` naming a set's members in a dashboard cell; and `worksheet`, blank by design, beside its worked example in a `panels` row.
 

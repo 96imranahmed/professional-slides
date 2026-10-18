@@ -114,18 +114,17 @@ export function contentRailInsets(props = {}) {
     : 18;
 }
 
-function estimatedLines(text, width) {
-  const charactersPerLine = Math.max(12, Math.floor(width / 7));
-  return String(text).split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0);
-}
-
 export function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY, marker = "circle", distribute = false, rolePrefix = "list" }) {
   const defaultGap = tokenValue(token("space.3"));
   const minimumGap = tokenValue(token("space.1"));
   const markerSize = numbered ? 24 : ["square", "circle"].includes(marker) ? 6 : 18;
   const textOffset = numbered ? 36 : ["square", "circle"].includes(marker) ? 18 : 36;
   const textWidth = Math.max(1, frame.width - textOffset);
-  let heights = items.map((item) => Math.max(28, estimatedLines(item, textWidth) * 20));
+  // Each item measured, and drawn in the lines it was measured to (a chevron's details keep them in the PPTX too,
+  // emit_pptx.py LABEL_ROLES): estimated from a character count and wrapped again by PowerPoint, a 30-character detail took
+  // two lines' room and was drawn on one, so a column of details was spaced unevenly.
+  const layouts = items.map((item) => measureText(String(item), textWidth, { fontSize: tokenValue(COMPACT), wrapWidthRatio: ENGINE_RESERVE }));
+  let heights = layouts.map((layout) => Math.max(28, layout.lines.length * 20));
   let gap = defaultGap;
   if (distribute) {
     const distributedHeight = (frame.height - defaultGap * Math.max(0, items.length - 1)) / Math.max(1, items.length);
@@ -155,7 +154,8 @@ export function simpleList({ id, frame, items, numbered = false, markerColor = P
     } else {
       nodes.push(shapePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, geometry: "rightArrow", frame: { x: frame.x + 2, y: y + 5, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
     }
-    nodes.push(textPrimitive({ id: stableId(id, "item", index), role: `${rolePrefix}-item`, frame: { x: frame.x + textOffset, y, width: textWidth, height }, text: item, style: textStyle(COMPACT, INK, false, "left", "top") }));
+    const layout = layouts[index];
+    nodes.push(textPrimitive({ id: stableId(id, "item", index), role: `${rolePrefix}-item`, frame: { x: frame.x + textOffset, y, width: textWidth, height }, text: layout.text, style: { ...textStyle(COMPACT, INK, false, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
     cursor += height + gap;
   });
   return nodes;

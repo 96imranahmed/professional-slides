@@ -90,6 +90,19 @@ console.log(JSON.stringify({
         self.assertLess(tracked["tracker"], tracked["title"])
         self.assertLess(tracked["rule"], tracked["body"])
 
+    def test_without_a_rule_the_body_starts_where_it_does_with_one(self):
+        # The tracker's step is taken once: the title moves down for it, and the body under a two-line title does not take it
+        # again. Counted twice, an unruled page's body started 12px lower than a ruled one's, and two of the BA deck's charts
+        # no longer fitted when its title bar was dropped.
+        result = run_node(CHROME + r"""
+const tracker={trackerId:'map',items:['A','B','C'].map(id=>({id,label:`Section ${id}`})),selectedId:'B',construction:'compact-label',mode:'light'};
+const ruled={palette:{base:'midnight',colors:{'style.titleRule':'rule','style.titleRuleLength':'full','style.titleRuleColor':'rule'}}}, plain={palette:'midnight'};
+const body=(deck,props)=>page(deck,props).out.contentFrame.y;
+console.log(JSON.stringify(['Short title','""" + LONG + r"""'].flatMap((title)=>[{title},{title,tracker}]).map((props)=>[body(plain,props),body(ruled,props)])));
+""")
+        for plain, ruled in result:
+            self.assertEqual(plain, ruled)
+
     def test_the_rule_is_set_by_tokens_a_palette_may_override(self):
         result = run_node(CHROME + r"""
 const custom=page({palette:{base:'midnight',colors:{'style.titleRule':'rule','style.titleRuleLength':'full','style.titleRuleColor':'ink','line.titleRule':2,'layout.titleRuleGap':16}}},{title:'Short title'});
