@@ -49,7 +49,7 @@ Each title states the finding, not the topic: the subject, what it did, and by h
 
 Match the verb to the evidence: a measured result *is*, a sensitivity *could reach*, an approved plan *will*. Where the evidence is thinner than the wording, narrow the claim - a segment, a period, a softer verb - and keep its direction; the limitation goes in a note (or the subtitle, where the deck uses them), not in place of the finding. Hedges (*may*, *potentially*, *various*, *considerations*) mark a finding not yet written: replace each with the measured fact.
 
-Structural pages keep their fixed heading: a contents page, a section divider, `Executive summary` or `Executive summary: <answer>`.
+Structural pages keep their fixed heading: a contents page, a section divider, `Executive summary` or `Executive summary: <answer>`. A section divider (`kind: "section"`) is titled with its section's claim and carries a paragraph under it, `summary`: two or three sentences on what the section finds and what follows, read beside the tracker of the deck's sections.
 
 ## The executive summary
 
