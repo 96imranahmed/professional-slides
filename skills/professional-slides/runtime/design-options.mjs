@@ -38,7 +38,7 @@ export function sampleDeck() {
     schema: "professional-slides.deck/v3", id: "design-options", contents: false, footer: "Northwind growth plan (sample)",
     cover: { title: "Northwind: growing the subscription base", subtitle: "Sample pages for choosing a design", date: "September 2026", logo: "Northwind" },
     slides: [
-      { id: "s1", kind: "section", title: "Market outlook", summary: "Demand reaches $1.65B by 2030, and enterprise buyers bring two-thirds of the growth to 2028. Winning them before 2027 sets the plan." },
+      { id: "s1", kind: "section", title: "Market outlook" },
       { id: "chart", title: "Demand reaches $1.65B by 2030 on a 13% CAGR, led by enterprise buyers",
         exhibit: { type: "chart.column", heading: "Addressable market", unit: "$M", categories: ["2024", "2025", "2026E", "2027E", "2028E", "2029E", "2030E"],
           series: [{ name: "Market", values: [820, 900, 990, 1090, 1220, 1400, 1650] }], forecastFrom: "2026E", cagr: { from: "2024", to: "2030E" } },
@@ -50,7 +50,7 @@ export function sampleDeck() {
         ],
         soWhat: "Win enterprise accounts before 2027, while the consumer segment is still price-bound.",
         source: "Illustrative figures", highlight: "enterprise seats" },
-      { id: "s2", kind: "section", title: "Operations", summary: "Three of five workstreams hold their dates. Billing and onboarding wait on one vendor decision, due this week." },
+      { id: "s2", kind: "section", title: "Operations" },
       { id: "table", title: "Two of five workstreams wait on a vendor decision; three hold their dates",
         exhibit: { type: "table", columns: ["Workstream", "Owner", "Status", "Complete", "Next step"],
           rows: [["Billing platform", "J. Smith", "At risk", "40%", "Vendor decision due this week"],

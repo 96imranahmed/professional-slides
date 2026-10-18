@@ -644,15 +644,15 @@ const deck = build([compilePage({{ id: 's1', kind: 'section', title: '01 / Deman
 const divider = deck.slides.find((s) => s.nodes.some((n) => n.role === 'divider-title'));
 const out = REGISTRY.get('takeaways').render({{ id: 't', frame: {{ x: 0, y: 0, width: 1280, height: 720 }}, props: {{ items: ['Short run: OpenAI is better placed for attention and distribution across its billion weekly users.', 'Capital: the larger raise and the higher mark belong to different firms.'] }} }}).nodes;
 const item = out.find((n) => n.role === 'takeaways-item');
-const bare = (() => {{ try {{ compilePage({{ id: 's3', kind: 'section', title: 'Costs' }}); return null; }} catch (e) {{ return e.message; }} }})();
-console.log(JSON.stringify({{ bare, compiled: compilePage({{ id: 's1', kind: 'section', title: '01 / Demand', summary: 'Audience and spend' }}).title,
-  title: divider.nodes.find((n) => n.role === 'divider-title').text, numeral: divider.nodes.find((n) => n.role === 'divider-number')?.style.fontFamily.tokenId ?? null,
+console.log(JSON.stringify({{ compiled: compilePage({{ id: 's1', kind: 'section', title: '01 / Demand' }}).title,
+  title: divider.nodes.find((n) => n.role === 'divider-title').text, paragraph: divider.nodes.filter((n) => n.role === 'divider-subtitle').length, numeral: divider.nodes.find((n) => n.role === 'divider-number')?.style.fontFamily.tokenId ?? null,
   runs: item.runs.map((r) => r.bold), bold: item.style.bold }}));
 """)
         self.assertEqual(result["compiled"], "Demand")
-        # A divider carries its paragraph beside the tracker: one written without it is refused, naming the key.
-        self.assertIn("s3: a section divider carries a paragraph under its title - `summary`", result["bare"])
         self.assertEqual(result["title"], "Demand and market position")
+        # A divider is its numeral and title beside the contents, with no paragraph; a section's summary is its detail on
+        # the contents page (the user, of the BA dividers: they should not carry a paragraph).
+        self.assertEqual(result["paragraph"], 0)
         self.assertIn(result["numeral"], (None, "font.body"))
         self.assertEqual(result["runs"], [True, False])
         self.assertFalse(result["bold"])

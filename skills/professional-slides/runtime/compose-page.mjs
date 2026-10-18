@@ -86,7 +86,7 @@ export const SLIDE_KEYS = Object.freeze({
   implication: "the gutter mark joining evidence to meaning: \"divider-chevron\", \"chevron\", \"rule\", or false when the words carry it",
   items: "the entries on an agenda or takeaways page",
   active: "which agenda entry the deck is on",
-  summary: "the line under a section divider's title",
+  summary: "a section's detail on the contents page (the divider itself carries no paragraph)",
   role: "semantic page role, including executive-summary",
   evidenceStatus: "evidence qualifier in the shared subtitle band",
   number: "a section divider's number",
@@ -162,8 +162,9 @@ const KINDS = {
     items: slide.points || slide.items,
     ...(fixedTone(slide, id, ["dark", "light"]) === "light" ? { mode: "light", ground: "light" } : {}) }),
   // A divider's ground is the design system's (a navy panel, a field of the primary, the page) on the deck's own ground.
+  // A divider is its numeral and title beside the deck's contents: it carries no paragraph. A section's `summary` is the
+  // detail the contents page prints under its name.
   section: (slide, { id }) => ({ kind: "divider", title: slide.title, ...(fixedTone(slide, id, []) ?? {}),
-    ...(slide.summary ? { subtitle: slide.summary } : {}),
     ...(Array.isArray(slide.contents) ? { contents: slide.contents, contentsActive: slide.contentsActive } : {}),
     ...(slide.number !== undefined ? { number: slide.number } : {}) }),
   agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column", ...(fixedTone(slide, id, ["dark", "light"]) ? { ground: slide.tone } : {}),

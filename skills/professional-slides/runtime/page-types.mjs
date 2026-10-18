@@ -813,9 +813,6 @@ export function compilePage(pageIn, index = 0, { players = null, spineOnly = fal
     // A structural page written without an id is given one from its kind and its place, here, once: every later stage
     // - the composition, the build - then names it the same way, where each would otherwise number it by its own count.
     const named = { ...page, id: page.id ?? `${page.kind}-${index + 1}` };
-    // A divider carries a paragraph under its title, beside the tracker: what the section finds and what follows.
-    if ((page.kind === "section" || page.kind === "divider") && !(typeof page.summary === "string" && page.summary.trim()))
-      throw new Error(`${named.id}: a section divider carries a paragraph under its title - \`summary\`: two or three sentences saying what the section finds and what follows from it`);
     if (page.kind === "section" && typeof page.title === "string" && /^\s*\d{1,2}\s*[/|.:)\-–—]/.test(page.title)) return { ...named, title: page.title.replace(/^\s*(?:section\s+)?\d{1,2}\s*(?:[/|.:)\-–—]\s*)+/i, "").trim() || page.title };
     if (page.kind && ["section", "divider", "agenda", "cover"].includes(page.kind)) return named;
     throw new Error(`${id}: give the page a \`type\` - one of ${Object.keys(PAGE_TYPES).join(", ")} - or a structural \`kind\` (section, agenda). Run \`node runtime/author-deck.mjs --types\` for what each is for.`);

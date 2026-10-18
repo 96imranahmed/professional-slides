@@ -202,8 +202,8 @@ const example = JSON.parse(fs.readFileSync(dir + '/page-types.pages.json', 'utf8
 const chart = example.pages.find((p) => p.type === 'trend' && p.form === 'line');
 // A variation seed whose draw sets the contents page in columns.
 const columnsSeed = Array.from({ length: 200 }, (_, i) => `seed-${i}`).find((seed) => variationChoices(seed).agendaStyle === 'columns');
-async function deck(sections, deckKeys = {}, summary = 'What the part finds.') {
-  const pages = Array.from({ length: sections }, (_, i) => [{ kind: 'section', id: `s${i}`, title: `Part ${i + 1}`, summary }, { ...chart, id: `p${i}` }]).flat();
+async function deck(sections, deckKeys = {}, summary = null) {
+  const pages = Array.from({ length: sections }, (_, i) => [{ kind: 'section', id: `s${i}`, title: `Part ${i + 1}`, ...(summary ? { summary } : {}) }, { ...chart, id: `p${i}` }]).flat();
   const { spec } = compileDeck({ deck: { ...example.deck, workflow: undefined, rulesVersion: undefined, ...deckKeys }, pages });
   const composed = await composeForAuthoring(spec, dir);
   const agenda = composed.deck?.slides.find((s) => s.id === 'agenda-1');
