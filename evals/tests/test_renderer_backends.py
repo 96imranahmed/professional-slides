@@ -116,11 +116,26 @@ class PowerPointCommandTests(unittest.TestCase):
 
 
 class PowerPointLockTests(unittest.TestCase):
-    def test_concurrent_export_fails_promptly_and_the_lock_is_released(self):
+    def test_concurrent_exports_wait_their_turn_and_the_lock_is_released(self):
+        # The design-option sheets render four samples side by side: a second export queues for PowerPoint rather
+        # than failing, and gives up only past its wait.
+        import threading
+        import time
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(backends.tempfile, "gettempdir", return_value=tmp):
+            order = []
+            def peer():
+                with backends.powerpoint_lock():
+                    order.append("peer")
             with backends.powerpoint_lock():
-                with self.assertRaisesRegex(RuntimeError, "busy with another renderer"):
-                    with backends.powerpoint_lock():
+                thread = threading.Thread(target=peer)
+                thread.start()
+                time.sleep(0.5)
+                order.append("first done")
+            thread.join(5)
+            self.assertEqual(order, ["first done", "peer"])
+            with backends.powerpoint_lock():
+                with self.assertRaisesRegex(RuntimeError, "busy with another renderer for 0.3s"):
+                    with backends.powerpoint_lock(wait=0.3):
                         self.fail("a peer exporter acquired the same lock")
             with backends.powerpoint_lock():
                 pass

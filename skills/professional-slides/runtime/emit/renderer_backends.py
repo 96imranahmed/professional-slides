@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
 
@@ -146,12 +147,17 @@ try {
 '''
 
 
-@contextlib.contextmanager
-def powerpoint_lock():
-    """Office is a shared desktop app: only one of our exports may use it.
+# How long an export waits for PowerPoint while another of ours has it. The design-option sheets render four samples
+# side by side; the exports queue for the app rather than failing (or, in auto, falling back to LibreOffice).
+LOCK_WAIT = 600
 
-    A busy app fails this attempt promptly, permitting automatic LibreOffice
-    fallback. OS file locks release even when an exporter process crashes.
+
+@contextlib.contextmanager
+def powerpoint_lock(wait: float = LOCK_WAIT):
+    """Office is a shared desktop app: one of our exports uses it at a time.
+
+    The others wait their turn, up to `wait` seconds, then fail (auto then falls
+    back to LibreOffice). OS file locks release even when an exporter process crashes.
     """
     user = hashlib.sha256(os.fsencode(str(Path.home()))).hexdigest()[:16]
     file = Path(tempfile.gettempdir()) / f"professional-slides-powerpoint-{user}.lock"
@@ -167,10 +173,15 @@ def powerpoint_lock():
             import fcntl
             acquire = lambda: fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             release = lambda: fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        try:
-            acquire()
-        except OSError as error:
-            raise RuntimeError("PowerPoint is busy with another renderer; retry or select libreoffice") from error
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                acquire()
+                break
+            except OSError as error:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f"PowerPoint was busy with another renderer for {wait:g}s; retry or select libreoffice") from error
+                time.sleep(0.2)
         try:
             yield
         finally:
