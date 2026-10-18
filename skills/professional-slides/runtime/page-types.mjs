@@ -104,7 +104,7 @@ export const PAGE_TYPES = Object.freeze({
     commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   panels: {
-    task: "one question answered for two to four cuts, measures or members side by side - or up to twelve as small multiples",
+    task: "one question answered for two to four cuts, measures or members side by side - or up to twelve as small multiples, where the series are too many to share one axis (series compared over the same periods are lines on one chart, trend/line)",
     // `sequence`: two or three exhibits read left to right with an arrow
     // between each - cause and effect, before and after, input to result.
     // `small-multiples`: five to twelve cuts as one trellis of small charts of

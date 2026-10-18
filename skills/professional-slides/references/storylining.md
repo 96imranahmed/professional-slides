@@ -66,7 +66,7 @@ A summary carries the answer and the case for it, in four to six developed state
 
 ## Approve the storyline
 
-Show the user the titles in order, each with its page type and the data behind it, and ask for approval in one message. The user can reorder, cut, merge or add pages there, where it is cheap. Once approved, write each page once; change a title afterwards only when the evidence changes.
+Show the user the titles in order, each with its page type and the data behind it, and ask for approval in one message. A chart page lists its candidate charts, best first, and the one taken ([Drawing](drawing.md#pick-the-obvious-chart)); where the deck needs variety, take a page's next candidate, not a chart that draws its claim less directly. The user can reorder, cut, merge or add pages there, where it is cheap. Once approved, write each page once; change a title afterwards only when the evidence changes.
 
 ## Revising a deck
 
