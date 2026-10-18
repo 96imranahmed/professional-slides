@@ -732,7 +732,7 @@ function bindExhibit(ex, what, context) {
   const raw = indexed && series.every((s) => s.measures.every((m) => m.base === undefined));
   const written = raw ? undefined : units[0];
   if (typeof ex.unit === "string" && ex.unit.trim() && !perSeries && (written === undefined || normalUnit(ex.unit) !== normalUnit(written)))
-    return void fail(`${what} types its unit as "${ex.unit}", and ${refs.join(", ")} ${refs.length === 1 ? "is" : "are"} recorded in ${units.join(", ")}${raw ? ` and drawn as an index` : ""}: leave \`unit\` out of a bound exhibit and the runtime writes it`, refs);
+    return void fail(`${what} types its unit as "${ex.unit}", and ${refs.join(", ")} ${refs.length === 1 ? "is" : "are"} recorded in ${units.join(", ")}${raw ? ` and drawn as an index` : ""}: leave \`unit\` out of a bound exhibit and the runtime writes it${raw ? "" : ` - to word it differently ("of 100" for "points"), change the measure's \`unit\` in the insight log`}`, refs);
   const values = series.map((s) => labels.map((label) => (s.kind === "scalar" ? s.scalar : s.at.get(label)?.value ?? null)));
   // The run of periods that rest on an assumption is said on the chart: bracketed above the plot, beside the recorded run.
   const assumed = labels.map((label) => axed.some((s) => s.at.get(label)?.assumed));

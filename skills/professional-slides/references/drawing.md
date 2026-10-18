@@ -86,6 +86,8 @@ A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines
 
 The frame sets hard limits - a chart's three callouts, a rail's eight lines, a pie's five parts, a labelled-rows page's five rows - and `--types` and `--limits <type>/<form>` print them. A page that does not fit is refused with what to change; a table past the rows a page holds continues on the next page with its header repeated (`PAGE_SPLITS`, advised). Text that overlaps, a heading that wraps where it should fit, type too small for its role or set where it cannot be read is refused at the build with the page and the element.
 
+A band of the page left empty is advised (`SCENE_VOID`). On cards, tiles and small multiples the first lever is the count a row, `exhibit.columns`: fewer a row stand taller and take the height, more a row take the width. Elsewhere, give the exhibit the height or move the commentary beside it.
+
 **Components without a page form.** Seven components are strips or bands that cannot fill a page; each reaches one as an exhibit of a `panels` page: `journey` (stages and their touchpoints) and `highlight-strip` (numbered findings) across a short row of a dashboard; `icon-trends`, `speech` and `status-list` beside the exhibit they explain; `logo-collage` naming a set's members in a dashboard cell; and `worksheet`, blank by design, beside its worked example in a `panels` row.
 
 ## Pictures and maps

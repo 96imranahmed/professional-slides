@@ -362,7 +362,7 @@ function defineChevronProcess() {
     role: "process",
     tokens: [
       "color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.onPrimary", "font.body", "type.heading",
-      "type.compact", "type.label", "line.hairline", "radius.none", "radius.round", "space.1", "space.3", "space.4"
+      "type.body", "type.compact", "type.label", "line.hairline", "radius.none", "radius.round", "space.1", "space.3", "space.4"
     ],
     preferredSize: { width: 1160, height: 360 },
     sample: {
@@ -377,13 +377,30 @@ function defineChevronProcess() {
       const span = frame.width / items.length;
       const headingHeight = items.some(item => item.heading?.trim()) ? 42 : 0;
       const nodes = [];
+      // A chevron's notch and point each take half its height (emit_pptx.py), so the label starts past the notch. One line,
+      // set across the middle, runs on into the point to 18px short of its tip; lines above and below it stop where the
+      // point starts to narrow. Before, every label kept 36px off both ends, and five steps beside commentary could not
+      // hold "Recommend".
+      const bandWidth = (index) => span + (index < items.length - 1 ? tokenValue(token("space.4")) : 0);
+      const fit = (label, index, size) => {
+        const measure = (width) => measureText(label, width, { fontSize: tokenValue(size), bold: true, wrapWidthRatio: ENGINE_RESERVE });
+        try { const line = measure(bandWidth(index) - 54); if (line.lines.length === 1) return { layout: line, width: bandWidth(index) - 54 }; } catch { /* one line cannot hold it */ }
+        try { const lines = measure(bandWidth(index) - 72); return lines.height <= 64 ? { layout: lines, width: bandWidth(index) - 72 } : null; } catch { return null; }
+      };
+      // Every step's label at one size: the heading size, or a step down where a label does not fit its chevron at it.
+      const labelsAt = (size) => { const fitted = items.map((item, index) => fit(item.label, index, size)); return fitted.every(Boolean) ? fitted : null; };
+      const labelSize = labelsAt(token("type.heading")) ? token("type.heading") : token("type.body");
+      const labels = labelsAt(labelSize);
+      if (!labels) {
+        const at = items.findIndex((item, index) => !fit(item.label, index, labelSize));
+        throw new Error(`The step "${items[at].label}" does not fit its chevron: ${items.length} steps across ${Math.floor(frame.width)}px leave a label ${Math.floor(bandWidth(at) - 54)}px on one line. Give the process the page's width (\`commentary: "below"\` or \`"none"\`), use fewer steps, or a shorter step name`);
+      }
       items.forEach((item, index) => {
         const x = frame.x + index * span;
         if (item.heading?.trim()) nodes.push(textPrimitive({ id: stableId(id, "heading", index), role: "process-heading", frame: { x: x + 8, y: frame.y, width: span - 16, height: 34 }, text: item.heading, style: textStyle(token("type.heading"), INK, true, "left") }));
         nodes.push(shapePrimitive({ id: stableId(id, "band", index), role: "process-band", geometry: "chevron", frame: { x, y: frame.y + headingHeight, width: span + (index < items.length - 1 ? tokenValue(token("space.4")) : 0), height: 70 }, style: boxStyle(index === 0 && props.emphasizeFirst ? PRIMARY : INK, SURFACE, HAIRLINE, token("radius.none")) }));
-        const label = measureText(item.label, span - 72, { fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: ENGINE_RESERVE });
-        if (label.height > 64) throw new Error("Process label exceeds its band; enlarge the component or shorten the copy");
-        nodes.push(textPrimitive({ id: stableId(id, "label", index), role: "process-label", frame: { x: x + 36, y: frame.y + headingHeight + 35 - label.height / 2, width: span - 72, height: label.height }, text: label.text, style: { ...textStyle(token("type.heading"), WHITE, true, "center", "top"), lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
+        const { layout: label, width: labelWidth } = labels[index];
+        nodes.push(textPrimitive({ id: stableId(id, "label", index), role: "process-label", frame: { x: x + 36, y: frame.y + headingHeight + 35 - label.height / 2, width: labelWidth, height: label.height }, text: label.text, style: { ...textStyle(labelSize, WHITE, true, "center", "top"), lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
         const details = item.details || [];
         nodes.push(...simpleList({ id: stableId(id, "details", index), frame: { x: x + 10, y: frame.y + headingHeight + 90, width: span - 26, height: frame.height - headingHeight - 94 }, items: details, numbered: props.detailStyle === "circled-number", marker: "circle", rolePrefix: "process-detail" }));
       });

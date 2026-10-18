@@ -937,18 +937,28 @@ function legendText(scale, absent = false) {
 // figure to the highest in the figures' own units - "10.4%" to "25.6%" - with
 // no line of text: swatches numbered one to five under "1 = 10.4; 5 = 25.6"
 // read as a second scale the table does not have.
-function layoutRamp(id, scale, width, size, gap) {
-  const low = measure(scale.ramp.low, width, true, size), high = measure(scale.ramp.high, width, true, size);
-  // The shades take what the two figures leave, up to a column's width each
-  // and down to an icon's, as the numbered key's swatches did.
-  const count = scale.max - scale.min + 1, slot = Math.min(v("space.6"), (width - low.width - high.width - 4 * gap) / count);
-  if (slot < v("icon.medium"))
-    throw new Error(`The heat key (${scale.ramp.low} to ${scale.ramp.high}) does not fit under its table; widen the table or set \`legend: false\` - every cell prints its figure`);
-  return { id, scale, ramp: { low, high, slot, count }, entries: [], height: Math.max(v("icon.medium"), low.height, high.height) + gap };
+// Under a table of two ramps or more, each opens with the columns it keys - "Research, Memo (of 15)" - or the reader
+// cannot tell which shades which: a heatmap with a domain a column drew a bare "0 to 15" and "0 to 25" one under the other.
+function rampName(scale) {
+  const columns = scale.ramp.columns ?? [scale.label];
+  const tails = new Set(columns.map((label) => String(label).match(/\s*\([^()]*\)\s*$/)?.[0].trim() ?? ""));
+  const tail = tails.size === 1 ? [...tails][0] : "";
+  return `${columns.map((label) => (tail ? String(label).slice(0, String(label).lastIndexOf(tail)).trim() : label)).join(", ")}${tail ? ` ${tail}` : ""}`;
 }
 
-function layoutLegend(id, scale, width, size, gap, absent = false) {
-  if (scale.type === "heatmap" && scale.ramp && !absent) return layoutRamp(id, scale, width, size, gap);
+function layoutRamp(id, scale, width, size, gap, named = false) {
+  const name = named ? measure(`${rampName(scale)}:`, Math.max(1, width / 2), false, size) : null;
+  const low = measure(scale.ramp.low, width, true, size), high = measure(scale.ramp.high, width, true, size);
+  // The shades take what the name and two figures leave, up to a column's width
+  // each and down to an icon's, as the numbered key's swatches did.
+  const count = scale.max - scale.min + 1, slot = Math.min(v("space.6"), (width - (name ? name.width + gap : 0) - low.width - high.width - 4 * gap) / count);
+  if (slot < v("icon.medium"))
+    throw new Error(`The heat key (${scale.ramp.low} to ${scale.ramp.high}) does not fit under its table; widen the table or set \`legend: false\` - every cell prints its figure`);
+  return { id, scale, ramp: { name, low, high, slot, count }, entries: [], height: Math.max(v("icon.medium"), name?.height ?? 0, low.height, high.height) + gap };
+}
+
+function layoutLegend(id, scale, width, size, gap, absent = false, named = false) {
+  if (scale.type === "heatmap" && scale.ramp && !absent) return layoutRamp(id, scale, width, size, gap, named);
   const text = legendText(scale, absent),
     layout = measure(text, width, false, size);
   const entries = [];
@@ -1400,9 +1410,9 @@ function measureLegends({ frame, model, used, gap, textSize }) {
       throw new Error("Only single-series bar legends may be omitted, with their unit visible in every using column header or its unit line, a binary scale whose every column header asks a question, or a heat scale whose every cell prints its figure");
   }
   const absent = new Set(model.cells.flat().filter((cell) => cell && ["missing", "na"].includes(cell.value)).map((cell) => cell.scale));
-  const legends = [...used.entries()].filter(([, scale]) => scale.legend !== false).map(([id, scale]) =>
-    layoutLegend(id, scale, frame.width, textSize, gap, absent.has(id)),
-  );
+  const kept = [...used.entries()].filter(([, scale]) => scale.legend !== false);
+  const ramps = kept.filter(([id, scale]) => scale.type === "heatmap" && scale.ramp && !absent.has(id)).length;
+  const legends = kept.map(([id, scale]) => layoutLegend(id, scale, frame.width, textSize, gap, absent.has(id), ramps > 1));
   return legends;
 }
 
@@ -2501,9 +2511,11 @@ function drawTableLegends(table) {
       const legendTop = y;
       if (ramp) {
         // Lowest figure, the shades in order, highest figure: one row.
-        const row = Math.max(v("icon.medium"), ramp.low.height, ramp.high.height);
-        putText(stableId(id, "legend-low", scaleId), "table-legend", { x: frame.x, y: y + (row - ramp.low.height) / 2, width: ramp.low.width + 1 }, ramp.low, textStyle(true, ink, "left", m.textSize));
-        const x0 = frame.x + ramp.low.width + 1 + m.gap;
+        const row = Math.max(v("icon.medium"), ramp.name?.height ?? 0, ramp.low.height, ramp.high.height);
+        const start = ramp.name ? frame.x + ramp.name.width + 1 + m.gap : frame.x;
+        if (ramp.name) putText(stableId(id, "legend-name", scaleId), "table-legend", { x: frame.x, y: y + (row - ramp.name.height) / 2, width: ramp.name.width + 1 }, ramp.name, textStyle(false, ink, "left", m.textSize));
+        putText(stableId(id, "legend-low", scaleId), "table-legend", { x: start, y: y + (row - ramp.low.height) / 2, width: ramp.low.width + 1 }, ramp.low, textStyle(true, ink, "left", m.textSize));
+        const x0 = start + ramp.low.width + 1 + m.gap;
         for (let value = scale.min; value <= scale.max; value++) {
           nodes.push(rectPrimitive({ id: stableId(id, "legend-swatch", scaleId, value), role: "table-legend-swatch",
             frame: { x: x0 + (value - scale.min) * ramp.slot, y: y + (row - v("icon.medium")) / 2, width: ramp.slot, height: v("icon.medium") },

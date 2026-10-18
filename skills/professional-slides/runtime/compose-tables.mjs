@@ -752,6 +752,7 @@ function heatColumns(ex, indexes) {
     if (sharedKey && declaredScales.has(sharedKey)) {
       const { id, labels } = declaredScales.get(sharedKey);
       labels.push(label);
+      scales[id].ramp.columns = [...labels];
       // Named by what the columns' labels share after their last comma ("% satisfied"), else by the unit.
       const tails = new Set(labels.map((text) => (text.includes(",") ? text.split(/,\s*/).pop().trim() : "")));
       const tail = tails.size === 1 ? [...tails][0] : "";
@@ -760,7 +761,7 @@ function heatColumns(ex, indexes) {
       continue;
     }
     const id = `${barScaleId(label).replace(/-bar$/, "")}-${i + 1}-heat`;
-    scales[id] = { type: "heatmap", label: unit && !label.includes(unit) ? `${label} (${unit})` : label, min: 1, max: HEAT_STEPS, anchors: { 1: ends[0], [HEAT_STEPS]: ends[1] }, ramp: { low: inUnits(ends[0]), high: inUnits(ends[1]) },
+    scales[id] = { type: "heatmap", label: unit && !label.includes(unit) ? `${label} (${unit})` : label, min: 1, max: HEAT_STEPS, anchors: { 1: ends[0], [HEAT_STEPS]: ends[1] }, ramp: { low: inUnits(ends[0]), high: inUnits(ends[1]), columns: [label] },
       ...(ex.legend === false ? { legend: false } : {}), palette: "theme-sequential" };
     if (sharedKey) declaredScales.set(sharedKey, { id, labels: [label] });
     modes.set(i, { id, lo, hi, down });
@@ -880,8 +881,8 @@ export function validateCategoryLabels(ex) {
 
 function numberedRowLabel(value) {
   const text = String(value?.text ?? value ?? "");
-  // Clock times and decimal identifiers are data, not ordinal row prefixes.
-  if (/^\s*\d+[:.]\d/.test(text)) return null;
+  // Clock times, decimal identifiers and ranges ("1-2: Research", weeks one to two) are data, not ordinal row prefixes.
+  if (/^\s*\d+[:.]\d/.test(text) || /^\s*\d+\s*[-–]\s*\d/.test(text)) return null;
   return text.match(/^\s*(\d+)\s*[·.)\-–:]\s*(.*\S)\s*$/);
 }
 

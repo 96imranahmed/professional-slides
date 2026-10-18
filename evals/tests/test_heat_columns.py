@@ -59,7 +59,8 @@ console.log(JSON.stringify({ own: steps(own), declared: steps(declared), scores:
         # Across a declared domain of 0 to 4 the same figures sit higher: the shade means the same in every table.
         self.assertEqual(result["declared"], [3, 4, "n/a", 5, 4])
         self.assertEqual(result["scores"], [1, 3, 5, 2])
-        self.assertEqual(result["ramp"], [{"low": "2.0%", "high": "4.0%"}, {"low": "0%", "high": "4%"}])
+        # Each ramp knows the columns it keys, to name them where a table draws more than one.
+        self.assertEqual(result["ramp"], [{"low": "2.0%", "high": "4.0%", "columns": ["Margin"]}, {"low": "0%", "high": "4%", "columns": ["Margin"]}])
         self.assertEqual(result["figures"], ["2.0", "3.0", None, "4.0", "2.5"])
         self.assertEqual(result["scoreScale"]["1"], "Lowest")
 

@@ -314,7 +314,9 @@ async function main(argv) {
       typeface: site.typography ? `A face the deck sets is measured from its installed files: python3 runtime/font-table.py --family "${site.typography.body}" (installing the face, where it is not installed, is the user's to do; the deck is otherwise set in Arial)` : null });
   }
   const prefs = readPreferences(file);
-  if (command === "show") return print({ file, ...where, ...prefs, missing: missingQuestions(prefs), unset: unsetAnswers(prefs), deckKeys: deckKeys(prefs), reuse: reuseLine(prefs, file) });
+  // A stored density is kept, and shown as not applied: the storyline sets a deck's density from its reader.
+  const notApplied = prefs.answers?.density ? { notApplied: { density: `stored as "${prefs.answers.density.value}" and not applied: a deck's density is set at the storyline from how its reader reads it` } } : {};
+  if (command === "show") return print({ file, ...where, ...prefs, ...notApplied, missing: missingQuestions(prefs), unset: unsetAnswers(prefs), deckKeys: deckKeys(prefs), reuse: reuseLine(prefs, file) });
   // JSON even for a bare string, so a script can parse any answer the same way.
   if (command === "get") return console.log(JSON.stringify(rest[0] ? prefs.answers[rest[0]]?.value ?? null : answerValues(prefs)));
   if (command === "deck-keys") return print(deckKeys(prefs));

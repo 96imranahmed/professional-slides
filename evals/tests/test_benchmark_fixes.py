@@ -219,5 +219,92 @@ console.log(JSON.stringify({{ photos: (cover(photos)?.marks ?? []).length, logos
         self.assertEqual(result, {"photos": 0, "logos": 2})
 
 
+class SpacebarRunSnagTests(unittest.TestCase):
+    """The snags a from-scratch Spacebar run on 6e7056b met, each fixed where it starts."""
+
+    COMPOSE = """
+import fs from 'node:fs';
+import { compileDeck, composeForAuthoring } from './skills/professional-slides/runtime/author-deck.mjs';
+const dir = './skills/professional-slides/examples';
+const example = JSON.parse(fs.readFileSync(dir + '/page-forms.pages.json', 'utf8'));
+const table = example.pages.find((p) => p.id === 'f-lookup-table');
+const compose = async (exhibit) => {
+  const { spec } = compileDeck({ deck: { ...example.deck, workflow: undefined, rulesVersion: undefined }, pages: [{ ...table, id: 't1', highlight: undefined, exhibit }] });
+  const composed = await composeForAuthoring(spec, dir);
+  if (composed.error || composed.pageErrors?.length) throw new Error(composed.error ?? composed.pageErrors.join('; '));
+  return composed.deck.slides.find((s) => s.id === 't1').nodes;
+};
+"""
+
+    def test_a_list_item_is_drawn_in_the_lines_it_was_measured_to(self):
+        # Estimated from a character count and wrapped again by the renderer, a 30-character detail took two lines' room
+        # and was drawn on one.
+        result = run_node(PRELUDE + """
+const items = ['Scope', 'Research', 'Build', 'Review'].map((label) => ({ heading: label, label, details: ['Draft memo from research notes', 'Check figures'] }));
+const nodes = draw('chevron-process', { items }, 'midnight', { x: 60, y: 160, width: 1160, height: 420 }).nodes.filter((n) => n.role === 'process-detail-item');
+console.log(JSON.stringify(nodes.map((n) => ({ wrap: n.style.wrap, drawn: n.text === n.data.textLayout.text, room: n.frame.height === Math.max(28, n.data.textLayout.lines.length * 20) }))));
+""")
+        self.assertTrue(result)
+        for item in result:
+            self.assertEqual(item, {"wrap": False, "drawn": True, "room": True})
+
+    def test_a_chevron_label_runs_into_its_point_and_steps_down_before_it_is_refused(self):
+        result = run_node(PRELUDE + """
+const steps = (labels) => labels.map((label, i) => ({ heading: `Phase ${i + 1}`, label, details: ['One detail'] }));
+const sizes = (width, labels) => draw('chevron-process', { items: steps(labels) }, 'midnight', { x: 60, y: 160, width, height: 420 }).nodes.filter((n) => n.role === 'process-label').map((n) => n.style.fontSize.tokenId);
+const five = ['Scope', 'Research', 'Build', 'Recommend', 'Review'];
+console.log(JSON.stringify({ beside: sizes(760, five), narrower: sizes(700, five),
+  refused: refusal(() => sizes(600, [...five, 'Procurement'])) }));
+""")
+        self.assertEqual(set(result["beside"]), {"type.heading"})   # "Recommend" fits five steps beside commentary
+        self.assertEqual(set(result["narrower"]), {"type.body"})    # one size down for every step, not just one
+        self.assertIn('does not fit its chevron', result["refused"])
+        self.assertIn('`commentary: "below"`', result["refused"])  # a key the page can set, not "widen its box"
+
+    def test_a_leading_range_is_a_label_not_a_numbered_disc_and_two_heat_ramps_name_their_columns(self):
+        result = run_node(self.COMPOSE + """
+const ranged = await compose({ columns: ['Weeks', 'What happened', 'Result'], rows: [['1-2: Research', 'Read the brief', 'A memo'], ['3-4: Build', 'Built the model', 'A workbook'], ['5-6: Review', 'Checked every total', 'Sign-off']] });
+const heat = await compose({ columns: ['Model', { label: 'Research (of 15)', heat: true, domain: [0, 15] }, { label: 'Memo (of 15)', heat: true, domain: [0, 15] }, { label: 'Spreadsheet (of 25)', heat: true, domain: [0, 25] }],
+  rows: [['Sol', 13, 14, 23], ['Opus', 9, 10, 22], ['Grok', 10, 8, 17]] });
+const one = await compose({ columns: ['Model', { label: 'Research (of 15)', heat: true, domain: [0, 15] }, { label: 'Memo (of 15)', heat: true, domain: [0, 15] }], rows: [['Sol', 13, 14], ['Opus', 9, 10], ['Grok', 10, 8]] });
+const texts = (nodes) => nodes.filter((n) => n.type === 'text').map((n) => n.text);
+console.log(JSON.stringify({ discs: ranged.filter((n) => n.data?.sectionNumber !== undefined).length, labels: texts(ranged).filter((t) => /^\\d-\\d: /.test(t)),
+  names: heat.filter((n) => n.id.includes('legend-name')).map((n) => n.text), single: one.filter((n) => n.id.includes('legend-name')).length }));
+""")
+        self.assertEqual(result["discs"], 0)
+        self.assertEqual(result["labels"], ["1-2: Research", "3-4: Build", "5-6: Review"])
+        self.assertEqual(result["names"], ["Research, Memo (of 15):", "Spreadsheet (of 25):"])
+        self.assertEqual(result["single"], 0)  # one ramp is the table's only shading: it needs no name
+
+    def test_an_empty_band_on_cards_names_their_count_a_row_first(self):
+        tmp = Path(tempfile.mkdtemp(prefix="cards-void-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        examples = ROOT / "skills" / "professional-slides" / "examples"
+        shutil.copytree(examples / "assets", tmp / "assets")
+        doc = json.loads((examples / "page-types.pages.json").read_text())
+        page = next(p for p in doc["pages"] if p["id"] == "p17")
+        page.update(commentary="none", exhibit={"tone": "outline", "columns": 3, "items": [
+            {"icon": "clock", "title": "Off-peak timetable", "text": "Half-hourly service from December 2027."},
+            {"icon": "bolt", "title": "Electrification", "text": "Electric trains from 2030."},
+            {"icon": "money", "title": "Fare reform", "text": "Simpler fares from 2028."}]})
+        page.pop("bar", None)
+        doc["pages"] = [page]
+        doc.pop("appendix", None)
+        (tmp / "v.pages.json").write_text(json.dumps(doc))
+        run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "v.pages.json"), "--check"], capture_output=True, text=True)
+        self.assertIn("SCENE_VOID [p17]: On a parallel/cards page the band is closed first by `exhibit.columns` (cards a row; it is 3)", run.stdout + run.stderr)
+
+    def test_a_stored_density_is_shown_as_not_applied_and_example_notes_follow_the_page(self):
+        tmp = Path(tempfile.mkdtemp(prefix="prefs-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        env = {**__import__("os").environ, "HOME": str(tmp), "XDG_CONFIG_HOME": str(tmp / "config")}
+        subprocess.run([NODE, str(RUNTIME / "preferences.mjs"), "set", "density=executive"], capture_output=True, text=True, env=env, cwd=tmp, check=True)
+        shown = json.loads(subprocess.run([NODE, str(RUNTIME / "preferences.mjs"), "show"], capture_output=True, text=True, env=env, cwd=tmp, check=True).stdout)
+        self.assertIn("not applied", shown["notApplied"]["density"])
+        merged = subprocess.run(f'"{NODE}" "{RUNTIME / "author-deck.mjs"}" --example ranking/bar 2>&1', shell=True, capture_output=True, text=True).stdout
+        self.assertTrue(merged.lstrip().startswith("{"))
+        self.assertLess(merged.index('"id"'), merged.index("Other worked pages"))
+
+
 if __name__ == "__main__":
     unittest.main()
