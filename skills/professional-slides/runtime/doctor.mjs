@@ -119,12 +119,6 @@ export function rendererProbe(env = process.env, platform = process.platform, py
     error: run.error?.message || run.stderr?.trim() || "Renderer probe returned no report" };
 }
 
-/** Installed capability, not proof of activation, Automation permission, or a successful export. */
-export const rendererInstalled = (env = process.env, platform = process.platform) => {
-  const renderer = rendererProbe(env, platform);
-  return Boolean(renderer.selected) && !renderer.error && Object.keys(renderer.missing).length === 0;
-};
-
 // font-metrics.mjs's lookup: RUNTIME_NODE_MODULES first, else this checkout.
 async function canvasCheck(env) {
   try {

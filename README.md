@@ -4,7 +4,7 @@ An AI skill for planning, creating, and revising editable PowerPoint decks. Star
 
 Built for board papers, project updates, pitches, due diligence, and strategy decks. Runs in Codex or Claude Code with a local authoring runtime.
 
-[Explore the gallery](https://shiphappens.xyz/slides) · [Download a sample deck](https://shiphappens.xyz/professional-slides/decks/british-airways-europe.pptx) · [Read the skill](skills/professional-slides/SKILL.md#pipeline)
+[Explore the gallery](https://shiphappens.xyz/slides) · [Download a sample deck](https://shiphappens.xyz/professional-slides/decks/british-airways-europe.pptx) · [Read the skill](skills/professional-slides/SKILL.md)
 
 ![An annotated trend chart produced by Professional Slides](assets/sample-trend.png)
 

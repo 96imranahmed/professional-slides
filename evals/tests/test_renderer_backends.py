@@ -199,3 +199,22 @@ console.log(JSON.stringify(rendererProbe({ ...process.env, PROFESSIONAL_SLIDES_R
 ''')
         result = subprocess.run([os.environ.get("RUNTIME_PYTHON") or sys.executable, str(RUNTIME / "emit/renderer_backends.py"), "--renderer", "libreoffice"], capture_output=True, text=True, check=True)
         self.assertEqual(report, json.loads(result.stdout))
+
+
+class RenderCacheRendererTests(unittest.TestCase):
+    """The per-slide render cache (render-cache.json) names the renderer that drew it: a rebuild splices held pages only
+    from the same renderer, so a deck is never half PowerPoint's and half LibreOffice's."""
+
+    def test_a_cache_is_held_only_for_the_renderer_that_drew_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "deck.pdf").write_bytes(b"%PDF-1.4")
+            (out / "slide-1.png").write_bytes(b"png")
+            cache = {"schema": render_pptx.RENDER_CACHE_SCHEMA, "dpi": 96, "pdf": "deck.pdf", "keys": ["k1"]}
+            (out / render_pptx.RENDER_CACHE).write_text(json.dumps({**cache, "renderer": "powerpoint"}))
+            self.assertEqual(list(render_pptx.held_renders(out, 96, "powerpoint")), ["k1"])
+            self.assertEqual(render_pptx.held_renders(out, 96, "libreoffice"), {})
+            # A cache written before the renderer was named was LibreOffice's.
+            (out / render_pptx.RENDER_CACHE).write_text(json.dumps(cache))
+            self.assertEqual(list(render_pptx.held_renders(out, 96, "libreoffice")), ["k1"])
+            self.assertEqual(render_pptx.held_renders(out, 96, "powerpoint"), {})
