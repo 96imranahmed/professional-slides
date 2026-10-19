@@ -14,7 +14,7 @@
 //   node runtime/author-deck.mjs <id>.pages.json  compile, check and write the deck
 
 import { REGISTRY } from "./registry.mjs";
-import { readablePeriod } from "./time-axis.mjs";
+import { readablePeriod, isPeriodLabel } from "./time-axis.mjs";
 import { playerEntries, playerNames, plannedMark, planPlayerMarks } from "./players.mjs";
 import { isTable, rowCells, finite, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { textWordList, proseParts } from "./text-contract.mjs";
@@ -482,6 +482,31 @@ function formExhibit(id, page, ex, adjusted) {
     ex.annotations = notes.slice(0, keep);
     setAside(`${notes.length - keep} callout${notes.length - keep === 1 ? "" : "s"}`, why);
   };
+  // A trend runs over time. Members measured at one time drawn as a trend read as a change that never happened: the
+  // A350F deck's e-commerce page joined four shares - international, worldwide, two lanes - with a rising line.
+  if (page.type === "trend" && !["sparklines", "model"].includes(page.form) && cats.length >= 2) {
+    const odd = cats.filter((category) => !isPeriodLabel(category));
+    if (odd.length) throw new Error(`TREND_NOT_TIME: ${id}: a trend runs over periods, and ${odd.length === cats.length ? "none of its categories is one" : `${odd.slice(0, 3).map((c) => `"${c}"`).join(", ")}${odd.length > 3 ? ` and ${odd.length - 3} more` : ""} ${odd.length === 1 ? "is" : "are"} not`}: members compared at one time are a ranking (\`ranking/bar\`), the parts of a whole a composition`);
+  }
+  // A ranking is read in order: its bars are set largest first, as a distribution's are, unless the order is the
+  // author's (\`order: "given"\`) or runs it brackets (\`categoryGroups\`). Four of the A350F deck's ranked pages came out
+  // in the order their measures listed their members.
+  if (page.type === "ranking" && ["bar", "column", "lollipop"].includes(page.form)) {
+    const given = ex.order === "given";
+    delete ex.order;
+    const key = series[0]?.values || [];
+    if (!given && !ex.categoryGroups && cats.length > 2 && key.length === cats.length && key.every(finite)) {
+      const order = cats.map((_, i) => i).sort((a, b) => Number(key[b]) - Number(key[a]) || a - b);
+      if (order.some((at, i) => at !== i)) {
+        const reorder = (list) => (Array.isArray(list) && list.length === cats.length ? order.map((i) => list[i]) : list);
+        ex.categories = reorder(ex.categories);
+        ex.series = series.map((item) => ({ ...item, values: reorder(item.values) }));
+        for (const k of ["categoryNotes", "rowNotes"]) if (ex[k] !== undefined) ex[k] = reorder(ex[k]);
+        if (Array.isArray(ex.deltas) && ex.deltas.every((d) => typeof d !== "object")) ex.deltas = reorder(ex.deltas);
+        if (Array.isArray(ex.dataTable)) ex.dataTable = ex.dataTable.map((row) => ({ ...row, values: reorder(row.values) }));
+      }
+    }
+  }
   if (page.type === "trend" && page.form === "indexed") {
     const base = ex.indexBase ?? cats[0], subject = ex.subject ?? series[0]?.name;
     const at = cats.indexOf(String(base));
@@ -939,6 +964,15 @@ function checkExhibitData({ page, id, slide, exhibits, primary, adjusted }) {
   // An icon over a chart's heading (`headingIcon`, registry-chart-title.mjs) names the panel by its picture before its
   // words. It needs a heading to stand over - a table heads its columns with `columns[].headerIcon` - and panels side
   // by side share one heading band, so an icon over one heading and not the next sets their headings at two heights.
+  // The unit prints beside the heading: a heading that already says it reads it twice - "Fuel burn for the same job,
+  // 777F = 100, index (777F = 100)" on the A350F deck.
+  for (const ex of exhibitsOf(slide)) {
+    const heading = String(ex.heading ?? ""), unit = typeof ex.unit === "string" ? ex.unit : "";
+    const plain = (text) => text.toLowerCase().replace(/[^a-z0-9%$£€=]+/g, " ").trim();
+    const parts = [unit, ...[...unit.matchAll(/\(([^)]+)\)/g)].map((m) => m[1])].map(plain).filter((part) => part.includes(" ") || part.includes("="));
+    const repeated = parts.find((part) => ` ${plain(heading)} `.includes(` ${part} `));
+    if (heading && repeated) throw new Error(`HEADING_REPEATS_UNIT: ${id}: the heading "${heading}" already says "${repeated}", and the unit "${unit}" prints beside it; say it once - in \`unit\`, and the heading names the measure`);
+  }
   const iconed = exhibitsOf(slide).filter((ex) => ex.headingIcon !== undefined);
   for (const ex of iconed) {
     if (!String(ex.type ?? "").startsWith("chart.")) throw new Error(`${id}: \`headingIcon\` stands over a chart's heading, and a ${ex.type} exhibit draws none${ex.type === "table" ? "; a table sets an icon over a column's header as `columns[].headerIcon`" : ""}`);

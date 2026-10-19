@@ -433,10 +433,12 @@ def gate_unsourced_picture(slide_no, slide, findings):
         slide_no, "UNSOURCED_PICTURE", len(empty), 0,
         "This page draws {} picture frame{} with no picture in {}. Writing a picture as `alt` with no "
         "`path` is how a page gets laid out before its photographs are cleared, and it is not how a deck "
-        "is delivered. The build fetches logos from Wikipedia, and photographs, illustrations and flags from "
-        "Wikimedia Commons; one still empty found nothing: give it a `search` (or a player's `wikipedia` title) "
-        "that names it better, supply the file as `path` (a flag as assets/flags/<code>.png), or drop the "
-        "picture and give the page the icons, the exhibit or the width instead.".format(
+        "is delivered. The build fetches logos from Wikipedia, flags and illustrations from Wikimedia Commons, "
+        "and photographs from Commons, Openverse and the stock libraries whose key is set, taking only a file "
+        "that names what the search asks for; one still empty found nothing that did: see the files each could "
+        "take (`pictures WORK --candidates`) and `pick` one, give it a `search` (or a player's `wikipedia` title) "
+        "that names it better, supply the file as `path` with its `credit` (a flag as assets/flags/<code>.png), "
+        "or drop the picture and give the page the icons, the exhibit or the width instead.".format(
             len(empty), "" if len(empty) == 1 else "s", "it" if len(empty) == 1 else "them"),
     ))
 

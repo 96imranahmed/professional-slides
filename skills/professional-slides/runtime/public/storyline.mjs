@@ -7,6 +7,8 @@
 // or dropped after it without a new approval. The A350F deck (Oct 2026) went from a request to twelve rendered pages
 // with its reader assumed and its storyline never shown; nothing in the CLI knew a storyline existed.
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { PAGE_TYPES } from "../page-types.mjs";
 import { writeJsonWhole } from "../cli.mjs";
 
@@ -97,16 +99,33 @@ export function storylineProblems(storyline) {
   return problems;
 }
 
-/** The approval message: the count and its breakdown, the reader, the answer, the argument tree, the alternative. */
-export function approvalMessage(storyline) {
+/** The sections a contents page lists and a divider opens: the named ones between the opening and the appendix. */
+const dividedSections = (storyline) => (storyline.sections ?? []).filter((s) => typeof s.name === "string" && s.name.trim() && !["opening", "appendix"].includes(s.role ?? "finding"));
+/** Whether the deck draws a contents page and a divider a section: on unless `contents: false`, from two named sections. */
+export const drawsContents = (storyline, deck = {}) => deck.contents !== false && dividedSections(storyline).length >= 2;
+
+/** A page whose data is still to find: its title's figures are a guess until the research is done. */
+const unverified = (page) => page.data?.status === "to-find";
+
+/**
+ * The approval message: the count and its breakdown with the pages the build adds, the reader, the answer, the argument
+ * tree a line or two a page, the alternative. One shape at every length: each page's comparison, candidates and data are
+ * in storyline.md beside the pages file (approvalDetail), so a 98-page storyline is not 32 KB of chat.
+ */
+export function approvalMessage(storyline, deck = {}) {
   const pages = storylinePages(storyline);
   const count = (role) => pages.filter((p) => p.role === role).length;
   const findings = storyline.sections.filter((s) => (s.role ?? "finding") === "finding");
-  const body = pages.filter((p) => p.role !== "appendix").length;
+  const body = pages.filter((p) => p.role !== "appendix").length, appendix = count("appendix");
   const parts = [count("opening") && `${count("opening")} opening`, count("setup") && `${count("setup")} setup`,
     `${count("finding")} in ${findings.length} section${findings.length === 1 ? "" : "s"}`, count("closing") && `${count("closing")} closing`].filter(Boolean);
+  // The pages the build draws besides the argument: the cover, a contents page and a divider a section where the deck
+  // draws them, an appendix divider, and a credits page once a photograph is used. The A350F deck planned 100 and got 101.
+  const dividers = drawsContents(storyline, deck) ? dividedSections(storyline).length : 0;
+  const added = ["the cover", dividers && "a contents page", dividers && `${dividers} section dividers`, appendix && "an appendix divider"].filter(Boolean);
+  const total = body + appendix + 1 + (dividers ? dividers + 1 : 0) + (appendix ? 1 : 0);
   const r = storyline.reader;
-  const lines = [`Storyline: ${body} page${body === 1 ? "" : "s"} (${parts.join(" · ")})${count("appendix") ? ` + appendix of ${count("appendix")}` : ""}, plus the cover and any dividers`,
+  const lines = [`Storyline: ${body} page${body === 1 ? "" : "s"} (${parts.join(" · ")})${appendix ? ` + appendix of ${appendix}` : ""}. The build adds ${added.join(", ").replace(/, ([^,]*)$/, " and $1")}: ${total} pages in all, ${total + 1} if the deck carries photographs (a credits page).`,
     `Reader: ${r.audience} · knows: ${r.readerKnows} · for: ${r.decision} · read as: ${r.density}`,
     `Question: ${storyline.question}`, `Answer: ${storyline.answer}`, ""];
   let n = 0, a = 0, finding = 0;
@@ -115,14 +134,45 @@ export function approvalMessage(storyline) {
     lines.push(role === "finding" ? `${++finding}. ${section.claim}` : `${role[0].toUpperCase()}${role.slice(1)}${section.claim ? `: ${section.claim}` : ""}`);
     for (const page of section.pages) {
       const number = role === "appendix" ? `A${++a}` : String(++n);
-      const detail = [page.type, page.compares && `compares ${page.compares}${Number.isInteger(page.members) ? ` (${page.members} members${(page.series ?? 1) > 1 ? ` × ${page.series} series` : ""})` : ""}`,
-        page.candidates && `candidates ${page.candidates.map((c) => (c === page.type ? `${c} (taken)` : c)).join(", ")}`,
-        page.data && `data ${page.data.status}: ${page.data.what}${page.data.source ? ` (${page.data.source})` : ""}`].filter(Boolean).join(" · ");
-      lines.push(`   ${number.padStart(3)}  ${page.title}`, `        ${detail}`);
+      const first = page.candidates?.[0];
+      const detail = [page.type, Number.isInteger(page.members) && `${page.members} members${(page.series ?? 1) > 1 ? ` × ${page.series} series` : ""}`,
+        first && first !== page.type && `not its first candidate, ${first}`, page.data && `data ${page.data.status}`].filter(Boolean).join(" · ");
+      lines.push(`   ${number.padStart(3)}${unverified(page) ? "*" : " "} ${page.title}`, `        ${detail}`);
     }
   }
+  if (pages.some(unverified)) lines.push("", "* The data behind this page is still to find: its figures are a guess until the research is done, and may change the title.");
   lines.push("", `Alternative: ${storyline.alternative}`, "", "Reply to approve it, or change any line: titles, order, pages, length.");
   return lines.join("\n");
+}
+
+/** Each page's comparison, candidate charts and data, as Markdown: storyline.md, which the approval message points to. */
+export function approvalDetail(storyline) {
+  const lines = [`# Storyline: ${storyline.question}`, "", `**Answer:** ${storyline.answer}`, ""];
+  let n = 0, a = 0;
+  for (const section of storyline.sections) {
+    const role = section.role ?? "finding";
+    lines.push(`## ${section.name ?? role[0].toUpperCase() + role.slice(1)}${section.claim ? `: ${section.claim}` : ""}`, "");
+    for (const page of section.pages) {
+      const number = role === "appendix" ? `A${++a}` : String(++n);
+      lines.push(`${number}. **${page.title}**${unverified(page) ? " (data still to find)" : ""}`, `   - ${page.type}${page.compares ? `, compares ${page.compares}` : ""}${Number.isInteger(page.members) ? ` (${page.members} members${(page.series ?? 1) > 1 ? ` × ${page.series} series` : ""})` : ""}`);
+      if (page.candidates) lines.push(`   - candidates, best first: ${page.candidates.join(", ")}`);
+      if (page.data) lines.push(`   - data ${page.data.status}: ${page.data.what}${page.data.source ? ` (${page.data.source})` : ""}`);
+    }
+    lines.push("");
+  }
+  lines.push(`**Alternative:** ${storyline.alternative}`, "");
+  return lines.join("\n");
+}
+
+/**
+ * Pages the storyline plans too short to fill a page: a chart of three members or fewer in one series, set across the
+ * page. Said at the storyline, where planning its commentary beside it costs nothing; the A350F deck met two dozen of them
+ * as empty bands (SCENE_VOID) after its pages were written.
+ */
+export function shortPages(storyline) {
+  return storylinePages(storyline).filter((page) => isChart(page.type) && Number.isInteger(page.members) && page.members <= 3 && (page.series ?? 1) <= 1)
+    .map((page) => ({ code: "STORYLINE_SHORT_PAGE", id: page.id, severity: "advisory",
+      repair: `${page.id}: ${page.members} member${page.members === 1 ? "" : "s"} in one series leave the page short: plan its commentary beside it (\`commentary: "beside"\`), more members or a second series, or another page's panel` }));
 }
 
 /** What a new argument still needs before pages: a storyline, its shape, the user's approval of this version. Null when held. */
@@ -133,9 +183,9 @@ export function storylineNeed(work) {
     message: "Write the `storyline` block in the pages file - question, answer, reader, sections and their pages, one alternative length - then run `storyline WORK` and show the user its message. No page is written before they approve it." };
   const problems = storylineProblems(storyline);
   if (problems.length) return { kind: "storyline", target: work.file, problems, message: `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}` };
-  if (!storyline.approval) return { kind: "storyline-approval", message: approvalMessage(storyline),
+  if (!storyline.approval) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck),
     ask: "Show the user this message and end your turn. Record their reply with `storyline WORK --approve \"<their words>\"`. A request to make a deck is not approval." };
-  if (storyline.approval.hash !== storylineHash(storyline)) return { kind: "storyline-approval", message: approvalMessage(storyline),
+  if (storyline.approval.hash !== storylineHash(storyline)) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck),
     ask: "The storyline changed after the user approved it: show them this version and record their reply with `--approve`." };
   return null;
 }
@@ -147,7 +197,8 @@ export function storylineDrift(work) {
   const ids = new Set(approved.map((p) => p.id)), have = new Set(written.map((p) => String(p.id)));
   const titles = new Map(approved.map((p) => [p.id, p.title]));
   return { missing: approved.filter((p) => !have.has(p.id)).map((p) => p.id), added: written.filter((p) => !ids.has(String(p.id))).map((p) => String(p.id)),
-    retitled: written.filter((p) => titles.has(String(p.id)) && typeof p.title === "string" && p.title !== titles.get(String(p.id))).map((p) => String(p.id)) };
+    retitled: written.filter((p) => titles.has(String(p.id)) && typeof p.title === "string" && p.title !== titles.get(String(p.id))).map((p) => String(p.id)),
+    titles: Object.fromEntries(written.filter((p) => titles.has(String(p.id)) && typeof p.title === "string" && p.title !== titles.get(String(p.id))).map((p) => [String(p.id), { approved: titles.get(String(p.id)), now: p.title }])) };
 }
 
 /**
@@ -172,15 +223,19 @@ export function holdRefusal(hold) {
   return `STORYLINE_PAGES_CHANGED: the pages differ from the storyline the user approved${added.length ? `; added: ${added.join(", ")}` : ""}${missing.length ? `; not written: ${missing.join(", ")}` : ""}. Write the pages they approved, or change the storyline and show them the new version (\`node runtime/command.mjs storyline <work>\`).`;
 }
 
-/** `storyline WORK`: the approval message, or what the storyline still lacks. */
-export function showStoryline(work, results) {
+/** `storyline WORK`: the approval message, or what the storyline still lacks; storyline.md beside the pages file holds each page's detail. */
+export async function showStoryline(work, results) {
   if (!work.doc.storyline) return results.needed([storylineNeed({ ...work, project: { argument: "new" } })]);
   const problems = storylineProblems(work.doc.storyline);
   if (problems.length) return results.blocked("STORYLINE_INVALID", `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}`);
+  const detail = path.join(path.dirname(work.file), "storyline.md");
+  await fs.writeFile(detail, approvalDetail(work.doc.storyline));
+  const message = `${approvalMessage(work.doc.storyline, work.doc.deck)}\n\nEach page's comparison, candidate charts and data: ${detail}`;
+  const advisories = shortPages(work.doc.storyline);
   const approved = work.doc.storyline.approval?.hash === storylineHash(work.doc.storyline);
-  return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: approvalMessage(work.doc.storyline) })
-    : results.needed([{ kind: "storyline-approval", message: approvalMessage(work.doc.storyline),
-      ask: "Show the user this message and end your turn. Record their reply with `storyline WORK --approve \"<their words>\"`. A request to make a deck is not approval." }]);
+  return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: message, artifacts: [detail], ...(advisories.length ? { advisories } : {}) })
+    : results.needed([{ kind: "storyline-approval", message,
+      ask: "Show the user this message and end your turn. Record their reply with `storyline WORK --approve \"<their words>\"`. A request to make a deck is not approval." }], { artifacts: [detail], ...(advisories.length ? { advisories } : {}) });
 }
 
 /** `storyline WORK --approve "<words>"`: the user's reply, verbatim, bound to this version of the storyline. */
@@ -203,8 +258,18 @@ export async function scaffoldStoryline(work, results) {
   const have = new Set([...lists.body, ...lists.appendix].map((p) => String(p.id)));
   const written = [];
   let previous = { body: null, appendix: null };
+  // A divider opens each named section where the deck draws a contents page: without two, `contents` drew nothing (the
+  // A350F deck set it "once" and had no contents page). A divider is the runtime's page, not the argument's.
+  const opens = new Map(drawsContents(storyline, work.doc.deck) ? dividedSections(storyline).map((section, i) => [section.pages[0]?.id, { id: `section-${i + 1}`, kind: "section", title: section.name, ...(section.claim ? { summary: section.claim } : {}) }]) : []);
   for (const page of storylinePages(storyline)) {
     const list = page.role === "appendix" ? "appendix" : "body";
+    const divider = opens.get(page.id);
+    if (divider && !have.has(divider.id)) {
+      const at = previous[list] === null ? 0 : lists[list].findIndex((p) => String(p.id) === previous[list]) + 1;
+      lists[list].splice(at, 0, divider);
+      written.push(divider.id);
+      previous[list] = divider.id;
+    }
     if (!have.has(page.id)) {
       const { name, form } = formOf(page.type);
       const at = previous[list] === null ? 0 : lists[list].findIndex((p) => String(p.id) === previous[list]) + 1;

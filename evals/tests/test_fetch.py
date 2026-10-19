@@ -238,8 +238,11 @@ console.log(JSON.stringify({
   notPng: await run([['api.php', reply(answer(commonsFile('File:Platform.svg')))], ['330px-render.png', reply(Buffer.from('<svg/>'))]]),
 }));
 ''')
-        self.assertEqual(result["unlicensed"], {"failed": ["Passengers on a platform: no freely licensed illustration among the search's results; set `search` to the words a drawing of it would be filed under, or supply the file"], "path": None})
-        self.assertEqual(result["searchDown"], {"failed": ["Passengers on a platform: Commons API 500"], "path": None})
+        # An illustration is Commons' alone; the message names what was asked, where it looked, and what to do.
+        self.assertIsNone(result["unlicensed"]["path"])
+        self.assertRegex(result["unlicensed"]["failed"][0], r'^PICTURE_UNMATCHED: Passengers on a platform: no freely licensed illustration that matches "Passengers on a platform" in commons - set `search` to the words a drawing of it would be filed under')
+        self.assertIsNone(result["searchDown"]["path"])
+        self.assertIn("in commons (Commons API 500)", result["searchDown"]["failed"][0])
         self.assertEqual(result["downloadFailed"], {"failed": ["Passengers on a platform: download 404"], "path": None})
         self.assertEqual(result["notPng"], {"failed": ["Passengers on a platform: the rendering of File:Platform.svg is not a PNG"], "path": None})
 

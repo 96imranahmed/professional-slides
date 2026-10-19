@@ -36,11 +36,12 @@ class PreferencesFileTests(unittest.TestCase):
 
     def test_answers_round_trip_with_when_and_how_they_were_chosen(self):
         missing = json.loads(cli(self.home, "show").stdout)["missing"]
-        # Density is the deck's, set at the storyline from its reader, so the intake does not ask it.
-        self.assertEqual(missing, ["reference", "design", "colours", "tracker", "titleRule", "surfaces"])
+        # Density is the deck's, set at the storyline from its reader, so the intake does not ask it. Whether the user has a
+        # stock picture library's key is asked once, while none is set.
+        self.assertEqual(missing, ["reference", "design", "colours", "tracker", "titleRule", "surfaces", "pictureKeys"])
         cli(self.home, "set", "design=editorial", "colours=brand", 'brand={"primary":"#0B6E4F","accent":"#F2A900"}', "tracker=label",
             "--reference", str(self.home / "house.pptx"))
-        cli(self.home, "set", "titleRule=system", "surfaces=reference", "density=executive", "--source", "default")
+        cli(self.home, "set", "titleRule=system", "surfaces=reference", "density=executive", "pictureKeys=none", "--source", "default")
         stored = json.loads((self.home / "preferences.json").read_text())
         self.assertEqual(stored["schema"], "professional-slides.preferences/v1")
         self.assertEqual(stored["answers"]["design"]["value"], "editorial")
@@ -115,7 +116,7 @@ class PreferencesFileTests(unittest.TestCase):
 
     def test_nothing_unanswered_is_applied_and_each_unset_answer_names_its_default(self):
         shown = json.loads(cli(self.home, "show").stdout)
-        asked = ["reference", "design", "colours", "tracker", "titleRule", "surfaces"]
+        asked = ["reference", "design", "colours", "tracker", "titleRule", "surfaces", "pictureKeys"]
         self.assertEqual([u["key"] for u in shown["unset"]], asked)
         self.assertEqual({u["key"]: u["default"] for u in shown["unset"]}["design"], "consulting", "the recommendation is shown")
         self.assertEqual(shown["deckKeys"], {}, "an empty store sets no deck key")
@@ -128,7 +129,7 @@ class PreferencesFileTests(unittest.TestCase):
         self.assertEqual(json.loads(pages.read_text())["deck"], {"id": "d"}, "apply writes no default the user never chose")
         cli(self.home, "set", "design=journal", "density=pre-read")
         shown = json.loads(cli(self.home, "show").stdout)
-        self.assertEqual([u["key"] for u in shown["unset"]], ["reference", "colours", "tracker", "titleRule", "surfaces"])
+        self.assertEqual([u["key"] for u in shown["unset"]], ["reference", "colours", "tracker", "titleRule", "surfaces", "pictureKeys"])
         self.assertEqual(shown["deckKeys"], {"design": "journal"})  # a stored density is kept, not applied: the storyline sets it
 
     def test_invalid_answers_and_files_are_refused(self):
@@ -157,7 +158,7 @@ class PreferencesFileTests(unittest.TestCase):
         self.assertNotIn("stats", stored["house"]["value"])
         self.assertNotIn("Client house", json.dumps(stored))
         shown = json.loads(cli(self.home, "show").stdout)
-        self.assertEqual(shown["missing"], ["surfaces"])
+        self.assertEqual(shown["missing"], ["surfaces", "pictureKeys"])
         self.assertEqual(shown["deckKeys"]["design"], "journal")
         self.assertEqual(shown["deckKeys"]["chrome"]["left"], 60)
         self.assertEqual(shown["deckKeys"]["tracker"], "pills")

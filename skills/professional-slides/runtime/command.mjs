@@ -10,6 +10,9 @@ import { referenceExample } from "./reference-page.mjs";
 import { complete, blocked, needed, newWorkspace, openWorkspace, inspectWorkspace, importSource, editWorkspace, buildWorkspace, checkWorkspace, applyStoredPreferences, packageRoot } from "./public/workspace.mjs";
 import { STORYLINE_SCHEMA, showStoryline, approveStoryline, scaffoldStoryline } from "./public/storyline.mjs";
 import { makeOptions, applyCandidate } from "./public/candidates.mjs";
+import { addInsights } from "./public/insights.mjs";
+import { pictureCandidates } from "./public/pictures.mjs";
+import { setPictureKey, clearPictureKey, keyStatus, keysPath } from "./picture-keys.mjs";
 import { importStyle, buildStyle, HOUSE_SCHEMA } from "./public/styles.mjs";
 import { checkEnvironment, setup, setupHome } from "./public/setup.mjs";
 
@@ -21,12 +24,15 @@ export const COMMANDS = Object.freeze({
   import: {args:1,usage:"import SOURCE --out WORK",about:"Keep a supplied deck, image or PDF and import its evidence",flags:{out:flag()}},
   storyline: {args:1,usage:"storyline WORK [--approve \"USER'S WORDS\" | --scaffold]",about:"Show the storyline for approval, record the user's reply, or write the approved pages",flags:{approve:flag(),scaffold:flag("boolean")}},
   inspect: {args:1,usage:"inspect WORK [--slide ID_OR_NUMBER]",about:"Read source pages, evidence and required authoring inputs",flags:{slide:flag()}},
-  catalog: {args:0,usage:"catalog [--type TYPE[/FORM]|house|storyline] [--schema|--example]",about:"Discover registered capabilities, schemas and examples",flags:{type:flag(),schema:flag("boolean"),example:flag("boolean")}},
+  catalog: {args:0,usage:"catalog [--type TYPE[/FORM]|house|storyline|sources] [--schema|--example]",about:"Discover registered capabilities, schemas and examples",flags:{type:flag(),schema:flag("boolean"),example:flag("boolean")}},
   edit: {args:1,usage:"edit WORK --file PATCH.json",about:"Apply content or design scoped page replacements",flags:{file:flag()}},
   options: {args:1,usage:"options WORK --slide ID_OR_NUMBER [--count 3] [--design SYSTEM] [--style PROFILE] [--no-fetch]",about:"Render distinct, content-preserving slide alternatives",flags:{slide:flag(),count:flag(),design:flag(),style:flag(),"no-fetch":flag("boolean")}},
   apply: {args:1,usage:"apply WORK --candidate ID",about:"Apply the exact saved candidate after freshness checks",flags:{candidate:flag()}},
+  insights: {args:1,usage:"insights WORK --add BATCH.json",about:"File one research batch as a part of the insight log, its sources beside it",flags:{add:flag()}},
+  keys: {args:0,usage:"keys [--set PROVIDER | --clear PROVIDER]",about:"Show which picture libraries have a key, or set one (read from standard input) or clear it: pexels, unsplash, pixabay",flags:{set:flag(),clear:flag()}},
+  pictures: {args:1,usage:"pictures WORK --candidates",about:"Find each planned picture's best three files across the picture libraries, on one sheet to look at before the build",flags:{candidates:flag("boolean")}},
   check: {args:1,usage:"check WORK",about:"Compile every page and run its layout checks, without rendering",flags:{}},
-  build: {args:1,usage:"build WORK --out OUT [--no-fetch]",about:"Build and check the saved PowerPoint using local Office; --no-fetch looks up no logo, photograph or place",flags:{out:flag(),renderer:flag(),"no-fetch":flag("boolean")}},
+  build: {args:1,usage:"build WORK --out OUT [--page ID[,ID...]] [--no-fetch]",about:"Build and check the saved PowerPoint using local Office; --page builds and renders those pages alone to look at; --no-fetch looks up no logo, photograph or place",flags:{out:flag(),renderer:flag(),page:flag(),"no-fetch":flag("boolean")}},
   "style import": {args:1,usage:"style import SOURCE --out PROFILE.json",about:"Extract a named house profile without changing user defaults",flags:{out:flag()}},
   "style build": {args:1,usage:"style build PROFILE.json --out OUT [--no-fetch]",about:"Render editable style-guide and template slides",flags:{out:flag(),renderer:flag(),"no-fetch":flag("boolean")}},
 });
@@ -52,11 +58,20 @@ export async function execute(argv) {
   if(v.renderer)process.env.PROFESSIONAL_SLIDES_RENDERER=v.renderer;
   const renderer=v.renderer||process.env.PROFESSIONAL_SLIDES_RENDERER||"auto";
   if(command==="setup")return setup(v);
+  if(command==="keys"){
+    if(v.set&&v.clear)throw new Error("Choose --set or --clear");
+    // The key comes on standard input, never as an argument: it stays out of the shell's history and the transcript.
+    if(v.set){const chunks=[];if(!process.stdin.isTTY)for await(const chunk of process.stdin)chunks.push(chunk);setPictureKey(v.set,Buffer.concat(chunks).toString("utf8"));}
+    if(v.clear)clearPictureKey(v.clear);
+    return complete({message:v.set?`Stored the ${v.set} key in ${keysPath()}.`:v.clear?`Cleared the ${v.clear} key.`:"Picture libraries with a key, and where it is read from:",pictureKeys:keyStatus()});
+  }
   if(command==="doctor")return checkEnvironment({probe:v.probe,renderer});
   if(command==="catalog"){
     if(v.schema&&v.example)throw new Error("Choose --schema or --example");
     if(v.type==="house")return complete({schemaDefinition:HOUSE_SCHEMA});
     if(v.type==="storyline")return complete({schemaDefinition:STORYLINE_SCHEMA});
+    // The sources registry a page cites by key: research batches carry it, `insights --add` files it beside their part.
+    if(v.type==="sources")return complete({schemaDefinition:pageSchema().properties.sources});
     const [type,form]=(v.type||"").split("/");
     if(type&&!PAGE_TYPES[type])throw new Error(`Unknown type ${type}`);
     if(v.schema)return complete({schemaDefinition:form?formFields(type,form):pageSchema(type||null)});
@@ -84,11 +99,13 @@ export async function execute(argv) {
     if(v.approve!==undefined)return approveStoryline(work,v.approve,results);
     return v.scaffold?scaffoldStoryline(work,results):showStoryline(work,results);
   }
+  if(command==="insights")return addInsights(work,required(v.add,"add"),{complete,blocked});
+  if(command==="pictures"){if(!v.candidates)throw new Error(commandHelp(command));return pictureCandidates(work,{complete});}
   if(command==="check")return checkWorkspace(work);
   if(command==="edit")return editWorkspace(work,await readJson(path.resolve(required(v.file,"file"))));
   if(command==="options")return makeOptions(work,required(v.slide,"slide"),{count:v.count===undefined?3:Number(v.count),design:v.design,style:v.style,fetch:fetching});
   if(command==="apply")return applyCandidate(work,required(v.candidate,"candidate"));
-  if(command==="build")return buildWorkspace(work,required(v.out,"out"),{fetch:fetching});
+  if(command==="build")return buildWorkspace(work,required(v.out,"out"),{fetch:fetching,...(v.page?{only:new Set(String(v.page).split(",").map(s=>s.trim()).filter(Boolean))}:{})});
   throw new Error(`Unhandled command ${command}`);
 }
 export async function main(argv=process.argv.slice(2)) {
@@ -103,7 +120,7 @@ export async function main(argv=process.argv.slice(2)) {
     if(result.preferences)process.stdout.write(`${result.preferences}\n`);
     if(result.storyline)process.stdout.write(`\n${result.storyline}\n`);
     for(const input of result.requiredInputs||[])if(input.message)process.stdout.write(`\n${input.message}\n${input.ask?`\n${input.ask}\n`:""}`);
-    if(result.findings?.length||result.advisories?.length||result.requiredInputs?.some(i=>!i.message)||result.environment||result.candidates||result.types||result.examples||result.schemaDefinition)process.stdout.write(JSON.stringify(result,null,2)+"\n");
+    if(result.findings?.length||result.advisories?.length||result.requiredInputs?.some(i=>!i.message)||result.environment||result.candidates||result.types||result.examples||result.schemaDefinition||result.pictureKeys)process.stdout.write(JSON.stringify(result,null,2)+"\n");
   }
   return {complete:0,error:1,blocked:2,"needs-input":3}[result.status]??1;
 }

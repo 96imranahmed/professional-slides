@@ -29,6 +29,7 @@ import { UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } fro
 import { DESIGN_NAMES, SURFACES } from "./design-systems.mjs";
 import { PALETTES } from "./palettes.mjs";
 import { readSite } from "./site-design.mjs";
+import { pictureKeys } from "./picture-keys.mjs";
 
 export const PREFERENCES_SCHEMA = "professional-slides.preferences/v1";
 
@@ -87,6 +88,9 @@ export const ANSWERS = Object.freeze({
   // A reference deck's inferred frame (import-template.py's house profile,
   // less its own title, stats and notes): stored so the next deck reuses the
   // house without the file.
+  // Whether the user has a key for a stock picture library (picture-keys.mjs): asked once, and only while none is set -
+  // Commons and Openverse need none. "none" is stored so it is not asked again; `keys --set` adds one any time.
+  pictureKeys: { ask: true, default: "none", check: oneOf(["none", "set"]) },
   house: { ask: false, default: null, check: (v) => v === null || (v && typeof v === "object" && Object.keys(v).every((k) => HOUSE_KEYS.includes(k))) ? null : `use a house profile's ${HOUSE_KEYS.join(", ")} or null` }
 });
 const HOUSE_KEYS = ["design", "palette", "typography", "chrome", "pageTemplate", "density", "fill", "weight"];
@@ -204,7 +208,17 @@ export const answerValues = (prefs) => Object.fromEntries(Object.entries(prefs.a
 export function missingQuestions(prefs) {
   const values = answerValues(prefs);
   const fromHouse = values.house ? new Set(["design", ...(values.house.palette ? ["colours", "titleRule"] : []), ...(values.house.density ? ["density"] : [])]) : new Set();
-  return ANSWER_KEYS.filter((key) => ANSWERS[key].ask && values[key] === undefined && !fromHouse.has(key));
+  const keyed = Object.keys(pictureKeys()).length > 0;
+  return ANSWER_KEYS.filter((key) => ANSWERS[key].ask && values[key] === undefined && !fromHouse.has(key) && !(key === "pictureKeys" && keyed));
+}
+
+/** The questions the intake asks once, as the agent puts them: each still missing, with its recommended answer. */
+export const QUESTION_TEXT = Object.freeze({
+  pictureKeys: "Do you have an API key for Pexels, Unsplash or Pixabay, for photographs Wikimedia Commons and Openverse lack? (recommended: none for now; add one any time with `keys --set pexels`, the key on standard input)",
+});
+export function askLine(prefs) {
+  const asked = missingQuestions(prefs).filter((key) => QUESTION_TEXT[key]);
+  return asked.length ? `Ask once, then store the answer (\`preferences.mjs set ${asked.map((key) => `${key}=${ANSWERS[key].default}`).join(" ")}\` for the defaults): ${asked.map((key) => QUESTION_TEXT[key]).join(" ")}` : "";
 }
 
 /** The missing questions with the answer each recommends: shown to the agent, never applied. */

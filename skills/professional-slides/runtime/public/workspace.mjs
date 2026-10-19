@@ -8,8 +8,9 @@ import { authorDeck, compileDeck, readInsights, loggedSources, openComposeCache 
 import { readPagesFile, compiledFrom } from "../pages-file.mjs";
 import { buildDeck } from "../build-deck.mjs";
 import { REFERENCE_SCHEMA, validateReference } from "../reference-page.mjs";
-import { readPreferences, deckKeys, applyToDeck, reuseLine } from "../preferences.mjs";
+import { readPreferences, deckKeys, applyToDeck, reuseLine, askLine } from "../preferences.mjs";
 import { storylineNeed, storylineDrift, storylineHold } from "./storyline.mjs";
+import { assertOutputDirectory } from "../output-path.mjs";
 
 export const runtime = fileURLToPath(new URL("../", import.meta.url));
 export const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -27,7 +28,9 @@ export async function python(script, args = []) {
   return runProcess(pythonBin(), [path.join(runtime, script), ...args], { expect: [0, 2] });
 }
 export async function newWorkspace(dir, doc = null, { argument = null } = {}) {
-  const root = path.resolve(dir);
+  // Where a build may write is where a workspace may live: the check `build` makes, made here, so a task folder the
+  // build would refuse is refused before any work goes into it (the A350F run built in `outputs/` until the build said no).
+  const root = await assertOutputDirectory(path.resolve(dir));
   await fs.mkdir(root, { recursive: true });
   if (await readJson(path.join(root, "project.json"), { optional: true })) throw new Error(`Workspace already exists: ${root}`);
   const pages = "deck.pages.json";
@@ -35,6 +38,8 @@ export async function newWorkspace(dir, doc = null, { argument = null } = {}) {
   await fs.writeFile(path.join(root, pages), JSON.stringify(doc || { deck: { schema: "professional-slides.deck/v3", id: "deck", contents: false }, pages: [] }, null, 2) + "\n", { flag: "wx" });
   // A workspace `init` starts is a new argument: its pages wait for an approved storyline (storyline.mjs).
   await writeJsonWhole(path.join(root, "project.json"), { schema: "professional-slides.project/v1", pages, ...(argument ? { argument } : {}) });
+  // The insight log the research fills, so the first `check` reads it rather than finding nothing (SKILL.md step 4).
+  if (argument === "new") await fs.writeFile(path.join(root, "deck.insights.json"), JSON.stringify({ schema: "professional-slides.insights/v1", insights: [] }, null, 2) + "\n", { flag: "wx" }).catch((e) => { if (e.code !== "EEXIST") throw e; });
   return openWorkspace(root);
 }
 /** The user's stored design answers, written into a new deck's keys it does not set; the stored file is only read. */
@@ -43,7 +48,7 @@ export async function applyStoredPreferences(work) {
   try { prefs = readPreferences(); } catch (e) { return { line: `Stored preferences were not applied: ${e.message}`, set: [] }; }
   const { document, set } = applyToDeck(work.doc, deckKeys(prefs));
   if (set.length) { work.doc = document; await writeJsonWhole(work.file, work.doc); }
-  return { line: reuseLine(prefs), set };
+  return { line: [reuseLine(prefs), askLine(prefs)].filter(Boolean).join("\n"), set };
 }
 export async function openWorkspace(dir) {
   if (!dir) throw new Error("A workspace path is required");
@@ -215,6 +220,23 @@ export async function editWorkspace(work, patch) {
 // and reported as complete; a design edit that set a page's points aside (PAGE_ADJUSTED) dropped them without a word.
 const STOP_BEFORE_RENDER = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
 
+/**
+ * The advisories in the order they matter: what the user must hear (a title changed since they approved it), what may be
+ * wrong (one figure given two values), then the rest; typed numbers that match no recorded value are one line with the
+ * pages, not one a page - on the A350F deck the one finding that mattered, NUMBERS_DISAGREE, sat among 30 of them.
+ */
+const ADVISORY_ORDER = ["STORYLINE_TITLE_CHANGED", "NUMBERS_DISAGREE", "NUMBER_STALE", "WORDING_STALE", "STORYLINE_SHORT_PAGE"];
+export function rankedAdvisories(list) {
+  const untraced = list.filter((f) => f.code === "NUMBER_UNTRACED");
+  const rest = list.filter((f) => f.code !== "NUMBER_UNTRACED");
+  const rank = (f) => { const at = ADVISORY_ORDER.indexOf(f.code); return at < 0 ? ADVISORY_ORDER.length : at; };
+  const ranked = rest.map((f, i) => ({ f, i })).sort((a, b) => rank(a.f) - rank(b.f) || a.i - b.i).map(({ f }) => f);
+  if (!untraced.length) return ranked;
+  const pages = [...new Set(untraced.map((f) => String(f.id ?? "").split(",")[0]).filter(Boolean))];
+  return [...ranked, { code: "NUMBER_UNTRACED", severity: "advisory", pages, details: untraced,
+    repair: `${untraced.length} page${untraced.length === 1 ? "" : "s"} type numbers that match no recorded value (${pages.slice(0, 12).join(", ")}${pages.length > 12 ? ", ..." : ""}): record each in the insight log and print it by reference, or leave it where it is an estimate the page says is one; \`details\` lists them` }];
+}
+
 /** A new argument's pages against its approved storyline: held when one is unapproved, or pages were added or dropped since. */
 function argumentHeld(work) {
   const hold = storylineHold(work);
@@ -224,8 +246,8 @@ function argumentHeld(work) {
   if (hold?.drift) return { held: needed([{ kind: "storyline-approval", code: "STORYLINE_PAGES_CHANGED", missing: drift.missing, added: drift.added,
     message: `The pages differ from the storyline the user approved${drift.added.length ? `; added: ${drift.added.join(", ")}` : ""}${drift.missing.length ? `; not written: ${drift.missing.join(", ")}` : ""}.`,
     ask: "Write the pages the user approved, or change the storyline to the pages the deck needs and show them the new version (`storyline WORK`)." }]) };
-  return { advisories: drift.retitled.map((id) => ({ code: "STORYLINE_TITLE_CHANGED", id, severity: "advisory",
-    repair: `${id}: its title is not the one the user approved; tell them when you deliver` })) };
+  return { advisories: drift.retitled.map((id) => ({ code: "STORYLINE_TITLE_CHANGED", id, severity: "advisory", approved: drift.titles[id].approved, now: drift.titles[id].now,
+    repair: `${id}: approved as "${drift.titles[id].approved}", now "${drift.titles[id].now}"; tell the user when you deliver` })) };
 }
 
 /**
@@ -249,7 +271,7 @@ async function compileWorkspace(work, { python: py = pythonBin(), doc = null } =
   const authored = await authorDeck(source, { baseDir: work.root, insights: await readInsights(work.root, source.deck.id), python: py, composeCache: cache });
   await cache?.save();
   const stops = authored.advisories.filter((f) => STOP_BEFORE_RENDER.has(f.code));
-  const advisories = [...argument.advisories, ...authored.advisories.filter((f) => !STOP_BEFORE_RENDER.has(f.code))];
+  const advisories = rankedAdvisories([...argument.advisories, ...authored.advisories.filter((f) => !STOP_BEFORE_RENDER.has(f.code))]);
   if (authored.blocking.length || stops.length) return { held: complete({ status: "blocked", stage: "compile",
     message: "Stopped before the render: fix these pages in the pages file, then build again.", findings: [...authored.blocking, ...stops], advisories }) };
   return { authored, advisories, source };
@@ -310,6 +332,7 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
   }
   const uncertainties = work.doc.pages.flatMap(p => (p.uncertainties || []).map(message => ({ page: p.id, message })));
   return complete({ status, sourceHash: await fingerprint(work), artifacts: files, findings: result.blockers || [], advisories,
+    ...(status === "blocked" ? { message: `The files were written for review, not for delivery: the build is blocked on ${(result.blockers || []).length} finding${(result.blockers || []).length === 1 ? "" : "s"}; fix them and build again.` } : {}),
     checks: { mechanical: status === "complete" ? "passed" : "failed", rendering: result.status === "built-unrendered" ? "missing" : "ran", visual: "pending" },
     editability, uncertainties, result: path.join(path.resolve(out), "build-result.json") });
 }

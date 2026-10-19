@@ -20,8 +20,8 @@ A comparison draws every member the reader would ask about - every type, every c
 
 | The reader's question | Draw | Type, form |
 | --- | --- | --- |
-| Which is larger, and by how much? | Sorted bars | `ranking`, `bar` |
-| How did a measure move over time? | A line; columns for a few periods | `trend`, `line` or `column` |
+| Which is larger, and by how much? | Sorted bars (the runtime sorts them, largest first; `order: "given"` keeps yours) | `ranking`, `bar` |
+| How did a measure move over time? | A line; columns for a few periods. A trend runs over periods only: members measured at one time are refused (`TREND_NOT_TIME`) | `trend`, `line` or `column` |
 | Did one group stay ahead of another over time? | Lines on one axis, a line a group | `trend`, `line` |
 | How did members of different sizes move against their own starting point? | Indexed lines, the base period at 100 | `trend`, `indexed` |
 | How does a total divide into parts, and how does the mix differ? | Stacked bars | `composition`, `stacked-bar` |
@@ -96,7 +96,7 @@ A band of the page left empty is advised (`SCENE_VOID`). On cards, tiles and sma
 
 ## Pictures and maps
 
-A recognisable subject - a product, a place, a company - carries its pictures: `picture` pages, a photograph behind a statement, logos in tables. The build fetches the logos and photographs a deck plans, with their credits, unless the deck says `assets: { fetch: "none", reason }`; a frame left empty is refused (`UNSOURCED_PICTURE`). `place` form `map` draws a footprint, a network or a regional pattern; [Geography](geography.md) covers maps of regions the runtime does not ship.
+A recognisable subject - a product, a place, a company - carries its pictures: `picture` pages, a photograph behind a statement, logos in tables. The build fetches the logos and photographs a deck plans, with their credits, unless the deck says `assets: { fetch: "none", reason }`; a frame left empty is refused (`UNSOURCED_PICTURE`). A picture is `{ search, alt }` for the build to fetch, or `{ path, alt, credit }`, never a bare path. Its `search` names what the file must show - the model or registration it is filed under ("Qatar Airways A7-ANI Airbus A350-1041"), not only the type - since a file is taken only where it names those; where no library has one (a type first flown last month), show what it is built on and say so in the label. Look at `pictures WORK --candidates` before the build, and `pick` one. `place` form `map` draws a footprint, a network or a regional pattern; [Geography](geography.md) covers maps of regions the runtime does not ship.
 
 ## Look at the result
 

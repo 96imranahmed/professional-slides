@@ -13,6 +13,7 @@
 // 1 on a crash. `--no-render` checks for authoring and unrendered builds
 // (`build-deck.mjs --no-render`): the three binaries are reported, not required.
 // `--json` prints one object: { ready, render, node, python, binaries, optional, install }.
+import { keyStatus } from "./picture-keys.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFile, spawnSync } from "node:child_process";
@@ -165,7 +166,9 @@ export async function diagnose({ env = process.env, platform = process.platform,
   const renderer = rendererProbe(rendererChoice ? { ...env, PROFESSIONAL_SLIDES_RENDERER: rendererChoice } : env, platform, python.chosen ?? pythonBin(env));
   const binaries = binaryCheck(env, platform, renderer);
   const rendered = Boolean(renderer.selected) && !renderer.error && Object.keys(renderer.missing).length === 0;
-  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render), render, platform, node, python, binaries, renderer, optional,
+  // The picture libraries a fetch can search: Commons and Openverse always, a stock library where its key is set.
+  const pictures = { searched: ["commons", "openverse", ...Object.entries(keyStatus(env)).filter(([, from]) => from).map(([provider]) => provider)], keys: keyStatus(env) };
+  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render), render, platform, node, python, binaries, renderer, optional, pictures,
     install: installLines({ node, python, binaries, platform, renderer }) };
 }
 

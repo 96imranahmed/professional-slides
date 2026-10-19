@@ -73,7 +73,15 @@ export function imageProps(ref, baseDir) {
   // A picture planned as `{ alt, search }` and not fetched yet composes as the frame carrying its alt line (pictureFrame);
   // the build fetches it (fetch-pictures.mjs). The cover and a divider, which draw only an embedded photograph, wait for it.
   if (!sourcedPicture(ref)) return { alt: ref?.alt };
-  const file = path.resolve(baseDir, typeof ref === "string" ? ref : ref.path);
+  // A picture already embedded (resolveMediaRefs ran over its exhibit first) is passed on as it is: a compare side's
+  // image, embedded and then read for its file, failed with Node's own "paths[1]" error on the A350F deck.
+  if (typeof ref === "object" && ref.dataUri && !ref.path) {
+    const { dataUri, width, height, alt, credit, authorization } = ref;
+    return { dataUri, width, height, alt, ...(authorization ?? credit ? { authorization: authorization ?? credit } : {}) };
+  }
+  // A path alone carries no credit, and a picture is drawn with its maker and licence: refused here in words.
+  if (typeof ref === "string") throw new Error(`The picture "${ref}" is given as a path alone; a picture is { path, alt, credit } - the credit names its maker and licence - or { search, alt } for the build to fetch with its credit`);
+  const file = path.resolve(baseDir, ref.path);
   let buffer;
   try {
     buffer = fs.readFileSync(file);

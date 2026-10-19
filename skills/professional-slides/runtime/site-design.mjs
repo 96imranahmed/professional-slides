@@ -70,7 +70,16 @@ function faceCounts(css) {
  */
 export function siteDesign(cssTexts) {
   const css = cssTexts.join("\n");
-  const colours = colourCounts(css).filter((c) => c.sat >= 0.18 && c.light > 0.06 && c.light < 0.92).sort((a, b) => b.count - a.count);
+  // A colour a site names for its brand - a custom property called brand, primary, accent, corporate or main - says its
+  // role outright, and counts five times over; one that fills a header, a navigation bar or a button counts three. A
+  // count alone ranked airbus.com's body-text slate (#2B333F) over its navy and its blue.
+  const roles = new Map();
+  const role = (value, weight, why) => { const c = colourOf(/^#/.test(value) ? { hex: value.slice(1) } : { rgb: (/\d{1,3}/g.exec(value) && value.match(/\d{1,3}/g).slice(0, 3)) ?? [] }); if (c) roles.set(c.hex, { weight: (roles.get(c.hex)?.weight ?? 0) + weight, why: roles.get(c.hex)?.why ?? why }); };
+  for (const m of css.matchAll(/--([\w-]*(?:brand|primary|accent|corporate|main)[\w-]*)\s*:\s*(#[0-9a-f]{6}\b|#[0-9a-f]{3}\b|rgba?\([^)]*\))/gi)) role(m[2], 5, `--${m[1]}`);
+  for (const m of css.matchAll(/([^{}]*(?:header|nav|button|btn|banner|masthead)[^{}]*)\{[^}]*background(?:-color)?\s*:\s*(#[0-9a-f]{6}\b|#[0-9a-f]{3}\b|rgba?\([^)]*\))/gi)) role(m[2], 3, m[1].trim().split(/\s*,\s*/)[0].slice(0, 40));
+  // A brand colour has a hue: slate and charcoal (saturation under 0.3) are the page's text and rules.
+  const colours = colourCounts(css).map((c) => ({ ...c, count: c.count + (roles.get(c.hex)?.weight ?? 0) * Math.max(1, c.count), role: roles.get(c.hex)?.why ?? null }))
+    .filter((c) => c.sat >= 0.3 && c.light > 0.06 && c.light < 0.92).sort((a, b) => Boolean(b.role) - Boolean(a.role) || b.count - a.count);
   const primary = colours.find((c) => c.light <= 0.35) ?? colours[0] ?? null;
   const distinct = (c) => !primary || Math.abs(c.hue - primary.hue) > 15 || Math.abs(c.light - primary.light) > 0.15;
   const accent = colours.find((c) => c !== primary && c.light > 0.3 && c.light < 0.7 && distinct(c)) ?? colours.find((c) => c !== primary && distinct(c)) ?? null;
@@ -79,7 +88,7 @@ export function siteDesign(cssTexts) {
   const body = faces.running[0]?.name ?? faces.all[0]?.name ?? null, display = faces.heading[0]?.name ?? body;
   return { brand: primary ? { primary: primary.hex, ...(accent ? { accent: accent.hex } : {}) } : null,
     typography: body ? { body, display } : null,
-    evidence: { colours: colours.slice(0, 6).map((c) => `${c.hex} x${c.count}`), faces: faces.all.slice(0, 5).map((f) => `${f.name} x${f.count}`) } };
+    evidence: { colours: colours.slice(0, 6).map((c) => `${c.hex} x${c.count}${c.role ? ` (${c.role})` : ""}`), faces: faces.all.slice(0, 5).map((f) => `${f.name} x${f.count}`) } };
 }
 
 /** The stylesheets a page's HTML links and inlines: inline `<style>` blocks and `style` attributes, and the URLs of linked sheets. */

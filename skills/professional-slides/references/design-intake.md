@@ -17,6 +17,7 @@ Ask the reader questions first (who reads the deck, what they already know, what
 | 3 | Colours: the subject's own, your brand's, or a named palette? | `subject`, `brand` (one or two hex colours), `system`, `midnight`, `evergreen`, `crimson`, `graphite` | `subject` | `palettes.png` |
 | 4 | How should pages show where the reader is? | `pills`, `label`, `breadcrumb`, `number-strip`, `side-rail`, `repeat-contents`, `none`, `auto` | `auto` | `trackers.png` |
 | 5 | Title treatment (no line under the title unless the user's decks set one), and filled or open surfaces? | title: `system`, `rule`, `full`, `bar`, `band`, `block`, `tab`, `none`; surfaces: `reference`, `open` | `system`; `reference` | `title-treatments.png`, `surfaces.png` |
+| 6 | A key for Pexels, Unsplash or Pixabay, for photographs Commons and Openverse lack? Asked only while none is set. | `none`, `set` | `none` | - |
 
 | `design` | For | Frame |
 | --- | --- | --- |
@@ -32,6 +33,8 @@ A user who answers only some questions takes the defaults for the rest. With a s
 **A website answers the colours and the type.** `node runtime/preferences.mjs from-site <url>` reads the site's stylesheets and proposes `colours: "brand"` with `brand: { primary, accent }` and `typography: { body, display }`. Show the user what it found before storing it. A face the deck is set in is measured from its installed files (`$RUNTIME_PYTHON runtime/font-table.py --family "<face>"`); where it is not installed, the deck is set in Arial and says so.
 
 Once the user has given colours or picked a look, `node runtime/design-options.mjs <out-dir> --design <system> --brand '#RRGGBB,#RRGGBB'` redraws the sheets in their frame for the remaining questions (it needs PowerPoint or LibreOffice, and poppler).
+
+A key is the user's to set, never typed into a deck or a chat: `printf %s "$KEY" | professional-slides keys --set pexels` (or `unsplash`, `pixabay`) stores it beside the preferences, readable by the user alone; its environment variable (`PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY`, `PIXABAY_API_KEY`) wins over the file. `keys` says which are set; `doctor` lists the libraries a fetch searches. Store `pictureKeys=none` when they have none, and they can add one later.
 
 ## 3. Store and apply
 

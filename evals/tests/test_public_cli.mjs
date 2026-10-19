@@ -107,7 +107,10 @@ test('a new deck takes no page until the user approves its storyline, and builds
   const shown=await execute(['storyline',work]);
   assert.equal(shown.status,'needs-input');
   assert.match(shown.requiredInputs[0].message,/^Storyline: 2 pages \(1 opening · 1 in 1 section\)/);
-  assert.match(shown.requiredInputs[0].message,/compares seven types by age \(7 members\)/);
+  // One shape at every length: a line or two a page in the message, each page's comparison in storyline.md beside it.
+  assert.match(shown.requiredInputs[0].message,/2\* Large freighters are ageing out\n\s+ranking\/bar · 7 members · data to-find/);
+  assert.match(shown.requiredInputs[0].message,/\* The data behind this page is still to find/);
+  assert.match(await fs.readFile(path.join(work,'storyline.md'),'utf8'),/compares seven types by age \(7 members\)/);
   await assert.rejects(execute(['storyline',work,'--scaffold','--approve','yes']),/Choose/);
   assert.equal((await execute(['storyline',work,'--scaffold'])).status,'needs-input');
   assert.equal((await execute(['storyline',work,'--approve','Looks right, go ahead'])).status,'complete');
@@ -230,4 +233,47 @@ test('author-deck and build-deck hold a new argument to its approved storyline t
   // Pages without a storyline, outside a new workspace, compile as before.
   await fs.writeFile(file,JSON.stringify(doc()));
   assert.equal(author(file).status,0);
+});
+test('a research batch is filed as a part of the insight log, its measure names fixed and its sources beside it',async t=>{
+  const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const prev=process.env.PROFESSIONAL_SLIDES_HOME;process.env.PROFESSIONAL_SLIDES_HOME=path.join(dir,'home');t.after(()=>{if(prev===undefined)delete process.env.PROFESSIONAL_SLIDES_HOME;else process.env.PROFESSIONAL_SLIDES_HOME=prev;});
+  const work=path.join(dir,'w');
+  await execute(['init',work]);
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'deck.insights.json'),'utf8')).insights,[],'init starts the insight log');
+  const batch=path.join(dir,'fleet.json');
+  await fs.writeFile(batch,JSON.stringify({sources:{wiki:{name:'Wikipedia, List of 747 operators (Jul 2026)',status:'estimate',extra:'dropped'}},
+    insights:[{id:'i-builds',finding:'Delivered by band',cite:['wiki','elsewhere'],measures:{'777F':{unit:'aircraft',population:'777F delivered',period:'2009-2026',members:['2005-2014','2015 or later'],values:[99,232]}}}]}));
+  const filed=await execute(['insights',work,'--add',batch]);
+  assert.equal(filed.status,'complete');
+  assert.deepEqual(filed.renamed,['i-builds/777F is i-builds/m777F']);
+  assert.deepEqual(filed.advisories.map(a=>a.code),['MEASURE_RENAMED','SOURCE_NOT_IN_BATCH']);
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'insights','fleet.sources.json'),'utf8')),{wiki:{name:'Wikipedia, List of 747 operators (Jul 2026)',status:'estimate'}});
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'deck.insights.json'),'utf8')).include,['insights/fleet.json']);
+  // A batch that records an insight another batch holds is refused, and the log is left as it was.
+  const again=path.join(dir,'again.json');
+  await fs.writeFile(again,JSON.stringify({sources:{},insights:[{id:'i-builds',finding:'x',measures:{n:{unit:'aircraft',population:'p',period:'2026',value:1}}}]}));
+  assert.equal((await execute(['insights',work,'--add',again])).status,'blocked');
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'deck.insights.json'),'utf8')).include,['insights/fleet.json']);
+  assert.equal((await execute(['catalog','--type','sources','--schema'])).schemaDefinition.additionalProperties.required[0],'name');
+});
+test('a deck that draws a contents page is scaffolded with a divider a named section',async t=>{
+  const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const prev=process.env.PROFESSIONAL_SLIDES_HOME;process.env.PROFESSIONAL_SLIDES_HOME=path.join(dir,'home');t.after(()=>{if(prev===undefined)delete process.env.PROFESSIONAL_SLIDES_HOME;else process.env.PROFESSIONAL_SLIDES_HOME=prev;});
+  const work=path.join(dir,'w');
+  await execute(['init',work]);
+  const opened=await openWorkspace(work);
+  const base=storyline();
+  const section=(name,id)=>({...base.sections[1],name,pages:base.sections[1].pages.map(p=>({...p,id}))});
+  await fs.writeFile(opened.file,JSON.stringify({...opened.doc,deck:{...opened.doc.deck,contents:'once'},storyline:{...base,sections:[base.sections[0],section('Fleet','fleet'),section('Orders','orders')]}}));
+  assert.equal((await execute(['storyline',work,'--approve','Yes'])).status,'complete');
+  await execute(['storyline',work,'--scaffold']);
+  const pages=(await openWorkspace(work)).doc.pages;
+  assert.deepEqual(pages.map(p=>p.kind?`${p.kind}:${p.title}`:p.id),['summary','section:Fleet','fleet','section:Orders','orders']);
+});
+test('the picture libraries report which have a key, and never the key',async t=>{
+  const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const prev=process.env.PROFESSIONAL_SLIDES_HOME;process.env.PROFESSIONAL_SLIDES_HOME=path.join(dir,'home');t.after(()=>{if(prev===undefined)delete process.env.PROFESSIONAL_SLIDES_HOME;else process.env.PROFESSIONAL_SLIDES_HOME=prev;});
+  const shown=await execute(['keys','--json']);
+  assert.deepEqual(Object.keys(shown.pictureKeys),['pexels','unsplash','pixabay']);
+  assert.ok(!JSON.stringify(shown).includes('KEY='));
 });

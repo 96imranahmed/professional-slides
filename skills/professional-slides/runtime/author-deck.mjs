@@ -316,15 +316,31 @@ function twoValueFindings(spec, scene) {
  * row) is first that count's to close: the run that built the Spacebar deck spent three of its four rounds on the
  * generic advice before it found `columns`, which only `--schema parallel/cards` named.
  */
+// The lever each form's empty band answers to, first: what closed it on the A350F deck, where each short page took three
+// tries of the generic advice. A table's height is its rows, so commentary beside one changes nothing; a timeline's items
+// run in one band across, so its rows-down form fills the page.
+const TABLE_LEVER = "a table stands as tall as its rows: add the rows or columns the comparison needs, transpose a short wide table (its columns as rows), or set points `below` it - points `beside` a table leave its height as it is";
+const FORM_LEVERS = {
+  lookup: TABLE_LEVER, scorecard: TABLE_LEVER, matrix: TABLE_LEVER,
+  "schedule/timeline": "a timeline sets its items in one band: take `form: \"roadmap\"`, one row an item down the page, or add items",
+  "options/compare": "each side stands as tall as its points: give each five or six, or a `caption` under the panels",
+  "summary/executive-summary": "add a figure strip (`metrics`, three to five figures) under the points",
+  "argument/sidebar": "the paragraphs set the height beside the panel: add a paragraph, or say more in the panel",
+  "numbers/hero-number": "the figure's column fills with its points: three developed points `beside` it",
+  picture: "a picture keeps its shape: add a `kpi` under it, or set the points `below`",
+  ranking: "a few bars stand short: set the points `below` (up to three across), or add the members the comparison leaves out",
+  trend: "a short run stands short: set the points `below`, or add the periods or series the comparison needs",
+};
 function withFormLever(found, doc) {
   const byId = new Map([...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page?.id !== undefined && PAGE_TYPES[page.type]).map((page) => [String(page.id), page]));
   return found.map((f) => {
     const page = f.code === "SCENE_VOID" ? byId.get(String(f.id)) : null;
     if (!page) return f;
     const form = page.form ?? Object.keys(PAGE_TYPES[page.type].forms)[0];
+    const lever = FORM_LEVERS[`${page.type}/${form}`] ?? FORM_LEVERS[page.type];
     let count;
     try { count = formFields(page.type, form).exhibit?.columns; } catch { return f; }
-    if (typeof count !== "string" || !/^(int|\d+-\d+)\b/.test(count)) return f;
+    if (typeof count !== "string" || !/^(int|\d+-\d+)\b/.test(count)) return lever ? { ...f, repair: `On a ${page.type}/${form} page, ${lever}. ${f.repair}` } : f;
     const set = page.exhibit?.columns === undefined ? "it is set by the runtime" : `it is ${page.exhibit.columns}`;
     return { ...f, repair: `On a ${page.type}/${form} page the band is closed first by \`exhibit.columns\` (${count.replace(/^int - /, "")}; ${set}): fewer a row stand taller and take the height, more a row take the width. ${f.repair}` };
   });
@@ -593,6 +609,13 @@ async function main(argv) {
   if (listed !== undefined) return listed;
   if (!file) throw new UsageError(USAGE);
   if (values.render && !values.check) throw new UsageError(`--render renders a check: --check --render\n${USAGE}`);
+  // The render runs the build's Python stages: under the Python the doctor finds with python-pptx, as the public CLI runs
+  // them, not whichever \`python3\` is first on the PATH (the A350F run's check rendered nothing for want of python-pptx).
+  if (values.render && !process.env.RUNTIME_PYTHON) {
+    const { diagnose } = await import("./doctor.mjs");
+    const report = await diagnose({ render: false });
+    if (report.python.chosen) process.env.RUNTIME_PYTHON = report.python.chosen;
+  }
   let doc;
   try { doc = await readPagesFile(file); } catch (error) { console.error(error.message); return 2; }
   const dir = path.dirname(path.resolve(file));
