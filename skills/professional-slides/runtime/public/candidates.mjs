@@ -28,7 +28,7 @@ async function optionDeck(work, { design, style }) {
   return deck;
 }
 
-export async function makeOptions(work, selector, { count = 3, design, style } = {}) {
+export async function makeOptions(work, selector, { count = 3, design, style, fetch = true } = {}) {
   if (!Number.isInteger(count) || count < 1 || count > 8) throw new Error("count must be an integer from 1 to 8");
   if (design && !DESIGN_NAMES.includes(design)) throw new Error(`Unknown design ${design}`);
   const { page, index } = selectPage(work.doc, String(selector));
@@ -68,7 +68,7 @@ export async function makeOptions(work, selector, { count = 3, design, style } =
       const signature = digest(shape?.nodes.map(n=>({ type:n.type, role:n.role, frame:n.frame, text:n.text })) || []);
       if (seen.has(signature)) continue;
       let result;
-      try { result = await buildWorkspace(work, out, { doc, authored, only: new Set([String(page.id)]), specPath: path.join(dir, `${candidateId}.deck.json`) }); }
+      try { result = await buildWorkspace(work, out, { doc, authored, only: new Set([String(page.id)]), specPath: path.join(dir, `${candidateId}.deck.json`), fetch }); }
       catch (e) { rejected.push({ form, commentary, reason: e.message }); continue; }
       if (result.status !== "complete") { rejected.push({ form, commentary, findings: result.findings }); continue; }
       seen.add(signature);

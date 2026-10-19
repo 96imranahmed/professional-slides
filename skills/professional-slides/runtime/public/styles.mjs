@@ -57,7 +57,7 @@ export async function importStyle(source, output) {
   return complete({status:missing.length?"needs-input":"complete",artifacts:[out],profile,
     requiredInputs:missing.length?[{kind:"house-profile",target:out,fields:missing,schema:HOUSE_SCHEMA,message:"Fill these fields and remove resolved entries from unresolved; no user defaults were changed."}]:[]});
 }
-export async function buildStyle(file,out) {
+export async function buildStyle(file,out,{fetch=true}={}) {
   const profile=await readJson(path.resolve(file)), missing=validateHouse(profile);
   if(missing.length) return needed([{kind:"house-profile",target:path.resolve(file),fields:missing,schema:HOUSE_SCHEMA}]);
   const root=path.resolve(out);
@@ -78,7 +78,7 @@ export async function buildStyle(file,out) {
     return newWorkspace(dir,document);
   };
   const work=await owned(path.join(root,"template-source"),doc);
-  const built=await buildWorkspace(work,path.join(root,"template"));
+  const built=await buildWorkspace(work,path.join(root,"template"),{fetch});
   if(built.status!=="complete")return built;
   const scene=await readJson(path.join(root,"template","scene.json"));
   const tokenRows=["type.actionTitle","type.body","type.compact"].filter(k=>scene.tokens[k]).map(k=>[k,`${scene.tokens[k].value} pt`, "Shared runtime typography"]);
@@ -91,7 +91,7 @@ export async function buildStyle(file,out) {
     ]},source:"Brand profile supplied by the user; shared runtime tokens"
   }]};
   const guideWork=await owned(path.join(root,"style-guide-source"),guide);
-  const guideBuild=await buildWorkspace(guideWork,path.join(root,"style-guide"));
+  const guideBuild=await buildWorkspace(guideWork,path.join(root,"style-guide"),{fetch});
   if(guideBuild.status!=="complete")return guideBuild;
   return complete({artifacts:[saved,...built.artifacts,...guideBuild.artifacts],checks:{mechanical:"passed",visual:"pending"},message:"Editable template slides, not a POTX with masters. Synthetic example data is labelled in the slides."});
 }

@@ -811,8 +811,10 @@ export function compilePage(pageIn, index = 0, { players = null, spineOnly = fal
   const id = page.id ?? `page-${index + 1}`;
   if (page.type === "reference") {
     validateReference(page);
+    // A reconstruction standing in for a slide of an imported deck names it, as a typed page does, so the revision keeps
+    // its place and section and does not count the original as dropped.
     return { id, kind: "reference", title: page.title, reference: page.reference, nodes: page.nodes, notes: page.notes,
-      uncertainties: page.uncertainties || [], ...(page.hidden ? { hidden: true } : {}) };
+      uncertainties: page.uncertainties || [], ...(page.hidden ? { hidden: true } : {}), ...(page.sourceSlide !== undefined ? { sourceSlide: page.sourceSlide } : {}) };
   }
   if (!page.type) {
     // A section's number is the divider's numeral and the tracker's marker;

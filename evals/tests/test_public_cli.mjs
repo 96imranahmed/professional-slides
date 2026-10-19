@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { execute } from '../../skills/professional-slides/runtime/command.mjs';
+import { execute, COMMANDS } from '../../skills/professional-slides/runtime/command.mjs';
 import { newWorkspace, editWorkspace, openWorkspace, fingerprint, digest, contentSignature, renderedSlide } from '../../skills/professional-slides/runtime/public/workspace.mjs';
 import { ownerOf } from '../../skills/professional-slides/runtime/public/setup.mjs';
 import { privateAddress, readSite } from '../../skills/professional-slides/runtime/site-design.mjs';
@@ -189,4 +189,20 @@ test('a site read reaches only public addresses',async()=>{
   for(const a of ['8.8.8.8','151.101.1.69','2606:4700::6810:84e5'])assert.equal(privateAddress(a),false,a);
   await assert.rejects(readSite('http://169.254.169.254/latest/meta-data'),/private or local/);
   await assert.rejects(readSite('file:///etc/passwd'),/http or https/);
+});
+test('a reconstruction keeps the imported slide it stands for, and a picture takes no outline it was not given',async()=>{
+  const { compilePage } = await import('../../skills/professional-slides/runtime/page-types.mjs');
+  const { registerReference } = await import('../../skills/professional-slides/runtime/reference-page.mjs');
+  const page={...referenceExample(),id:'r',reference:'sources/reference.png',sourceSlide:3};
+  assert.equal(compilePage(page).sourceSlide,3);
+  const registry=new Map();registerReference(registry);
+  const frame={x:0,y:0,width:100,height:100};
+  const drawn=registry.get('reference-page').render({id:'r',props:{reference:'x.png',nodes:[{id:'pic',kind:'image',frame,src:'data:image/png;base64,AA=='},{id:'box',kind:'rect',frame}]}});
+  const nodes=Array.isArray(drawn)?drawn:drawn.nodes??drawn.children??[];
+  const style=(id)=>nodes.find(n=>n.id===`r-${id}`)?.style??{};
+  assert.equal(style('pic').stroke,undefined);
+  assert.equal(style('box').stroke.value,'#808080');
+});
+test('the commands that build take --no-fetch',async()=>{
+  for(const name of ['build','options','style build'])assert.equal(COMMANDS[name].flags['no-fetch'].type,'boolean',name);
 });

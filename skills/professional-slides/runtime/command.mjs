@@ -23,12 +23,12 @@ export const COMMANDS = Object.freeze({
   inspect: {args:1,usage:"inspect WORK [--slide ID_OR_NUMBER]",about:"Read source pages, evidence and required authoring inputs",flags:{slide:flag()}},
   catalog: {args:0,usage:"catalog [--type TYPE[/FORM]|house|storyline] [--schema|--example]",about:"Discover registered capabilities, schemas and examples",flags:{type:flag(),schema:flag("boolean"),example:flag("boolean")}},
   edit: {args:1,usage:"edit WORK --file PATCH.json",about:"Apply content or design scoped page replacements",flags:{file:flag()}},
-  options: {args:1,usage:"options WORK --slide ID_OR_NUMBER [--count 3] [--design SYSTEM] [--style PROFILE]",about:"Render distinct, content-preserving slide alternatives",flags:{slide:flag(),count:flag(),design:flag(),style:flag()}},
+  options: {args:1,usage:"options WORK --slide ID_OR_NUMBER [--count 3] [--design SYSTEM] [--style PROFILE] [--no-fetch]",about:"Render distinct, content-preserving slide alternatives",flags:{slide:flag(),count:flag(),design:flag(),style:flag(),"no-fetch":flag("boolean")}},
   apply: {args:1,usage:"apply WORK --candidate ID",about:"Apply the exact saved candidate after freshness checks",flags:{candidate:flag()}},
   check: {args:1,usage:"check WORK",about:"Compile every page and run its layout checks, without rendering",flags:{}},
-  build: {args:1,usage:"build WORK --out OUT",about:"Build and check the saved PowerPoint using local Office",flags:{out:flag(),renderer:flag()}},
+  build: {args:1,usage:"build WORK --out OUT [--no-fetch]",about:"Build and check the saved PowerPoint using local Office; --no-fetch looks up no logo, photograph or place",flags:{out:flag(),renderer:flag(),"no-fetch":flag("boolean")}},
   "style import": {args:1,usage:"style import SOURCE --out PROFILE.json",about:"Extract a named house profile without changing user defaults",flags:{out:flag()}},
-  "style build": {args:1,usage:"style build PROFILE.json --out OUT",about:"Render editable style-guide and template slides",flags:{out:flag(),renderer:flag()}},
+  "style build": {args:1,usage:"style build PROFILE.json --out OUT [--no-fetch]",about:"Render editable style-guide and template slides",flags:{out:flag(),renderer:flag(),"no-fetch":flag("boolean")}},
 });
 export function commandHelp(name) {
   return name&&COMMANDS[name] ? `professional-slides ${COMMANDS[name].usage}\n${COMMANDS[name].about}\nAll commands accept --json and --help.`
@@ -74,7 +74,8 @@ export async function execute(argv) {
   if(["build","options","style build"].includes(command)){
     const ready=await checkEnvironment({renderer});if(ready.status!=="complete")return ready;
   }
-  if(command==="style build")return buildStyle(p[0],required(v.out,"out"));
+  const fetching=!v["no-fetch"];
+  if(command==="style build")return buildStyle(p[0],required(v.out,"out"),{fetch:fetching});
   const work=await openWorkspace(p[0]);
   if(command==="inspect")return inspectWorkspace(work,v.slide);
   if(command==="storyline"){
@@ -85,9 +86,9 @@ export async function execute(argv) {
   }
   if(command==="check")return checkWorkspace(work);
   if(command==="edit")return editWorkspace(work,await readJson(path.resolve(required(v.file,"file"))));
-  if(command==="options")return makeOptions(work,required(v.slide,"slide"),{count:v.count===undefined?3:Number(v.count),design:v.design,style:v.style});
+  if(command==="options")return makeOptions(work,required(v.slide,"slide"),{count:v.count===undefined?3:Number(v.count),design:v.design,style:v.style,fetch:fetching});
   if(command==="apply")return applyCandidate(work,required(v.candidate,"candidate"));
-  if(command==="build")return buildWorkspace(work,required(v.out,"out"));
+  if(command==="build")return buildWorkspace(work,required(v.out,"out"),{fetch:fetching});
   throw new Error(`Unhandled command ${command}`);
 }
 export async function main(argv=process.argv.slice(2)) {

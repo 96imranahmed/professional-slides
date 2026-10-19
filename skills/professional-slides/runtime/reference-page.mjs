@@ -84,8 +84,9 @@ export function registerReference(registry) {
         const own = `${id}-${n.id}`, s = n.style || {};
         // Measured source styling has explicit provenance, separate from house tokens.
         const style = {};
+        // A picture takes no outline unless the source drew one; shapes and lines keep a visible default.
         const defaults = n.kind === "text" ? { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(token("type.body")), color: "#111418" }
-          : { fill: n.kind === "line" ? "none" : "#FFFFFF", stroke: "#808080", lineWidth: 1 };
+          : n.kind === "image" ? {} : { fill: n.kind === "line" ? "none" : "#FFFFFF", stroke: "#808080", lineWidth: 1 };
         for (const [k, v] of Object.entries({ ...defaults, ...s })) style[k] = ["fill", "stroke", "color", "fontFamily", "fontSize", "lineWidth"].includes(k) && v !== "none"
           ? { tokenId: `reference.${own}.${k}`, value: v, reference: props.reference } : v;
         let node;

@@ -110,12 +110,19 @@ export async function importSource(source, dir) {
     await fs.mkdir(root, { recursive: true });
     const existing = await fs.readdir(root);
     if (existing.length) throw new Error("Import destination must be empty");
-    const result = await python("import-deck.py", [file, root, "--id", "deck", "--carry"]);
-    if (result.code) return blocked("IMPORT_FAILED", result.stderr || result.stdout);
+    // The folder was empty: a failed import empties it again, so the same command can be run again.
+    const undo = async () => { for (const e of await fs.readdir(root)) await fs.rm(path.join(root, e), { recursive: true, force: true }); };
+    const result = await python("import-deck.py", [file, root, "--id", "deck", "--carry"]).catch(async (e) => { await undo(); throw e; });
+    if (result.code) { await undo(); return blocked("IMPORT_FAILED", result.stderr || result.stdout); }
     await writeJsonWhole(path.join(root, "project.json"), { schema: "professional-slides.project/v1", pages: "deck.pages.json" });
     const work=await openWorkspace(root);
+    // The house style is read for pages redrawn later; the carried slides do not need it, so a deck whose style
+    // cannot be read is still imported, and says so.
     const style=await python("import-template.py",[file,"--out",path.join(root,"source.house.json")]);
-    if(style.code)return blocked("STYLE_IMPORT_FAILED",style.stderr||style.stdout);
+    if(style.code){
+      const inspected=await inspectWorkspace(work);
+      return {...inspected,advisories:[{code:"STYLE_IMPORT_FAILED",severity:"advisory",repair:`The deck's slides were imported; its house style could not be read, so a redrawn page takes the default design until \`deck.template\` names a profile (\`style import\`). ${(style.stderr||style.stdout||"").trim()}`}]};
+    }
     work.doc.deck.template="source.house.json";
     await writeJsonWhole(work.file,work.doc);
     return inspectWorkspace(work);
@@ -265,7 +272,7 @@ export function renderedSlide(out, scene, pageId) {
  * Build the PowerPoint and render it. `doc` and `authored` build an option already compiled (candidates.mjs); `only`
  * emits and renders those pages alone; `specPath` keeps an option's compiled deck out of the workspace's own.
  */
-export async function buildWorkspace(work, out, { python: py = pythonBin(), doc = null, authored: given = null, only = null, specPath = null } = {}) {
+export async function buildWorkspace(work, out, { python: py = pythonBin(), doc = null, authored: given = null, only = null, specPath = null, fetch = true } = {}) {
   const compiled = given ? { authored: given, advisories: given.advisories, source: doc } : await compileWorkspace(work, { python: py, doc });
   if (compiled.held) return compiled.held;
   const { authored, advisories } = compiled;
@@ -273,7 +280,8 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
   // The pages file and parts the deck was compiled from, by hash, as `author-deck` stamps it: a later build of this
   // deck.json from older pages is refused (DECK_OLDER_THAN_PAGES).
   await writeJsonWhole(spec, { ...authored.spec, ...(doc ? {} : { compiledFrom: compiledFrom(compiled.source) }) });
-  await buildDeck(spec, path.resolve(out), { python: py, render: true, source: { spec: authored.spec, baseDir: work.root }, ...(only ? { only } : {}) });
+  // `fetch: false` (`--no-fetch`) looks nothing up: no logo, photograph, flag or place leaves the machine's own files.
+  await buildDeck(spec, path.resolve(out), { python: py, render: true, fetchLogos: fetch, source: { spec: authored.spec, baseDir: work.root }, ...(only ? { only } : {}) });
   const result = await readJson(path.join(path.resolve(out), "build-result.json"));
   const status = result.status === "built" ? "complete" : "blocked";
   if (!result.pptxPath) return complete({ status: "blocked", findings: result.blockers || [], advisories, result: path.join(path.resolve(out), "build-result.json") });
