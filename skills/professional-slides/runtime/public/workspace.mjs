@@ -7,6 +7,8 @@ import { runProcess, lastJson } from "../process.mjs";
 import { authorDeck, readInsights } from "../author-deck.mjs";
 import { buildDeck } from "../build-deck.mjs";
 import { REFERENCE_SCHEMA, validateReference } from "../reference-page.mjs";
+import { readPreferences, deckKeys, applyToDeck, reuseLine } from "../preferences.mjs";
+import { storylineNeed, storylineDrift } from "./storyline.mjs";
 
 export const runtime = fileURLToPath(new URL("../", import.meta.url));
 export const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -23,15 +25,24 @@ export async function python(script, args = []) {
   }
   return runProcess(pythonBin(), [path.join(runtime, script), ...args], { expect: [0, 2] });
 }
-export async function newWorkspace(dir, doc = null) {
+export async function newWorkspace(dir, doc = null, { argument = null } = {}) {
   const root = path.resolve(dir);
   await fs.mkdir(root, { recursive: true });
   if (await readJson(path.join(root, "project.json"), { optional: true })) throw new Error(`Workspace already exists: ${root}`);
   const pages = "deck.pages.json";
   // Never overwrite an unrelated file in a nonempty task folder.
   await fs.writeFile(path.join(root, pages), JSON.stringify(doc || { deck: { schema: "professional-slides.deck/v3", id: "deck", contents: false }, pages: [] }, null, 2) + "\n", { flag: "wx" });
-  await writeJsonWhole(path.join(root, "project.json"), { schema: "professional-slides.project/v1", pages });
+  // A workspace `init` starts is a new argument: its pages wait for an approved storyline (storyline.mjs).
+  await writeJsonWhole(path.join(root, "project.json"), { schema: "professional-slides.project/v1", pages, ...(argument ? { argument } : {}) });
   return openWorkspace(root);
+}
+/** The user's stored design answers, written into a new deck's keys it does not set; the stored file is only read. */
+export async function applyStoredPreferences(work) {
+  let prefs;
+  try { prefs = readPreferences(); } catch (e) { return { line: `Stored preferences were not applied: ${e.message}`, set: [] }; }
+  const { document, set } = applyToDeck(work.doc, deckKeys(prefs));
+  if (set.length) { work.doc = document; await writeJsonWhole(work.file, work.doc); }
+  return { line: reuseLine(prefs), set };
 }
 export async function openWorkspace(dir) {
   if (!dir) throw new Error("A workspace path is required");
@@ -84,7 +95,8 @@ export function authoringInputs(work, selected = work.doc.pages) {
 }
 export async function inspectWorkspace(work, selector) {
   const selected = selector ? [selectPage(work.doc, selector).page] : work.doc.pages;
-  const requiredInputs = authoringInputs(work, selected);
+  const need = storylineNeed(work);
+  const requiredInputs = [...(need ? [need] : []), ...authoringInputs(work, selected)];
   return complete({ status: requiredInputs.length ? "needs-input" : "complete", workspace: work.root, pagesFile: work.file,
     sourceHash: await fingerprint(work), deck: work.doc.deck, pages: selected, requiredInputs,
     ...(work.doc.deck.inventory ? { inventory: await readJson(path.resolve(work.root, work.doc.deck.inventory)) } : {}) });
@@ -146,6 +158,8 @@ export async function editWorkspace(work, patch) {
     } else {
       if (edit.page === "new") {
         if (patch.scope !== "content" || !edit.value.id || next.pages.some(p=>p.id===edit.value.id)) throw new Error("Adding a page requires content scope and a unique id");
+        const need = storylineNeed(work);
+        if (need) return needed([need], { message: "No page is written before the user approves the storyline." });
         next.pages.push(edit.value);
         continue;
       }
@@ -165,12 +179,50 @@ export async function editWorkspace(work, patch) {
   await writeJsonWhole(work.file, next);
   return inspectWorkspace(await openWorkspace(work.root));
 }
-export async function buildWorkspace(work, out, { python: py = pythonBin() } = {}) {
+// Findings the compile measures on one page's layout, before any render. The build stops on them instead of rendering
+// a deck it will redo: the A350F deck's three half-empty pages were measured on the scene (SCENE_VOID), rendered anyway
+// and reported as complete; a design edit that set a page's points aside (PAGE_ADJUSTED) dropped them without a word.
+const STOP_BEFORE_RENDER = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
+
+/** A new argument's pages against its approved storyline: held when one is unapproved, or pages were added or dropped since. */
+function argumentHeld(work) {
+  const need = storylineNeed(work);
+  if (need) return { held: needed([need]) };
+  if (work.project?.argument !== "new") return { advisories: [] };
+  const drift = storylineDrift(work);
+  if (drift.missing.length || drift.added.length) return { held: needed([{ kind: "storyline-approval", code: "STORYLINE_PAGES_CHANGED", missing: drift.missing, added: drift.added,
+    message: `The pages differ from the storyline the user approved${drift.added.length ? `; added: ${drift.added.join(", ")}` : ""}${drift.missing.length ? `; not written: ${drift.missing.join(", ")}` : ""}.`,
+    ask: "Write the pages the user approved, or change the storyline to the pages the deck needs and show them the new version (`storyline WORK`)." }]) };
+  return { advisories: drift.retitled.map((id) => ({ code: "STORYLINE_TITLE_CHANGED", id, severity: "advisory",
+    repair: `${id}: its title is not the one the user approved; tell them when you deliver` })) };
+}
+
+/** Compile and lay out every page, with the page gates, and render nothing: `held` is the result to return when it stops. */
+async function compileWorkspace(work, { python: py = pythonBin() } = {}) {
+  const argument = argumentHeld(work);
+  if (argument.held) return argument;
   const inputs = authoringInputs(work);
-  if (inputs.length) return needed(inputs);
-  if (!work.doc.pages.length) return needed([{ kind: "pages", target: work.file, discover: "catalog --example" }]);
+  if (inputs.length) return { held: needed(inputs) };
+  if (!work.doc.pages.length) return { held: needed([{ kind: "pages", target: work.file, discover: "catalog --example" }]) };
   const authored = await authorDeck(work.doc, { baseDir: work.root, insights: await readInsights(work.root, work.doc.deck.id), python: py });
-  if (authored.blocking.length) return complete({ status: "blocked", findings: authored.blocking, advisories: authored.advisories });
+  const stops = authored.advisories.filter((f) => STOP_BEFORE_RENDER.has(f.code));
+  const advisories = [...argument.advisories, ...authored.advisories.filter((f) => !STOP_BEFORE_RENDER.has(f.code))];
+  if (authored.blocking.length || stops.length) return { held: complete({ status: "blocked", stage: "compile",
+    message: "Stopped before the render: fix these pages in the pages file, then build again.", findings: [...authored.blocking, ...stops], advisories }) };
+  return { authored, advisories };
+}
+
+/** `check WORK`: the compile and the page gates, without emitting or rendering anything. */
+export async function checkWorkspace(work) {
+  const compiled = await compileWorkspace(work);
+  if (compiled.held) return compiled.held;
+  return complete({ stage: "compile", message: "Every page composes and passes its layout checks; nothing was rendered.", advisories: compiled.advisories });
+}
+
+export async function buildWorkspace(work, out, { python: py = pythonBin() } = {}) {
+  const compiled = await compileWorkspace(work, { python: py });
+  if (compiled.held) return compiled.held;
+  const { authored, advisories } = compiled;
   const spec = path.join(work.root, `${work.doc.deck.id}.deck.json`);
   await writeJsonWhole(spec, authored.spec);
   await buildDeck(spec, path.resolve(out), { python: py, render: true, source: { spec: authored.spec, baseDir: work.root } });
@@ -202,7 +254,7 @@ export async function buildWorkspace(work, out, { python: py = pythonBin() } = {
     files.push(image);
   }
   const uncertainties = work.doc.pages.flatMap(p => (p.uncertainties || []).map(message => ({ page: p.id, message })));
-  return complete({ status, sourceHash: await fingerprint(work), artifacts: files, findings: result.blockers || [],
+  return complete({ status, sourceHash: await fingerprint(work), artifacts: files, findings: result.blockers || [], advisories,
     checks: { mechanical: status === "complete" ? "passed" : "failed", rendering: result.status === "built-unrendered" ? "missing" : "ran", visual: "pending" },
     editability, uncertainties, result: path.join(path.resolve(out), "build-result.json") });
 }

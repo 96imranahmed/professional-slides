@@ -7,7 +7,8 @@ import { PAGE_TYPES, pageSchema } from "./page-types.mjs";
 import { formFields } from "./form-fields.mjs";
 import { workedExamples } from "./author-deck.mjs";
 import { referenceExample } from "./reference-page.mjs";
-import { complete, blocked, newWorkspace, openWorkspace, inspectWorkspace, importSource, editWorkspace, buildWorkspace, packageRoot } from "./public/workspace.mjs";
+import { complete, blocked, needed, newWorkspace, openWorkspace, inspectWorkspace, importSource, editWorkspace, buildWorkspace, checkWorkspace, applyStoredPreferences, packageRoot } from "./public/workspace.mjs";
+import { STORYLINE_SCHEMA, showStoryline, approveStoryline, scaffoldStoryline } from "./public/storyline.mjs";
 import { makeOptions, applyCandidate } from "./public/candidates.mjs";
 import { importStyle, buildStyle, HOUSE_SCHEMA } from "./public/styles.mjs";
 import { checkEnvironment, setup } from "./public/setup.mjs";
@@ -16,13 +17,15 @@ const flag = (type="string") => ({type});
 export const COMMANDS = Object.freeze({
   setup: {args:0,usage:"setup --agent codex|claude|both [--scope user|project] [--renderer auto|powerpoint|libreoffice]",about:"Install a persistent agent skill and verify local rendering",flags:{agent:flag(),scope:flag(),renderer:flag()}},
   doctor: {args:0,usage:"doctor [--probe] [--renderer auto|powerpoint|libreoffice]",about:"Check local Office, Python and Poppler",flags:{probe:flag("boolean"),renderer:flag()}},
-  init: {args:1,usage:"init WORK",about:"Start a deck workspace",flags:{}},
+  init: {args:1,usage:"init WORK",about:"Start a new deck: its pages wait for an approved storyline",flags:{}},
   import: {args:1,usage:"import SOURCE --out WORK",about:"Keep a supplied deck, image or PDF and import its evidence",flags:{out:flag()}},
+  storyline: {args:1,usage:"storyline WORK [--approve \"USER'S WORDS\" | --scaffold]",about:"Show the storyline for approval, record the user's reply, or write the approved pages",flags:{approve:flag(),scaffold:flag("boolean")}},
   inspect: {args:1,usage:"inspect WORK [--slide ID_OR_NUMBER]",about:"Read source pages, evidence and required authoring inputs",flags:{slide:flag()}},
-  catalog: {args:0,usage:"catalog [--type TYPE[/FORM]|house] [--schema|--example]",about:"Discover registered capabilities, schemas and examples",flags:{type:flag(),schema:flag("boolean"),example:flag("boolean")}},
+  catalog: {args:0,usage:"catalog [--type TYPE[/FORM]|house|storyline] [--schema|--example]",about:"Discover registered capabilities, schemas and examples",flags:{type:flag(),schema:flag("boolean"),example:flag("boolean")}},
   edit: {args:1,usage:"edit WORK --file PATCH.json",about:"Apply content or design scoped page replacements",flags:{file:flag()}},
   options: {args:1,usage:"options WORK --slide ID_OR_NUMBER [--count 3] [--design SYSTEM] [--style PROFILE]",about:"Render distinct, content-preserving slide alternatives",flags:{slide:flag(),count:flag(),design:flag(),style:flag()}},
   apply: {args:1,usage:"apply WORK --candidate ID",about:"Apply the exact saved candidate after freshness checks",flags:{candidate:flag()}},
+  check: {args:1,usage:"check WORK",about:"Compile every page and run its layout checks, without rendering",flags:{}},
   build: {args:1,usage:"build WORK --out OUT",about:"Build and check the saved PowerPoint using local Office",flags:{out:flag(),renderer:flag()}},
   "style import": {args:1,usage:"style import SOURCE --out PROFILE.json",about:"Extract a named house profile without changing user defaults",flags:{out:flag()}},
   "style build": {args:1,usage:"style build PROFILE.json --out OUT",about:"Render editable style-guide and template slides",flags:{out:flag(),renderer:flag()}},
@@ -52,13 +55,18 @@ export async function execute(argv) {
   if(command==="catalog"){
     if(v.schema&&v.example)throw new Error("Choose --schema or --example");
     if(v.type==="house")return complete({schemaDefinition:HOUSE_SCHEMA});
+    if(v.type==="storyline")return complete({schemaDefinition:STORYLINE_SCHEMA});
     const [type,form]=(v.type||"").split("/");
     if(type&&!PAGE_TYPES[type])throw new Error(`Unknown type ${type}`);
     if(v.schema)return complete({schemaDefinition:form?formFields(type,form):pageSchema(type||null)});
     if(v.example){const examples=type==="reference"?[referenceExample()]:workedExamples().pages.filter(p=>(!type||p.type===type)&&(!form||p.form===form));return complete({examples});}
     return complete({types:type?{[type]:PAGE_TYPES[type]}:PAGE_TYPES});
   }
-  if(command==="init"){const work=await newWorkspace(p[0]);return inspectWorkspace(work);}
+  if(command==="init"){
+    const work=await newWorkspace(p[0],null,{argument:"new"});
+    const preferences=await applyStoredPreferences(work);
+    return complete({...await inspectWorkspace(work),...(preferences.line?{preferences:preferences.line}:{})});
+  }
   if(command==="import")return importSource(p[0],required(v.out,"out"));
   if(command==="style import")return importStyle(p[0],required(v.out,"out"));
   if(["build","options","style build"].includes(command)){
@@ -67,6 +75,13 @@ export async function execute(argv) {
   if(command==="style build")return buildStyle(p[0],required(v.out,"out"));
   const work=await openWorkspace(p[0]);
   if(command==="inspect")return inspectWorkspace(work,v.slide);
+  if(command==="storyline"){
+    const results={complete,blocked,needed};
+    if(v.approve!==undefined&&v.scaffold)throw new Error("Choose --approve or --scaffold");
+    if(v.approve!==undefined)return approveStoryline(work,v.approve,results);
+    return v.scaffold?scaffoldStoryline(work,results):showStoryline(work,results);
+  }
+  if(command==="check")return checkWorkspace(work);
   if(command==="edit")return editWorkspace(work,await readJson(path.resolve(required(v.file,"file"))));
   if(command==="options")return makeOptions(work,required(v.slide,"slide"),{count:v.count===undefined?3:Number(v.count),design:v.design,style:v.style});
   if(command==="apply")return applyCandidate(work,required(v.candidate,"candidate"));
@@ -81,7 +96,11 @@ export async function main(argv=process.argv.slice(2)) {
   else{
     process.stdout.write(`${result.status}${result.message?`: ${result.message}`:""}\n`);
     for(const artifact of result.artifacts||[])process.stdout.write(`${artifact}\n`);
-    if(result.findings?.length||result.requiredInputs?.length||result.environment||result.candidates||result.types||result.examples||result.schemaDefinition)process.stdout.write(JSON.stringify(result,null,2)+"\n");
+    // Messages meant for the user print as they read: the approval message above all.
+    if(result.preferences)process.stdout.write(`${result.preferences}\n`);
+    if(result.storyline)process.stdout.write(`\n${result.storyline}\n`);
+    for(const input of result.requiredInputs||[])if(input.message)process.stdout.write(`\n${input.message}\n${input.ask?`\n${input.ask}\n`:""}`);
+    if(result.findings?.length||result.advisories?.length||result.requiredInputs?.some(i=>!i.message)||result.environment||result.candidates||result.types||result.examples||result.schemaDefinition)process.stdout.write(JSON.stringify(result,null,2)+"\n");
   }
   return {complete:0,error:1,blocked:2,"needs-input":3}[result.status]??1;
 }
