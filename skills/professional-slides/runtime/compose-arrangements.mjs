@@ -521,14 +521,16 @@ export const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].inclu
 export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle }) {
   // Side ratios: chart + points 2:1, table + points 3:2 — a starting point,
   // not a constant. The column is then measured against what it holds (below).
-  const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : 2;
+  // A pair of values takes half the row, as strong decks set it (chart-sense.mjs comparesTooLittle).
+  const pairOf = (ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.categories) && ex.categories.length <= 2 && Array.isArray(ex.series) && ex.series.length === 1;
+  const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : pairOf(exhibits[0]) ? 1 : 2;
   const baseSideFr = heroFr === 3 ? 2 : 1;
   // A chart beside a text column keeps a one-line heading with the unit
   // inline; the two-line heading is for peers in a row, where the bands align.
   const heroItem = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" });
   if (String(exhibits[0].type).startsWith("chart.") && heroItem.props?.unit && !heroItem.props.unitPlacement) heroItem.props.unitPlacement = "inline";
   const { tone, list, kpiTile, insightBoxes, prose, sideItems, heading, hero } = sideColumnContents({ id, slide, exhibits, fill, pointsStyle, heroItem });
-  const { sideExtras, trackHeight, sideFr } = sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading });
+  const { sideExtras, trackHeight, sideFr } = sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading, pair: pairOf(exhibits[0]) });
   // A column of points alone that stays short at its narrowest is set under
   // the exhibit instead, in columns across it, and the exhibit takes the row:
   // two or three points beside a scatter run 45-55% down the page and leave
@@ -546,7 +548,9 @@ export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, ba
   // rows and a table down its lines; set under points they lose the height
   // they are read by.
   // A radar is round: under its points it would sit no larger in a band the page's width, so it keeps its column beside them.
-  const widens = (String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow";
+  // Two values in one series do not use the width either: strong decks set a pair at about half the page, beside its
+  // column (chart-sense.mjs comparesTooLittle).
+  const widens = ((String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow") && !pairOf(exhibits[0]);
   if (pointsOnly && widens && fill !== "airy" && slide.pointsAlign !== "middle" && slide.points.length <= 4
       && (sideExtras + listDepth(list, drawnTrack(sideFr), slide.density)) / trackHeight < SIDE_COLUMN_SHORT) {
     exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
@@ -613,7 +617,7 @@ function sideColumnContents({ id, slide, exhibits, fill, pointsStyle, heroItem }
 }
 
 /** The side column's width, negotiated with what it holds against the row's height. */
-function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading }) {
+function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading, pair = false }) {
   // The column's width is negotiated with its content, not fixed by the
   // layout: forty words in a 361px track leave two fifths of the column
   // empty, and the exhibit beside it wants that width anyway. A short column
@@ -642,7 +646,8 @@ function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insig
     // its frame; a table set wider wraps less and ends higher, trading the
     // column's band for one under the table, so beside a table the column
     // gives up a fifth at most.
-    const floor = heroFr === 3 ? baseSideFr * 0.8 : 0;
+    // A pair of values cannot use more width, so its column keeps its half.
+    const floor = heroFr === 3 ? baseSideFr * 0.8 : pair ? baseSideFr : 0;
     let fr = baseSideFr;
     while (depth(fr) < SIDE_COLUMN_DEPTH && fr * 0.95 >= floor - 1e-9 && sideTrack(fr * 0.95) >= SIDE_COLUMN_MIN_WIDTH) fr *= 0.95;
     return fr;

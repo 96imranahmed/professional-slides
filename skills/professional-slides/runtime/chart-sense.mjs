@@ -13,7 +13,12 @@
 // something that is not there.
 //
 // NO_COMPARISON - one value drawn as a chart, or one period on a chart that joins periods (a line, an area, a combo's
-// line): there is nothing to compare, and the figures say it.
+// line): there is nothing to compare, and the figures say it. Two values in one series are a comparison, but a thin one:
+// across the full width of a page, nothing marked and nothing beside it, it reads as an empty page - the A350F deck's
+// "777F 100, A350F 80" and "replacement 1,530, growth 1,075". In 539 pages of strong decks no such page stands: a pair
+// takes about half the page beside an insight column (12 of 13 read well), sits among panels, or runs wide only with
+// the change between its bars drawn and labelled. That is a page's fault, not the drawing's, so the page compile
+// refuses it (author-deck.mjs); the chart draws two marks as it is asked to.
 
 export const FLAT_SHARE = 0.1;
 export const LONG_RUN = 6;
@@ -26,6 +31,16 @@ const ON_THE_LINE = 0.15;
  * drawn on scales of their own, else one for all); `dated`: whether the categories are periods. Throws with the code and the
  * repair; returns nothing when the chart shows a comparison.
  */
+/**
+ * Whether a chart of `members` categories in `series` series is too thin for the page it fills: one series of two values
+ * drawn across the page with no insight column beside it (`shared` false) and no change marked between them (`changed`
+ * false). A sentence for the refusal, or null.
+ */
+export function comparesTooLittle({ members, series = 1, shared = false, changed = false }) {
+  if (members !== 2 || series !== 1 || shared || changed) return null;
+  return "two values in one series drawn across the page, with nothing marked between them, read as an empty page - set the chart beside its insight column (`commentary: \"beside\"`) and mark the change between the bars (`changeAnnotations`, a bracket with its label), pair it with another cut as `panels`, say the two figures as `numbers`, or draw the whole set they belong to";
+}
+
 export function assertComparison({ id, categories, series, span, props = {}, dated = true, line = false }) {
   // One mark compares nothing, and neither does one period on a chart that joins periods: the BA deck's loyalty page drew a
   // year's two figures as two dots over an empty line chart, on an axis cut to 275-375.

@@ -44,6 +44,7 @@ import { assetFindings, assetNotice } from "./asset-needs.mjs";
 import { carriedEntries, carriedFindings, carriedProblem, isCarried, revisionChanges, revisionLine, revisionRecordFindings, revisionStatement, stampKept, unheldLine, withImportedCredits } from "./revision.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
+import { comparesTooLittle } from "./chart-sense.mjs";
 import { readPagesFile, withParts, compiledFrom, staleCompile } from "./pages-file.mjs";
 import { exhibitKinds, formFields, kindFields, unreadKeys } from "./form-fields.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
@@ -249,6 +250,7 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   add(failed.filter((f) => !f.unbound).map(({ id, message, code }) => ({ code: code ?? "COMPILE", id: idOfMessage(message) ?? id, severity: "blocker", repair: message })));
   add(unreadExhibitKeys(doc));
   add(bindingFindings);
+  add(twoValueFindings(spec, composed.deck));
   for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const note of slide?.pageType?.advisories ?? [])
     add([{ code: "PAGE_ADJUSTED", id: String(slide.id), severity: "advisory", repair: `${slide.id}: ${String(note).replace(/^PAGE_ADJUSTED:\s*/, "")}` }]);
   // A chart refused for what it shows says so by its own code (chart-sense.mjs, chart-line.mjs): the page composes, its chart compares nothing.
@@ -283,6 +285,29 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const failedIds = new Set([...failed, ...composing].map((f) => f.id).filter((id) => id !== undefined && id !== null).map(String));
   return { spec, deck: composed.deck ?? null, composed, complete, failed, failedIds, blocking: listed.filter(isBlocker), advisories: listed.filter((f) => !isBlocker(f)),
     gates: { ran: gates.ran, reason: gates.reason ?? null }, assets: assets.statement, revision: revisionStatement(spec, imported), readAsChanged: revised };
+}
+
+/**
+ * A page whose one chart draws two values in one series across the page, with no insight column beside it and no change
+ * marked between them (chart-sense.mjs comparesTooLittle): refused before the render. Beside its column, as one of a
+ * page's panels, or with the change between them drawn and labelled, two bars hold their place. The width is read off
+ * the composed page - what the reader will see - not the placement asked for: the composer may set a short column under
+ * the chart.
+ */
+const TWO_VALUE_CHARTS = new Set(["chart.bar", "chart.column", "chart.lollipop"]);
+const SHARED_WIDTH = 0.75;
+function twoValueFindings(spec, scene) {
+  return [...(spec.slides || []), ...(spec.appendix || [])].flatMap((slide) => {
+    const chart = slide?.exhibit;
+    if (!chart || !TWO_VALUE_CHARTS.has(chart.type) || !Array.isArray(chart.categories) || !Array.isArray(chart.series)) return [];
+    const drawn = scene?.slides?.find((s) => String(s.id) === String(slide.id));
+    const frame = drawn?.componentInstances?.find((c) => c.id === `${slide.id}-exhibit`)?.frame;
+    const body = drawn?.contentFrame;
+    const shared = frame && body ? frame.width <= body.width * SHARED_WIDTH : ["exhibit-left", "exhibit-right", "sidebar"].includes(slide.layout);
+    const changed = Boolean(chart.cagr) || (Array.isArray(chart.changeAnnotations) && chart.changeAnnotations.length > 0);
+    const little = comparesTooLittle({ members: chart.categories.length, series: chart.series.length, shared, changed });
+    return little ? [{ code: "NO_COMPARISON", id: String(slide.id), severity: "blocker", repair: `${slide.id}: ${little}` }] : [];
+  });
 }
 
 /**

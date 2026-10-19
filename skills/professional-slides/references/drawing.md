@@ -16,7 +16,7 @@ A page names its `type`; its `form` defaults to the type's first and its `commen
 
 Choose the chart a reader of this kind of document expects for this kind of claim. The obvious one is usually right: one scatter of runtime against score, one table of every category's scores, one waterfall for a change between two totals.
 
-For each page, name its candidates first: the charts below that draw its claim's comparison, best first. Take the best. Variety across the deck is settled among those candidates - a page takes its second candidate where the first would repeat its neighbour's - and never by a chart that is not one of them. Series compared over the same periods share one axis: "the Atlantic earned more than the Pacific every year" is two lines, or a line a region for each airline, not six panels of columns.
+A comparison draws every member the reader would ask about - every type, every customer, every year - not a pair. For each page, name its candidates first: the charts below that draw its claim's comparison, best first. Take the best. Variety across the deck is settled among those candidates - a page takes its second candidate where the first would repeat its neighbour's - and never by a chart that is not one of them. Series compared over the same periods share one axis: "the Atlantic earned more than the Pacific every year" is two lines, or a line a region for each airline, not six panels of columns.
 
 | The reader's question | Draw | Type, form |
 | --- | --- | --- |
@@ -45,13 +45,14 @@ A chart earns its page by showing a comparison the reader can see. Name it befor
 - **A run that barely moves** (`SERIES_FLAT`): every series moves less than a tenth of the axis it is drawn on - often because a zero baseline or a second series at another level blew the axis out. The chart reads as a level. Say the level in the title or as figures; set the latest period's values side by side as bars where the point is how they compare; or plot what moves - the change on the period before, each series indexed to its first period, or a line whose axis starts near its values. A level set against a target line or band is exempt: it compares.
 - **One comparison drawn as a long series** (`ONE_COMPARISON`): six periods or more whose only number marks are one change between the same two periods, while the periods between stay within those two and close to the straight line between them. Draw the two periods (two columns, or a `slope`) with the change on them, or give the periods between a mark of their own (a callout, an event, a band) where what happens there is the point.
 
-One value drawn as a chart, or one period on a chart that joins periods, compares nothing either (`NO_COMPARISON`): two figures for one year are two columns side by side, or the figures themselves.
+One value drawn as a chart, or one period on a chart that joins periods, compares nothing either (`NO_COMPARISON`). Two values in one series hold half a page, not a page: set the chart beside its insight column (`commentary: "beside"`) or as one of two panels, label the bars rather than drawing an axis, and bracket the change between them with its label (`changeAnnotations`, `style: "bracket"`). Across the full width they stand only with that change drawn; with nothing marked and nothing beside them they read as an empty page and are refused. Two entities with one value each read better among their peers with the subject highlighted, or as two figures with the difference stated; two values that barely differ are one number.
 
 ## Draw it honestly
 
 - **Every position encodes a measure.** A scatter's axes are two measured quantities with their units; categories sit at fixed positions as labels. Do not jitter or offset marks to separate them; label them instead.
 - **Bars and areas start at zero.** A line may start above zero when the change is the point; say so in the axis.
 - **Show what was measured, no more.** Only a start and an end known: two bars or a slope, not a line with invented points. A rate repeated over years is a scenario, not a trend.
+- **A scenario shows its drivers.** Market × share × price → volume and revenue, as a table of scenarios or a bridge, not one input times three assumed rates.
 - **Keep kinds apart.** Actuals, estimates, forecasts and targets look different (`forecastFrom`, `assumedFrom`, `targets`); say the basis of each in the heading or a note.
 - **Round for display, not before.** Compute from unrounded inputs; a total that disagrees with its parts as published keeps the published figures and a note.
 - **Totals are the runtime's.** A waterfall bound to a measure marks its first and last members as totals; stacked charts print each stack's total unless `stackTotals: false`.

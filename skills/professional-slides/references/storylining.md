@@ -6,27 +6,31 @@ A storyline is the order in which one reader needs to hear an argument. Write it
 
 Ask before writing a title:
 
-- **Who reads it, and how.** A board walked through it in twenty minutes, a team reading it alone, a room watching it presented. This sets how many pages, whether the deck needs an appendix, and how much text a page carries: record it as `density` on `deck` - `live-pitch` for a room watching it presented, `executive` for a deck presented or sent ahead, `pre-read` for one read alone. A reference deck the user gave sets it instead, when its import inferred one; a habit stored from another deck does not.
-- **What they already know.** Have they seen the source? Do they know its terms, the method, the players? A deck summarising a benchmark for people who have never seen the benchmark must first say what was measured, on what, and how it was scored; the same deck for the benchmark's own team skips that and goes straight to the findings. Record the answer as `readerKnows` on `deck`.
-- **What it is for.** A decision, a recommendation, an update, an explanation. Record it as `decision`, and the question the deck answers as `question`.
+- **Who reads it, and how.** A board walked through it in twenty minutes, a team reading it alone, a room watching it presented. This sets how many pages and how much a page carries: its `density` is `live-pitch` for a room, `executive` for a deck presented or sent ahead, `pre-read` for one read alone (a reference deck's import may set it instead).
+- **What they already know.** Their source, its terms, the method, the players. A benchmark summary for people who have never seen the benchmark first says what was measured and how it was scored; for the benchmark's own team it goes straight to the findings.
+- **What it is for.** A decision, a recommendation, an update, an explanation.
 
-When the user gives a source and no more ("make a deck from this"), ask these three questions in one message, each with a recommended default. Do not guess the reader.
+Unless the request says, ask these three in one message, each with a recommended default. Do not guess the reader. The answers go in the storyline's `reader` (`audience`, `readerKnows`, `decision`, `density`), which `--scaffold` copies onto `deck`.
 
 ## The shape of a storyline
 
-1. **The setup the reader needs.** Only what this reader lacks: what the subject is, how the evidence was gathered, what the terms mean. One to three pages for a reader new to the source; none for one who knows it.
-2. **The answer.** One sentence that answers the question, sharp enough to be wrong. It opens the deck as the executive summary's title, or the first finding's.
+1. **The setup the reader needs.** Only what this reader lacks: what the subject is, how the evidence was gathered, what the terms mean. One to three pages for a reader new to the source; none for one who knows it. It opens on what is true and agreed (the situation), then what changed and why now (the complication): an answer to a question the reader has not been shown is a claim without a reason.
+2. **The answer.** One sentence that answers the question, sharp enough to be wrong, and sized in the reader's terms - money, units or share, with a range; "considerable" is not yet an answer. It opens the deck as the executive summary's title, or the first finding's.
 3. **The findings that prove it.** Three to five sections, each a claim that holds part of the answer up. Together they leave nothing needed to accept it; no two say the same thing. For a comparison, one section per criterion that decides it; for a recommendation, one per condition the choice depends on.
 4. **Pages under each finding.** Each page title proves part of its section's claim. A page whose title does not prove its section's claim is in the wrong section, or the section is missing a claim.
 5. **What follows.** The implication, the recommendation, the limits of the evidence and what would change the answer. Limits the source states itself take a page, not a footnote. The deck ends on the implication: its last page says what the reader should take away or do, not only what comes next.
 
-Read the titles down the deck alone: they should tell the whole argument. Read each level across: the sections should not overlap and together should be enough.
+Read the titles down the deck alone, as the reader in `readerKnows`: they should tell the whole argument, each following from the ones before. A term, actor or mechanism the reader first meets in a finding - "replacement" before anything says what is replaced, by when and why - is a missing setup page or a missing clause. Read each level across: the sections should not overlap and together should be enough.
 
-**Length follows the evidence and the occasion.** A board deck presented live runs eight to fifteen pages; a pre-read fifteen to thirty; detail, method and reference tables go to the appendix. Do not pad a deck to a length, and do not split one table or one chart across pages to make more of them.
+## How many pages
+
+Count them from the storyline: the executive summary; the setup this reader lacks; one page per distinct analysis each section's claim needs, usually two to four (a one-page section is a claim with one piece of evidence; a six-page section is two sections); one or two closing pages; and an appendix for method, sources and full tables. Then hold the count to the occasion - eight to fifteen body pages presented live, fifteen to thirty for a pre-read, thirty or more for a reference or diligence deck. A tree longer than the occasion moves detail to the appendix; a shorter one is missing analyses, not pages. When the user names a length, plan the analyses that fill it and say where it would pad. Never split one table or chart to make pages. The approval message states the count, its breakdown and one alternative length with what it drops or adds.
 
 ## Find the data first
 
-The titles a deck can prove depend on the data it has. Before writing them, read the source fully and collect what it measures: series over time, the whole set of members compared, shares, the steps of a change. Record each set of numbers in `<id>.insights.json` as a measure, and give every measure its `unit`, the `population` it describes and the `period` it is for (a series lists its `periods`); the compile refuses a measure without them:
+The titles a deck can prove depend on the data it has. Before writing them, name for each section's claim the analyses that would convince a sceptic: **size** it in the reader's units; **split** it by segment, type, customer or region; **compare** it with every alternative the reader would name, not one; **trend** it, history and forecast; **explain** it - the drivers, as a bridge, a tree or a process. A claim with one analysis behind it is a hypothesis: give it a second cut, or narrow it. A chart of the deck's own arithmetic - one input times assumed rates - is a sensitivity, not evidence.
+
+Read the source fully and collect what it measures: series over time, the whole set of members compared, shares, the steps of a change. With no source, research is the source, in two batches: one scan before the storyline, enough to form the answer and know what data exists; after approval, the datasets the approved analyses need, searched for together in a few parallel rounds, never page by page. Prefer the whole set - every type, every customer, every year - to a headline figure, and two independent sources for the figures the answer rests on. An analysis whose data cannot be found is dropped, and its claim narrows. Record each set of numbers in `<id>.insights.json` as a measure, and give every measure its `unit`, the `population` it describes and the `period` it is for (a series lists its `periods`); the compile refuses a measure without them:
 
 ```json
 { "schema": "professional-slides.insights/v1", "insights": [
@@ -35,7 +39,7 @@ The titles a deck can prove depend on the data it has. Before writing them, read
       "members": ["A", "B", "C"], "values": [71, 64, 58] } }, "cite": ["benchmark"] } ] }
 ```
 
-A page then prints the numbers by reference - an exhibit's `series: [{ "measure": "i-scores/score", "name": "Score" }]`, or `{{i-scores/score@A | 0}}` in any text - and the runtime writes them, so a number is typed once. A number typed on a page that matches no recorded value is advised (`NUMBER_UNTRACED`). Cite each source once in the pages file's `sources` registry and name it on the page by key (`source: ["benchmark"]`); the footer line is written from it. The footer takes the fullest form that fits: `name` with its `status` in brackets, else `short` with it, else `short` alone - so a status shows only where there is room - and adds the publication `date` unless the name already gives that month and year. `retrieved` is kept in the notes, never the footer.
+A page then prints the numbers by reference - an exhibit's `series: [{ "measure": "i-scores/score", "name": "Score" }]`, or `{{i-scores/score@A | 0}}` in any text - and the runtime writes them, so a number is typed once. A number typed on a page that matches no recorded value is advised (`NUMBER_UNTRACED`). Cite each source once in the pages file's `sources` registry and name it on the page by key (`source: ["benchmark"]`); the runtime writes the footer line from it, at the fullest form that fits.
 
 ## Titles
 
@@ -66,7 +70,9 @@ A summary carries the answer and the case for it, in four to six developed state
 
 ## Approve the storyline
 
-Show the user the titles in order, each with its page type and the data behind it, and ask for approval in one message. A chart page lists its candidate charts, best first, and the one taken ([Drawing](drawing.md#pick-the-obvious-chart)); where the deck needs variety, take a page's next candidate, not a chart that draws its claim less directly. The user can reorder, cut, merge or add pages there, where it is cheap. Once approved, write each page once; change a title afterwards only when the evidence changes.
+The `storyline` block of the pages file holds the argument (`catalog --type storyline --schema`); `storyline WORK` prints it as the approval message - the count and its breakdown, the reader, the tree, each page's comparison, candidate charts and data. Show it to the user and wait: they can reorder, cut, merge or add pages there, where it is cheap. A chart page's candidates are the charts that draw its claim, best first ([Drawing](drawing.md#pick-the-obvious-chart)); where the deck needs variety, take a page's next candidate, not a chart that draws its claim less directly.
+
+A request to make a deck is not approval: approval is the user's reply to the storyline, or their explicit words that they do not want to see it, recorded verbatim with `--approve`. Once approved, write each page once; change a title afterwards only when the evidence changes. A page added or dropped is a new storyline to approve.
 
 ## Revising a deck
 
