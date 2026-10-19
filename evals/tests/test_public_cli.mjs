@@ -4,7 +4,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { execute, COMMANDS } from '../../skills/professional-slides/runtime/command.mjs';
-import { newWorkspace, editWorkspace, openWorkspace, fingerprint, digest, contentSignature, renderedSlide } from '../../skills/professional-slides/runtime/public/workspace.mjs';
+import { newWorkspace, editWorkspace, openWorkspace, fingerprint, digest, contentSignature, renderedSlide, rankedAdvisories } from '../../skills/professional-slides/runtime/public/workspace.mjs';
+import { approvalMessage, shortPages } from '../../skills/professional-slides/runtime/public/storyline.mjs';
 import { ownerOf } from '../../skills/professional-slides/runtime/public/setup.mjs';
 import { privateAddress, readSite } from '../../skills/professional-slides/runtime/site-design.mjs';
 import { applyCandidate } from '../../skills/professional-slides/runtime/public/candidates.mjs';
@@ -84,13 +85,13 @@ test('the shipped reference example compiles to editable text rather than a flat
   assert.equal(scene.slides[0].nodes[0].text,'A native title');
 });
 
-// A new deck waits for an approved storyline: the A350F deck went from a request to rendered pages with none shown.
-const storyline=()=>({question:'How much upside?',answer:'150-250 aircraft, $60-100bn at list',
-  reader:{audience:'strategy team',readerKnows:'freight basics',decision:'size the opportunity',density:'pre-read'},
+// A new deck waits for an approved storyline: asking for a deck is not approval.
+const storyline=()=>({question:'How much upside?',answer:'150-250 units, $60-100m at list',
+  reader:{audience:'strategy team',readerKnows:'the market basics',decision:'size the opportunity',density:'pre-read'},
   sections:[{role:'opening',pages:[{id:'summary',title:'Executive summary',type:'summary/executive-summary'}]},
-    {claim:'The fleet must be replaced',pages:[{id:'fleet',title:'Large freighters are ageing out',type:'ranking/bar',compares:'seven types by age',members:7,
-      candidates:['ranking/bar','lookup/table'],data:{status:'to-find',what:'in-service fleet by type and build year'}}]}],
-  alternative:'10 pages: drops the fleet detail'});
+    {claim:'The installed base must be replaced',pages:[{id:'fleet',title:'Older units are ageing out',type:'ranking/bar',compares:'seven types by age',members:7,
+      candidates:['ranking/bar','lookup/table'],data:{status:'to-find',what:'installed base by type and build year'}}]}],
+  alternative:'10 pages: drops the installed-base detail'});
 test('a new deck takes no page until the user approves its storyline, and builds only the pages they approved',async t=>{
   const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
   const prev=process.env.PROFESSIONAL_SLIDES_HOME;process.env.PROFESSIONAL_SLIDES_HOME=path.join(dir,'home');t.after(()=>{if(prev===undefined)delete process.env.PROFESSIONAL_SLIDES_HOME;else process.env.PROFESSIONAL_SLIDES_HOME=prev;});
@@ -108,7 +109,7 @@ test('a new deck takes no page until the user approves its storyline, and builds
   assert.equal(shown.status,'needs-input');
   assert.match(shown.requiredInputs[0].message,/^Storyline: 2 pages \(1 opening · 1 in 1 section\)/);
   // One shape at every length: a line or two a page in the message, each page's comparison in storyline.md beside it.
-  assert.match(shown.requiredInputs[0].message,/2\* Large freighters are ageing out\n\s+ranking\/bar · 7 members · data to-find/);
+  assert.match(shown.requiredInputs[0].message,/2\* Older units are ageing out\n\s+ranking\/bar · 7 members · data to-find/);
   assert.match(shown.requiredInputs[0].message,/\* The data behind this page is still to find/);
   assert.match(await fs.readFile(path.join(work,'storyline.md'),'utf8'),/compares seven types by age \(7 members\)/);
   await assert.rejects(execute(['storyline',work,'--scaffold','--approve','yes']),/Choose/);
@@ -117,7 +118,7 @@ test('a new deck takes no page until the user approves its storyline, and builds
   assert.equal((await execute(['storyline',work,'--scaffold'])).status,'complete');
   const scaffolded=(await openWorkspace(work)).doc;
   assert.deepEqual(scaffolded.pages.map(p=>[p.id,p.type,p.form]),[['summary','summary','executive-summary'],['fleet','ranking','bar']]);
-  assert.equal(scaffolded.deck.readerKnows,'freight basics');
+  assert.equal(scaffolded.deck.readerKnows,'the market basics');
   assert.equal(scaffolded.storyline.approval.words,'Looks right, go ahead');
   // A page the user did not approve reopens the storyline; so does a storyline changed after approval.
   await fs.writeFile(opened.file,JSON.stringify({...scaffolded,pages:[...scaffolded.pages,{...doc().pages[0],id:'extra'}]}));
@@ -130,17 +131,17 @@ test('a new deck takes no page until the user approves its storyline, and builds
 });
 test('check stops before the render on a full-width two-bar chart and on text a placement sets aside',async t=>{
   const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
-  const chart=(more)=>({id:'two',type:'ranking',form:'column',title:'The A350F burns a fifth less fuel than the 777F',
-    exhibit:{heading:'Fuel burn',unit:'index',categories:['777F','A350F'],series:[{name:'Fuel',values:[100,80]}]},...more});
+  const chart=(more)=>({id:'two',type:'ranking',form:'column',title:'Model A uses a fifth less energy than Model B',
+    exhibit:{heading:'Energy use',unit:'index',categories:['Model B','Model A'],series:[{name:'Energy',values:[100,80]}]},...more});
   const deck={schema:'professional-slides.deck/v3',id:'deck',contents:false,assets:{fetch:'none',reason:'test'}};
   await newWorkspace(dir,{deck,pages:[chart({commentary:'on-exhibit'})]});
   const full=await execute(['check',dir]);
   assert.equal(full.status,'blocked');assert.equal(full.stage,'compile');
   assert.deepEqual(full.findings.map(f=>f.code),['NO_COMPARISON']);
   const work=await openWorkspace(dir);
-  await fs.writeFile(work.file,JSON.stringify({deck,pages:[chart({commentary:'beside',points:[{lead:'Fuel is a third of trip cost',text:'A fifth less fuel takes about seven points off the cost of a long-haul trip.'}]})]}));
+  await fs.writeFile(work.file,JSON.stringify({deck,pages:[chart({commentary:'beside',points:[{lead:'Energy is a third of running cost',text:'A fifth less energy takes about seven points off the running cost.'}]})]}));
   assert.ok(!(await execute(['check',dir])).findings.some(f=>f.code==='NO_COMPARISON'));
-  await fs.writeFile(work.file,JSON.stringify({deck,pages:[{...chart({commentary:'on-exhibit'}),exhibit:{heading:'Fleet',unit:'aircraft',categories:['747-400F','777F','MD-11F'],series:[{name:'Fleet',values:[120,240,60]}]},points:[{lead:'Set aside',text:'A point the placement does not draw.'}]}]}));
+  await fs.writeFile(work.file,JSON.stringify({deck,pages:[{...chart({commentary:'on-exhibit'}),exhibit:{heading:'Installed base',unit:'units',categories:['Model A','Model B','Model C'],series:[{name:'Units',values:[120,240,60]}]},points:[{lead:'Set aside',text:'A point the placement does not draw.'}]}]}));
   const adjusted=await execute(['check',dir]);
   assert.equal(adjusted.status,'blocked');
   assert.ok(adjusted.findings.some(f=>f.code==='PAGE_ADJUSTED'));
@@ -241,17 +242,17 @@ test('a research batch is filed as a part of the insight log, its measure names 
   await execute(['init',work]);
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'deck.insights.json'),'utf8')).insights,[],'init starts the insight log');
   const batch=path.join(dir,'fleet.json');
-  await fs.writeFile(batch,JSON.stringify({sources:{wiki:{name:'Wikipedia, List of 747 operators (Jul 2026)',status:'estimate',extra:'dropped'}},
-    insights:[{id:'i-builds',finding:'Delivered by band',cite:['wiki','elsewhere'],measures:{'777F':{unit:'aircraft',population:'777F delivered',period:'2009-2026',members:['2005-2014','2015 or later'],values:[99,232]}}}]}));
+  await fs.writeFile(batch,JSON.stringify({sources:{wiki:{name:'Wikipedia, List of operators (Jul 2026)',status:'estimate',extra:'dropped'}},
+    insights:[{id:'i-builds',finding:'Delivered by band',cite:['wiki','elsewhere'],measures:{'9X':{unit:'units',population:'Model 9X delivered',period:'2009-2026',members:['2005-2014','2015 or later'],values:[99,232]}}}]}));
   const filed=await execute(['insights',work,'--add',batch]);
   assert.equal(filed.status,'complete');
-  assert.deepEqual(filed.renamed,['i-builds/777F is i-builds/m777F']);
+  assert.deepEqual(filed.renamed,['i-builds/9X is i-builds/m9X']);
   assert.deepEqual(filed.advisories.map(a=>a.code),['MEASURE_RENAMED','SOURCE_NOT_IN_BATCH']);
-  assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'insights','fleet.sources.json'),'utf8')),{wiki:{name:'Wikipedia, List of 747 operators (Jul 2026)',status:'estimate'}});
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'insights','fleet.sources.json'),'utf8')),{wiki:{name:'Wikipedia, List of operators (Jul 2026)',status:'estimate'}});
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'deck.insights.json'),'utf8')).include,['insights/fleet.json']);
   // A batch that records an insight another batch holds is refused, and the log is left as it was.
   const again=path.join(dir,'again.json');
-  await fs.writeFile(again,JSON.stringify({sources:{},insights:[{id:'i-builds',finding:'x',measures:{n:{unit:'aircraft',population:'p',period:'2026',value:1}}}]}));
+  await fs.writeFile(again,JSON.stringify({sources:{},insights:[{id:'i-builds',finding:'x',measures:{n:{unit:'units',population:'p',period:'2026',value:1}}}]}));
   assert.equal((await execute(['insights',work,'--add',again])).status,'blocked');
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(work,'deck.insights.json'),'utf8')).include,['insights/fleet.json']);
   assert.equal((await execute(['catalog','--type','sources','--schema'])).schemaDefinition.additionalProperties.required[0],'name');
@@ -276,4 +277,29 @@ test('the picture libraries report which have a key, and never the key',async t=
   const shown=await execute(['keys','--json']);
   assert.deepEqual(Object.keys(shown.pictureKeys),['pexels','unsplash','pixabay']);
   assert.ok(!JSON.stringify(shown).includes('KEY='));
+});
+
+test('the storyline message counts the pages the build adds, marks pages whose data is unchecked and names a skipped candidate',()=>{
+  const plan={question:'How large is the market?',answer:'Large enough to enter',alternative:'10 pages',
+    reader:{audience:'executives',readerKnows:'the sector',decision:'whether to enter',density:'executive'},
+    sections:[{role:'opening',pages:[{id:'exec',title:'Executive summary',type:'summary/executive-summary'}]},
+      {role:'finding',name:'Demand',claim:'Demand is large',pages:[
+        {id:'forecast',title:'Demand doubles by 2035',type:'composition/stacked-bar',compares:'demand by segment',members:3,series:2,candidates:['composition/stacked-bar'],data:{status:'found',what:'a forecast'}},
+        {id:'pair',title:'Product A costs 20% less',type:'ranking/bar',compares:'two products',members:2,candidates:['ranking/bar'],data:{status:'to-find',what:'claims'}}]},
+      {role:'finding',name:'Traction',claim:'Customers choose it',pages:[
+        {id:'orders',title:'Orders by year',type:'trend/line',compares:'orders by year',members:6,candidates:['trend/stacked-column','trend/line'],data:{status:'to-find',what:'order book'}}]},
+      {role:'appendix',pages:[{id:'glossary',title:'Glossary',type:'lookup/table',compares:'terms',data:{status:'found',what:'definitions'}}]}]};
+  const withContents=approvalMessage(plan,{contents:'once'}),without=approvalMessage(plan,{contents:false});
+  assert.ok(withContents.includes('The build adds the cover, a contents page, 2 section dividers and an appendix divider: 10 pages in all, 11 if the deck carries photographs'));
+  assert.ok(without.includes('The build adds the cover and an appendix divider: 7 pages in all'));
+  assert.match(withContents,/\n\s+3\* Product A costs 20% less/);
+  assert.ok(withContents.includes('not its first candidate, trend/stacked-column'));
+  assert.ok(withContents.includes('* The data behind this page is still to find'));
+  assert.deepEqual(shortPages(plan).map(f=>f.id),['pair']);
+});
+
+test('advisories put a changed title first and merge untraced numbers into one line',()=>{
+  const out=rankedAdvisories([{code:'NUMBER_UNTRACED',id:'a'},{code:'SCENE_DENSE',id:'b'},{code:'NUMBER_UNTRACED',id:'c'},{code:'NUMBERS_DISAGREE',id:'d'},{code:'STORYLINE_TITLE_CHANGED',id:'e'}]);
+  assert.deepEqual(out.map(f=>f.code),['STORYLINE_TITLE_CHANGED','NUMBERS_DISAGREE','SCENE_DENSE','NUMBER_UNTRACED']);
+  assert.deepEqual(out.at(-1).pages,['a','c']);
 });

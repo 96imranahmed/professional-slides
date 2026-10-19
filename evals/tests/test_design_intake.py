@@ -444,3 +444,12 @@ console.log(JSON.stringify({{ backend: ctx.backend, has: ctx.hasFont('Brand Sans
                                      capture_output=True, text=True, timeout=300, env={**os.environ, "PROFESSIONAL_SLIDES_HOME": home})
             self.assertEqual(missing.returncode, 2)
             self.assertIn("is not installed on this machine", missing.stderr)
+
+    def test_a_colour_the_site_names_for_its_brand_outranks_a_frequent_body_colour(self):
+        result = run_node('''
+import { siteDesign } from './skills/professional-slides/runtime/site-design.mjs';
+const css = [':root { --site-color-primary-90: #1A3D6E; --site-color-primary-50: #3C78C8; }',
+  ...Array.from({ length: 20 }, () => 'p { color: #2B333F } .x { border-color: #2B333F }')].join('\\n');
+console.log(JSON.stringify(siteDesign([css]).brand));
+''')
+        self.assertEqual(result, {"primary": "#1A3D6E", "accent": "#3C78C8"})

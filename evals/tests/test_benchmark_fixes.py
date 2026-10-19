@@ -46,7 +46,7 @@ class StorylineTests(unittest.TestCase):
         self.assertIn("references/storylining.md", skill)
         self.assertIn("Limits the source states itself take a page", guide)
         self.assertIn("The deck ends on the implication", guide)
-        # The A350F deck went from a request to rendered pages with no storyline shown: asking for a deck is not approval.
+        # Asking for a deck is not approval: the storyline is shown before any page.
         self.assertIn("A request to make a deck is not approval", skill)
         self.assertIn("A request to make a deck is not approval", guide)
         self.assertNotIn("Commands do not ask questions", skill)
