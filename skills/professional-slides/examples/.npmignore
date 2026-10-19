@@ -1,0 +1,10 @@
+gallery-acceptance.deck.json
+*.author-log.jsonl
+*.author-cache.json
+*.compose-cache.json
+page-types.deck.json
+page-types.plan.json
+page-types.content.json
+page-forms.deck.json
+page-forms.plan.json
+page-forms.content.json

@@ -16,8 +16,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 
-ROOT_FILES = {'plugin.json', '.codex-plugin/plugin.json', '.claude-plugin/plugin.json',
-              'README.md', 'requirements.txt'}
+ROOT_FILES = set(json.loads((ROOT / 'distribution.json').read_text())['files'])
 EXCLUDED = {'dist', 'output', 'outputs', 'tmp', 'deliverables', 'renders',
             'node_modules', '__pycache__', '.git'}
 IMAGES = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
@@ -140,21 +139,26 @@ def validate(destination):
     return data
 
 
+def public_readme(source):
+    """Keep user flows identical in repository, npm and public plugin docs."""
+    text = (Path(source) / 'README.md').read_text()
+    start = text.index('## Development and packaging')
+    end = text.index('## Support and policies', start)
+    return text[:start] + text[end:]
+
+
 def build_submission(source, output):
     source, output = Path(source).resolve(), Path(output).resolve()
     if output == source or source.is_relative_to(output):
         raise ValueError('Output cannot replace the source')
     destination = output / 'professional-slides'
     package(source, destination)
-    # Development README links omitted test tools; the public README is source.
-    (destination / 'README.md').write_bytes((source / 'submission/README-DISTRIBUTION.md').read_bytes())
-    # The skill's setup line names the requirements file from the repository root; the package has it two levels up.
-    skill = destination / 'skills/professional-slides/SKILL.md'
-    text = skill.read_text().replace('From the repository: `python3 -m pip install -r requirements.txt`.',
-                                     'From the skill directory: `python3 -m pip install -r ../../requirements.txt`.')
-    if 'pip install -r ../../requirements.txt' not in text:
-        raise ValueError('SKILL.md no longer names the requirements file where the submission expects it')
-    skill.write_text(text)
+    # Publish the same setup and user flows, without links to omitted eval tools.
+    (destination / 'README.md').write_text(public_readme(source))
+    # The bundled public CLI resolves package resources relative to its own
+    # location in both distributions; no prompt rewriting or path patch needed.
+    if not (destination / 'skills/professional-slides/runtime/command.mjs').is_file():
+        raise ValueError('Submission is missing the public CLI')
     data = validate(destination)
     files = {p.relative_to(destination).as_posix(): {
         'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'bytes': p.stat().st_size}

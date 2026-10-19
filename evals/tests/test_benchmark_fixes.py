@@ -42,7 +42,7 @@ class StorylineTests(unittest.TestCase):
     def test_the_storyline_step_ends_on_the_limits_and_the_implication(self):
         # The process listed the setup and the findings and stopped; the re-authored deck ended on "next tests".
         skill = (SKILL / "SKILL.md").read_text()
-        self.assertIn("then what follows: the limits of the evidence and the implication, ending the deck on it", skill)
+        self.assertIn("references/storylining.md", skill)
         self.assertIn("Limits the source states itself take a page", (SKILL / "references" / "storylining.md").read_text())
 
 

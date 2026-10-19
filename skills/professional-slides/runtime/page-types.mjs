@@ -22,6 +22,7 @@ import { measureInsight } from "./registry-text.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase } from "./text-layout.mjs";
+import { validateReference, REFERENCE_SCHEMA } from "./reference-page.mjs";
 import { sourceDate } from "./sources-registry.mjs";
 import { halvesProblems } from "./compose-layouts.mjs";
 import { checkPictures } from "./compose-pictures.mjs";
@@ -207,6 +208,7 @@ export const PAGE_TYPES = Object.freeze({
     forms: { "executive-summary": "executive-summary", takeaways: "takeaways" },
     commentary: ["none"], exhibits: [0, 1],
   },
+  reference: { task: "reconstruct a supplied slide image as editable native elements", forms: { native: "reference" }, commentary: ["none"], exhibits: 0 },
 });
 
 /**
@@ -807,6 +809,11 @@ export function compilePage(pageIn, index = 0, { players = null, spineOnly = fal
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
+  if (page.type === "reference") {
+    validateReference(page);
+    return { id, kind: "reference", title: page.title, reference: page.reference, nodes: page.nodes, notes: page.notes,
+      uncertainties: page.uncertainties || [], ...(page.hidden ? { hidden: true } : {}) };
+  }
   if (!page.type) {
     // A section's number is the divider's numeral and the tracker's marker;
     // "01 / " written into its title as well numbers it three ways.
@@ -1377,10 +1384,11 @@ const FORM_SCHEMA = {
  * generation: the pages file, or with `only` the page schema of one type.
  */
 export function pageSchema(only = null) {
+  if (only === "reference") return REFERENCE_SCHEMA;
   if (only !== null && !PAGE_TYPES[only]) throw new Error(`unknown page type "${only}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   // Any page, typed or structural, may be hidden.
   const hidden = { type: "boolean", description: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide's page carries it, and a page composed where a hidden slide stood is hidden without it; false shows the slide again" };
-  const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => ({
+  const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => name === "reference" ? REFERENCE_SCHEMA : ({
     type: "object",
     required: ["id", "type", "title"],
     properties: {

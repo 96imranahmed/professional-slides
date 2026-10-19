@@ -384,6 +384,8 @@ export function unreadKeys(exhibit, { type, form, kind = exhibit?.type } = {}) {
  * on a form the type does not have.
  */
 export function formFields(type, form) {
+  if (type === "reference" && form === "native") return { form: "reference/native", task: PAGE_TYPES.reference.task, draws: "editable reference nodes", exhibits: 0,
+    commentary: ["none"], page: { reference: "supplied source image path", nodes: "native elements on the 1280 x 720 canvas; catalog --type reference --schema", uncertainties: "unreadable content and uncertain values" } };
   const t = PAGE_TYPES[type];
   if (!t) throw new Error(`unknown page type "${type}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   if (!Object.hasOwn(t.forms, form)) throw new Error(`${type} has no form "${form}"; its forms: ${Object.keys(t.forms).join(", ")}`);

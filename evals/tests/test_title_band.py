@@ -160,7 +160,7 @@ import fs from 'node:fs';
 const base=JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json','utf8')).pages.find(p=>p.id==='p03');
 const error=(page)=>{ try { compilePage(page); return null; } catch (e) { return e.message; } };
 const ok=compilePage({...base,subtitle:'Passenger journeys a year, all lines, FY19 to FY26'});
-const schema=pageSchema().properties.pages.items.oneOf.filter(t=>t.properties.type);
+const schema=pageSchema().properties.pages.items.oneOf.filter(t=>t.properties.type && t.properties.type.const !== 'reference');
 console.log(JSON.stringify({kept:ok.subtitle,
   statement:error({id:'s',type:'statement',form:'statement',commentary:'none',takeaway:false,why:'The claim stands alone as the message page',text:'The peak is full',title:'The peak is full',subtitle:'All lines'}),
   schema:schema.every(t=>t.properties.subtitle && !t.required.includes('subtitle')),

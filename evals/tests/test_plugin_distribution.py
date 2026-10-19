@@ -117,7 +117,7 @@ class PluginDistributionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source, dest = Path(tmp)/'source', Path(tmp)/'package'
             for name in [*MANIFESTS, 'skills/demo/SKILL.md', 'evals/scripts/check.py', 'output/private.pptx',
-                         'tmp/input.json', 'deliverables/report.json', '.context-engine.toml', 'package.json',
+                         'tmp/input.json', 'deliverables/report.json', '.context-engine.toml',
                          'package-lock.json', 'node_modules/pkg/package.json', 'skills/demo/__pycache__/x.py',
                          'skills/demo/runtime/__pycache__/x.py', 'skills/demo/output/data.json',
                          'skills/demo/outputs/data.json', 'skills/demo/dist/package.json', 'skills/demo/notes.txt']:
@@ -161,7 +161,7 @@ class PluginDistributionTests(unittest.TestCase):
                     # The build runs the scene design checks, so the overlap module ships with what it imports.
                     'skills/s/runtime/validate-overlap.mjs', 'skills/s/runtime/text-layout.mjs']:
             self.assertTrue(ships(rel), rel)
-        for rel in ['package.json', 'package-lock.json', 'evals/run.sh', 'evals/support/compose.mjs', 'assets/notes/icon.png',
+        for rel in ['package-lock.json', 'evals/run.sh', 'evals/support/compose.mjs', 'assets/notes/icon.png',
                     'skills/s/runtime/gates/.gitignore', 'skills/s/examples/page-types.author-log.jsonl',
                     'skills/s/examples/gallery-acceptance.deck.json', 'skills/s/examples/assets/notes.txt',
                     'skills/s/scratch/x.mjs', 'skills/s/.DS_Store']:
@@ -238,7 +238,9 @@ class ShippedPackageTests(RealPackage, unittest.TestCase):
         for name in (*MANIFESTS, 'README.md', 'requirements.txt', 'assets/icon.png',
                      'skills/professional-slides/SKILL.md'):
             self.assertIn(name, self.files)
-        self.assertNotIn('package.json', self.files, 'the dev manifest names devDependencies and scripts into evals/')
+        self.assertIn('package.json', self.files, 'npm and plugin installs share the versioned public CLI metadata')
+        self.assertIn('PRIVACY.md', self.files)
+        self.assertIn('TERMS.md', self.files)
         self.assertIn('python-pptx', (self.dest/'requirements.txt').read_text())
 
     def test_it_leaves_out_what_only_the_suite_uses(self):

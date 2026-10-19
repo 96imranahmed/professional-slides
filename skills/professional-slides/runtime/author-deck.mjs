@@ -432,7 +432,7 @@ export async function loggedSources(doc, dir, stem) {
   return readInsightLog(dir, stem).then((log) => logSources(dir, log)).catch(() => null);
 }
 
-const EXAMPLE_FILES = ["../examples/page-types.pages.json", "../examples/page-forms.pages.json"].map((file) => new URL(file, import.meta.url));
+const EXAMPLE_FILES = ["../examples/page-types.pages.json", "../examples/page-forms.pages.json", "../examples/reference.pages.json"].map((file) => new URL(file, import.meta.url));
 
 /** Every worked page, the worked deck's first, with the deck-level keys of that deck. */
 export function workedExamples() {

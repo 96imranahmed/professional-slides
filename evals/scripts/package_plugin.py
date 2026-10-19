@@ -19,15 +19,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # The plugin root: the three manifests (portable, Codex, Claude Code), the
 # README, and the Python requirements the emitter and pixel gates import.
-# package.json is the checkout's dev manifest - Playwright, sharp and scripts
-# into evals/ - and the runtime needs none of it, so it does not ship.
-ROOT_FILES = {
-    'plugin.json',
-    '.codex-plugin/plugin.json',
-    '.claude-plugin/plugin.json',
-    'README.md',
-    'requirements.txt',
-}
+# npm and plugin installs share the public CLI metadata and version. The
+# distribution contract names root files; repository-only evals stay out.
+ROOT_FILES = set(json.loads((ROOT / 'distribution.json').read_text())['files'])
 MANIFESTS = {'plugin.json', '.codex-plugin/plugin.json', '.claude-plugin/plugin.json'}
 IMAGES = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
 

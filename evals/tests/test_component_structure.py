@@ -75,8 +75,8 @@ console.log(JSON.stringify({
         # (the style classification): stat-list, flow, spectrum, layers, placement,
         # rank-flow, sankey, pictogram, arrow-rows, capsules, fact-grid,
         # zone-matrix, device-frame, worksheet, speech and side-statement.
-        self.assertEqual(result["registry"], 110)
-        self.assertEqual(result["components"], 83)
+        self.assertEqual(result["registry"], 111)
+        self.assertEqual(result["components"], 84)
         self.assertEqual(result["charts"], 27)
         self.assertEqual(result["layoutFixtures"], 76)
         self.assertGreater(result["componentBoards"], 0)

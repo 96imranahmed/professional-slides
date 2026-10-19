@@ -11,6 +11,7 @@
 //   registry-connectors.mjs    the connector between columns and the content rail
 //   registry-chart-title.mjs   the heading every chart draws
 import { registerChrome } from "./registry-chrome.mjs";
+import { registerReference } from "./reference-page.mjs";
 import { registerTextBlocks } from "./registry-text.mjs";
 import { registerDataBlocks } from "./registry-data.mjs";
 import { registerMediaBlocks, registerMedia } from "./registry-media.mjs";
@@ -41,7 +42,7 @@ const FAMILIES = [registerChrome, registerTextBlocks, registerDataBlocks, regist
   registerMedia, registerSegmentedEvidence, registerRelationshipNetwork, registerPanels, registerExtras, registerGantt, registerFramework, registerFigures, registerExhibitLinks];
 
 export function createRegistry() {
-  return FAMILIES.reduce((registry, register) => register(registry), new Map());
+  return [...FAMILIES, registerReference].reduce((registry, register) => register(registry), new Map());
 }
 
 export const REGISTRY = createRegistry();
