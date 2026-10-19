@@ -9,7 +9,7 @@ import { readPagesFile, compiledFrom } from "../pages-file.mjs";
 import { buildDeck } from "../build-deck.mjs";
 import { REFERENCE_SCHEMA, validateReference } from "../reference-page.mjs";
 import { readPreferences, deckKeys, applyToDeck, reuseLine } from "../preferences.mjs";
-import { storylineNeed, storylineDrift } from "./storyline.mjs";
+import { storylineNeed, storylineDrift, storylineHold } from "./storyline.mjs";
 
 export const runtime = fileURLToPath(new URL("../", import.meta.url));
 export const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -217,11 +217,11 @@ const STOP_BEFORE_RENDER = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
 
 /** A new argument's pages against its approved storyline: held when one is unapproved, or pages were added or dropped since. */
 function argumentHeld(work) {
-  const need = storylineNeed(work);
-  if (need) return { held: needed([need]) };
-  if (work.project?.argument !== "new") return { advisories: [] };
-  const drift = storylineDrift(work);
-  if (drift.missing.length || drift.added.length) return { held: needed([{ kind: "storyline-approval", code: "STORYLINE_PAGES_CHANGED", missing: drift.missing, added: drift.added,
+  const hold = storylineHold(work);
+  if (hold?.need) return { held: needed([hold.need]) };
+  if (work.project?.argument !== "new" && work.doc.storyline === undefined) return { advisories: [] };
+  const drift = hold?.drift ?? storylineDrift(work);
+  if (hold?.drift) return { held: needed([{ kind: "storyline-approval", code: "STORYLINE_PAGES_CHANGED", missing: drift.missing, added: drift.added,
     message: `The pages differ from the storyline the user approved${drift.added.length ? `; added: ${drift.added.join(", ")}` : ""}${drift.missing.length ? `; not written: ${drift.missing.join(", ")}` : ""}.`,
     ask: "Write the pages the user approved, or change the storyline to the pages the deck needs and show them the new version (`storyline WORK`)." }]) };
   return { advisories: drift.retitled.map((id) => ({ code: "STORYLINE_TITLE_CHANGED", id, severity: "advisory",

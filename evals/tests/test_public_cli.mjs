@@ -206,3 +206,28 @@ test('a reconstruction keeps the imported slide it stands for, and a picture tak
 test('the commands that build take --no-fetch',async()=>{
   for(const name of ['build','options','style build'])assert.equal(COMMANDS[name].flags['no-fetch'].type,'boolean',name);
 });
+test('author-deck and build-deck hold a new argument to its approved storyline too',async t=>{
+  const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const { spawnSync } = await import('node:child_process');
+  const { buildDeck } = await import('../../skills/professional-slides/runtime/build-deck.mjs');
+  const { readPagesFileSync, compiledFrom } = await import('../../skills/professional-slides/runtime/pages-file.mjs');
+  const author=(file)=>spawnSync(process.execPath,[path.resolve('skills/professional-slides/runtime/author-deck.mjs'),file],{encoding:'utf8'});
+  const one={...storyline(),sections:[{claim:'The decision is clear',pages:[{id:'one',title:'The decision is clear',type:'statement/statement'}]}]};
+  const file=path.join(dir,'deck.pages.json');
+  await fs.writeFile(file,JSON.stringify({...doc(),storyline:one}));
+  const refused=author(file);
+  assert.equal(refused.status,2);assert.match(refused.stderr,/STORYLINE_UNAPPROVED/);
+  // A workspace `init` started holds its pages even with no storyline written.
+  await fs.writeFile(path.join(dir,'project.json'),JSON.stringify({schema:'professional-slides.project/v1',pages:'deck.pages.json',argument:'new'}));
+  await fs.writeFile(file,JSON.stringify(doc()));
+  assert.match(author(file).stderr,/STORYLINE_UNAPPROVED/);
+  await fs.rm(path.join(dir,'project.json'));
+  // A deck.json compiled from pages whose storyline is unapproved is not built either.
+  await fs.writeFile(file,JSON.stringify({...doc(),storyline:one}));
+  const spec=path.join(dir,'deck.deck.json');
+  await fs.writeFile(spec,JSON.stringify({schema:'professional-slides.deck/v3',id:'deck',contents:false,slides:[{id:'one',kind:'statement',title:'The decision is clear',text:'Protect the original words'}],compiledFrom:compiledFrom(readPagesFileSync(file))}));
+  await assert.rejects(buildDeck(spec,path.join(dir,'out'),{render:false}),/user has not approved|STORYLINE_UNAPPROVED|approve/);
+  // Pages without a storyline, outside a new workspace, compile as before.
+  await fs.writeFile(file,JSON.stringify(doc()));
+  assert.equal(author(file).status,0);
+});

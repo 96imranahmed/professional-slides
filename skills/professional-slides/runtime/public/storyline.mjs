@@ -106,7 +106,7 @@ export function approvalMessage(storyline) {
   const parts = [count("opening") && `${count("opening")} opening`, count("setup") && `${count("setup")} setup`,
     `${count("finding")} in ${findings.length} section${findings.length === 1 ? "" : "s"}`, count("closing") && `${count("closing")} closing`].filter(Boolean);
   const r = storyline.reader;
-  const lines = [`Storyline: ${body} pages (${parts.join(" · ")})${count("appendix") ? ` + appendix of ${count("appendix")}` : ""}, plus the cover and any dividers`,
+  const lines = [`Storyline: ${body} page${body === 1 ? "" : "s"} (${parts.join(" · ")})${count("appendix") ? ` + appendix of ${count("appendix")}` : ""}, plus the cover and any dividers`,
     `Reader: ${r.audience} · knows: ${r.readerKnows} · for: ${r.decision} · read as: ${r.density}`,
     `Question: ${storyline.question}`, `Answer: ${storyline.answer}`, ""];
   let n = 0, a = 0, finding = 0;
@@ -148,6 +148,28 @@ export function storylineDrift(work) {
   const titles = new Map(approved.map((p) => [p.id, p.title]));
   return { missing: approved.filter((p) => !have.has(p.id)).map((p) => p.id), added: written.filter((p) => !ids.has(String(p.id))).map((p) => String(p.id)),
     retitled: written.filter((p) => titles.has(String(p.id)) && typeof p.title === "string" && p.title !== titles.get(String(p.id))).map((p) => String(p.id)) };
+}
+
+/**
+ * Whether a deck's pages are held to a storyline the user approved: null when they are, or when the deck is not a new
+ * argument; else `{ need }` (no storyline, an unshaped one, or one not approved as it stands) or `{ drift }` (pages added
+ * or dropped since). A new argument is a workspace `init` started, or any pages file that writes a `storyline` - so
+ * `author-deck` and `build-deck`, which the public CLI does not stand in front of, hold it the same way.
+ */
+export function storylineHold({ doc, project = null, file = null }) {
+  if (project?.argument !== "new" && doc?.storyline === undefined) return null;
+  const work = { doc, file, project: { argument: "new" } };
+  const need = storylineNeed(work);
+  if (need) return { need };
+  const drift = storylineDrift(work);
+  return drift.missing.length || drift.added.length ? { drift } : null;
+}
+
+/** The hold as one refusal for the scripts' own output: its code, and what to do. */
+export function holdRefusal(hold) {
+  if (hold.need) return `STORYLINE_UNAPPROVED: ${hold.need.message}${hold.need.ask ? `\n\n${hold.need.ask}` : ""}\nNo page is compiled or built before the user approves it: a deck is started with \`node runtime/command.mjs init <work>\`, and \`storyline <work>\` shows and records the approval.`;
+  const { added, missing } = hold.drift;
+  return `STORYLINE_PAGES_CHANGED: the pages differ from the storyline the user approved${added.length ? `; added: ${added.join(", ")}` : ""}${missing.length ? `; not written: ${missing.join(", ")}` : ""}. Write the pages they approved, or change the storyline and show them the new version (\`node runtime/command.mjs storyline <work>\`).`;
 }
 
 /** `storyline WORK`: the approval message, or what the storyline still lacks. */

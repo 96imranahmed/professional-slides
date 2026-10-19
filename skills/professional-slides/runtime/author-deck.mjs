@@ -44,6 +44,7 @@ import { assetFindings, assetNotice } from "./asset-needs.mjs";
 import { carriedEntries, carriedFindings, carriedProblem, isCarried, revisionChanges, revisionLine, revisionRecordFindings, revisionStatement, stampKept, unheldLine, withImportedCredits } from "./revision.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
+import { storylineHold, holdRefusal } from "./public/storyline.mjs";
 import { comparesTooLittle } from "./chart-sense.mjs";
 import { readPagesFile, withParts, compiledFrom, staleCompile } from "./pages-file.mjs";
 import { exhibitKinds, formFields, kindFields, unreadKeys } from "./form-fields.mjs";
@@ -595,6 +596,10 @@ async function main(argv) {
   let doc;
   try { doc = await readPagesFile(file); } catch (error) { console.error(error.message); return 2; }
   const dir = path.dirname(path.resolve(file));
+  // A new argument's pages wait for the storyline the user approved, here as in the public CLI: compiling them through
+  // this script is not a way round it (storyline.mjs storylineHold).
+  const hold = storylineHold({ doc, file, project: readJsonSync(path.join(dir, "project.json"), { optional: true }) });
+  if (hold) { console.error(holdRefusal(hold)); return 2; }
   const stem = doc.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "");
   const named = values.page === undefined ? null : new Set(String(values.page).split(",").map((id) => id.trim()).filter(Boolean));
   const known = new Set([...doc.pages, ...(doc.appendix || [])].map((page, index) => idAt(page, index)));

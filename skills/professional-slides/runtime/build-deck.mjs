@@ -30,11 +30,13 @@ import { composeAll } from "./compose-all.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
 import { RefusalError, registered } from "./errors.mjs";
-import { EXIT, UsageError, isMain, parseCli, pythonBin, readJson, runCli, writeJson } from "./cli.mjs";
+import { EXIT, UsageError, isMain, parseCli, pythonBin, readJson, readJsonSync, runCli, writeJson } from "./cli.mjs";
+import { existsSync } from "node:fs";
 
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
-import { staleCompile } from "./pages-file.mjs";
+import { staleCompile, readPagesFileSync } from "./pages-file.mjs";
+import { storylineHold, holdRefusal } from "./public/storyline.mjs";
 import { auditContent } from "./content-audit.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillFlags } from "./fetch-flags.mjs";
@@ -52,9 +54,20 @@ const runtime = path.dirname(fileURLToPath(import.meta.url));
 export const REFUSAL_CODES = Object.freeze({
   CONTENT_LOST: "composition lost authored content or visual intent",
   DECK_OLDER_THAN_PAGES: "the deck.json was compiled from a pages file, or a part of it, that has changed since",
+  STORYLINE_UNAPPROVED: "the deck.json was compiled from a new argument's pages whose storyline the user has not approved as it stands",
+  STORYLINE_PAGES_CHANGED: "the deck.json was compiled from pages that differ from the storyline the user approved",
 });
 
 const refuse = (code, message, findings = []) => new RefusalError(registered(REFUSAL_CODES, code), message, findings);
+
+/** The storyline hold of the pages file a deck.json was compiled from, when it names one beside it. */
+function storylineHoldOf(spec, baseDir) {
+  const pages = typeof spec?.compiledFrom?.pages === "string" ? path.join(baseDir, spec.compiledFrom.pages) : null;
+  if (!pages || !existsSync(pages)) return null;
+  let doc;
+  try { doc = readPagesFileSync(pages); } catch { return null; }
+  return storylineHold({ doc, file: pages, project: readJsonSync(path.join(baseDir, "project.json"), { optional: true }) });
+}
 
 /** What the build says of a deck.json older than its pages (pages-file.mjs staleCompile), and the compile that writes a current one. */
 function staleMessage(stale, deckFile) {
@@ -107,6 +120,10 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // minutes older and reported five blockers the pages had already fixed.
   const stale = source ? null : staleCompile(spec, baseDir);
   if (stale) throw refuse("DECK_OLDER_THAN_PAGES", staleMessage(stale, path.basename(specPath)));
+  // A deck.json compiled from a new argument's pages is built only while their storyline stands approved; the public
+  // CLI checks it before it compiles (source), so this guards the scripts.
+  const held = source ? null : storylineHoldOf(spec, baseDir);
+  if (held) throw refuse(held.need ? "STORYLINE_UNAPPROVED" : "STORYLINE_PAGES_CHANGED", holdRefusal(held).replace(/^STORYLINE_[A-Z_]+: /, ""));
   // The logos of the declared players marked by one load themselves: reused
   // from assets/logos/, fetched when missing, left as placeholders only when
   // that fails. A player marked by its photograph is fetched with the deck's
