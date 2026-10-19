@@ -42,8 +42,14 @@ class StorylineTests(unittest.TestCase):
     def test_the_storyline_step_ends_on_the_limits_and_the_implication(self):
         # The process listed the setup and the findings and stopped; the re-authored deck ended on "next tests".
         skill = (SKILL / "SKILL.md").read_text()
+        guide = (SKILL / "references" / "storylining.md").read_text()
         self.assertIn("references/storylining.md", skill)
-        self.assertIn("Limits the source states itself take a page", (SKILL / "references" / "storylining.md").read_text())
+        self.assertIn("Limits the source states itself take a page", guide)
+        self.assertIn("The deck ends on the implication", guide)
+        # The A350F deck went from a request to rendered pages with no storyline shown: asking for a deck is not approval.
+        self.assertIn("A request to make a deck is not approval", skill)
+        self.assertIn("A request to make a deck is not approval", guide)
+        self.assertNotIn("Commands do not ask questions", skill)
 
 
 class OrnamentTests(unittest.TestCase):
