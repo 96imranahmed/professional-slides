@@ -25,7 +25,7 @@ Run the bundled CLI from this skill's directory: `node runtime/command.mjs <comm
 
 ## Alternatives, images and brands
 
-**Alternatives.** `options <work> --slide <id> --count <n>`, optionally `--design <system>` or `--style <house.json>`, renders real-content alternatives; show the user the comparison image and the option ids, and apply the one they choose with `apply <work> --candidate <id>` (a stale option is refused). Do not pick for a user who asked to choose. A carried slide is first mapped to a page type from its extracted evidence.
+**Alternatives.** `options <work> --slide <id> --count <n>`, optionally `--design <system>` or `--style <house.json>`, renders real-content alternatives; show the user the comparison image and the option ids, and apply the one they choose with `apply <work> --candidate <id>` (a stale option is refused). A design or a style is the deck's: applying one restyles every page the deck composes, keeping each page's words and data (carried slides keep their own look); tell the user which pages it restyles. Do not pick for a user who asked to choose. A carried slide is first mapped to a page type from its extracted evidence.
 
 **Images.** For a slide image or PDF, `import` it, read each image and fill its `reference` page (`catalog --type reference --schema`) on a 1280 by 720 canvas: text, shapes, connectors and table cells as native elements, photographs as cropped pictures, never the whole image as the slide. Record what you cannot read in `uncertainties`; never invent hidden chart data. The build's report separates editable text and shapes from pictures; compare each page with its source.
 

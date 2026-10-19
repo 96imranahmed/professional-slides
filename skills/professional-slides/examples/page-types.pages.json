@@ -1984,7 +1984,8 @@
       "points": [
        "Owner: Priya Shah",
        "Capital: £205m, depot and fleet",
-       "Starts: December 2027"
+       "Starts: December 2027",
+       "Risk: June 2027 timetable bid"
       ]
      },
      {
@@ -1995,7 +1996,8 @@
       "points": [
        "Owner: Tom Hardcastle",
        "Capital: £390m",
-       "Starts: energised H2 2030"
+       "Starts: energised H2 2030",
+       "Risk: 2029 power upgrade"
       ]
      },
      {
@@ -2006,7 +2008,8 @@
       "points": [
        "Owner: Aisha Karim",
        "Capital: none",
-       "Starts: launch in 2030"
+       "Starts: launch in 2030",
+       "Risk: revenue lost to seasons"
       ]
      },
      {
@@ -2017,7 +2020,8 @@
       "points": [
        "Owner: Daniel Moss",
        "Capital: £45m, stations",
-       "Starts: sites agreed by 2028"
+       "Starts: sites agreed by 2028",
+       "Risk: two sites open after FY31"
       ]
      }
     ]
@@ -2167,6 +2171,8 @@
     "type": "chart.line",
     "heading": "Passenger journeys, actual and plan",
     "unit": "million",
+    "yMin": 46,
+    "yMax": 61,
     "categories": [
      "FY26",
      "FY27",

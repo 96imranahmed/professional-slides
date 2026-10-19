@@ -1100,7 +1100,7 @@
    "type": "ranking",
    "form": "range",
    "commentary": "on-exhibit",
-   "takeaway": false,
+   "takeaway": "At £440m the bid sits inside four of the five ranges and £80m under the cash-flow ceiling",
    "title": "The five methods value the Coast concession at £300m to £520m; our bid is £440m",
    "exhibit": {
     "heading": "Value of the Coast concession by method",
@@ -2969,7 +2969,7 @@
     },
     {
      "type": "chart.column",
-     "heading": "Peak trains over capacity",
+     "heading": "Peak trains with a seat for all",
      "headingIcon": "people",
      "unit": "%",
      "categories": [
@@ -2981,13 +2981,13 @@
      ],
      "series": [
       {
-       "name": "Over capacity",
+       "name": "Seat for all",
        "values": [
-        24,
-        26,
-        27,
-        15,
-        9
+        76,
+        74,
+        73,
+        85,
+        91
        ]
       }
      ],
@@ -3035,7 +3035,7 @@
     },
     {
      "lead": "Crowding followed",
-     "text": "With a train every twenty minutes the peak spread out: trains over capacity fell from 27% to 9%, though the line carries more riders than before."
+     "text": "With a train every twenty minutes the peak spread out: peak trains with a seat for everyone rose from 73% to 91%, though the line carries more riders than before."
     },
     {
      "lead": "Revenue came last",
@@ -3044,7 +3044,7 @@
    ],
    "highlight": [
     "81.2% to 91.8%",
-    "27% to 9%",
+    "73% to 91%",
     "£44m to £55m"
    ],
    "source": "Source: illustrative data for a fictional operator; synthetic performance and revenue records"
@@ -4429,7 +4429,8 @@
        "Half-hourly on the Dales and Valley lines",
        "Later last trains from Skipton",
        "Units and crews released from the peak",
-       "Adds 5.1 million journeys"
+       "Starts with the December 2027 timetable",
+       "Adds 5.1 million journeys a year by FY31"
       ]
      },
      {
@@ -4438,7 +4439,8 @@
        "Overhead wires from Leeds to Hull",
        "Fourteen electric trains in 2030",
        "Eleven diesel units freed for other lines",
-       "Adds 3.8 million journeys"
+       "Cuts the cost of a train-km by a quarter",
+       "Adds 3.8 million journeys a year by FY31"
       ]
      },
      {
@@ -4447,7 +4449,8 @@
        "Flexible part-time season tickets",
        "Off-peak day returns on every line",
        "Four station sites with 9,800 homes",
-       "Adds 2.8 million journeys"
+       "£80 million of developer contributions",
+       "Adds 2.8 million journeys a year by FY31"
       ]
      }
     ],
@@ -4491,6 +4494,10 @@
     {
      "lead": "Electrification changes two",
      "text": "Electric trains' lower fuel and maintenance bills cut the Eastern line from £21.40 a train-km to £15.80, and the network average to £16.40."
+    },
+    {
+     "lead": "Fixed layers need more riders",
+     "text": "Track access, stations and overheads, £7.30 of every £17.60, stay whether trains run or not, so the plan spreads them over more journeys rather than cutting trains."
     }
    ],
    "pointsHeading": false,
@@ -6130,6 +6137,10 @@
      {
       "label": "Housing sites are delayed",
       "text": "Two of four sites open after FY31. The plan loses 0.6 million journeys and £40 million of developer contributions, covered by contingency."
+     },
+     {
+      "label": "Crew training runs late",
+      "text": "The 36 extra crew qualify in June 2028, not December 2027. The half-hourly service waits six months, losing 0.4 million journeys in FY28, all recovered by FY29."
      },
      {
       "label": "Off-peak demand beats the trial",

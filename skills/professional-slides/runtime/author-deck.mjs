@@ -379,7 +379,7 @@ function folderStamp(dir) {
  * assets/. A check that edits one page of a hundred composes that page alone.
  * Safe to delete.
  */
-async function openComposeCache(file, { doc, baseDir }) {
+export async function openComposeCache(file, { doc, baseDir }) {
   const stored = await readJson(file, { optional: true }).catch(() => null);
   const before = stored?.schema === COMPOSE_CACHE_SCHEMA && stored.slides && typeof stored.slides === "object" ? stored.slides : {};
   const context = digest([runtimeStamp(), folderStamp(path.join(baseDir, "assets")), doc.deck ?? null]);
