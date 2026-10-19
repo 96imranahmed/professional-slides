@@ -271,6 +271,33 @@ test('a deck that draws a contents page is scaffolded with a divider a named sec
   const pages=(await openWorkspace(work)).doc.pages;
   assert.deepEqual(pages.map(p=>p.kind?`${p.kind}:${p.title}`:p.id),['summary','section:Fleet','fleet','section:Orders','orders']);
 });
+test('the storyline count says when the pages file holds fewer dividers than it counts',async t=>{
+  // The A350F deck was scaffolded before the scaffold wrote dividers: counted at 122 pages with none written, it built 101.
+  const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const prev=process.env.PROFESSIONAL_SLIDES_HOME;process.env.PROFESSIONAL_SLIDES_HOME=path.join(dir,'home');t.after(()=>{if(prev===undefined)delete process.env.PROFESSIONAL_SLIDES_HOME;else process.env.PROFESSIONAL_SLIDES_HOME=prev;});
+  const work=path.join(dir,'w');
+  await execute(['init',work]);
+  const opened=await openWorkspace(work);
+  const base=storyline();
+  const section=(name,id)=>({...base.sections[1],name,pages:base.sections[1].pages.map(p=>({...p,id}))});
+  await fs.writeFile(opened.file,JSON.stringify({...opened.doc,deck:{...opened.doc.deck,contents:'once'},storyline:{...base,sections:[base.sections[0],section('Fleet','fleet'),section('Orders','orders')]}}));
+  const shown=async()=>{const result=await execute(['storyline',work]);return result.storyline??result.requiredInputs[0].message;};
+  const counted='a contents page and 2 section dividers: 7 pages in all';
+  // Before any page is written, the scaffold writes them all.
+  assert.ok((await shown()).includes(counted));
+  assert.ok(!(await shown()).includes('The pages file holds'));
+  await execute(['storyline',work,'--approve','Yes']);
+  await execute(['storyline',work,'--scaffold']);
+  const scaffolded=(await openWorkspace(work)).doc;
+  await fs.writeFile(opened.file,JSON.stringify({...scaffolded,pages:scaffolded.pages.filter(p=>p.kind!=='section')}));
+  assert.ok((await shown()).includes(`${counted}, 8 if the deck carries photographs (a credits page). The pages file holds none of the 2 section dividers yet: \`storyline WORK --scaffold\` writes them; until then the build draws only the dividers the pages file holds.`));
+  await fs.writeFile(opened.file,JSON.stringify({...scaffolded,pages:scaffolded.pages.filter(p=>p.id!=='section-2')}));
+  assert.ok((await shown()).includes('The pages file holds 1 of the 2 section dividers: `storyline WORK --scaffold` writes the other 1;'));
+  await execute(['storyline',work,'--scaffold']);
+  assert.equal((await openWorkspace(work)).doc.pages.filter(p=>p.kind==='section').length,2);
+  assert.ok((await shown()).includes(counted));
+  assert.ok(!(await shown()).includes('The pages file holds'));
+});
 test('the picture libraries report which have a key, and never the key',async t=>{
   const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
   const prev=process.env.PROFESSIONAL_SLIDES_HOME;process.env.PROFESSIONAL_SLIDES_HOME=path.join(dir,'home');t.after(()=>{if(prev===undefined)delete process.env.PROFESSIONAL_SLIDES_HOME;else process.env.PROFESSIONAL_SLIDES_HOME=prev;});

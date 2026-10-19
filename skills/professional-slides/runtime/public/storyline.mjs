@@ -148,9 +148,10 @@ function wordsTally(pages) {
 /**
  * The approval message: the count and its breakdown with the pages the build adds, the reader, the answer, the argument
  * tree a line or two a page, the alternative. One shape at every length: each page's comparison, candidates and data are
- * in storyline.md beside the pages file (approvalDetail), so a 98-page storyline is not 32 KB of chat.
+ * in storyline.md beside the pages file (approvalDetail), so a 98-page storyline is not 32 KB of chat. `written` is the
+ * pages file's pages, body and appendix.
  */
-export function approvalMessage(storyline, deck = {}) {
+export function approvalMessage(storyline, deck = {}, written = []) {
   const pages = storylinePages(storyline);
   const count = (role) => pages.filter((p) => p.role === role).length;
   const findings = storyline.sections.filter((s) => (s.role ?? "finding") === "finding");
@@ -162,8 +163,12 @@ export function approvalMessage(storyline, deck = {}) {
   const dividers = drawsContents(storyline, deck) ? dividedSections(storyline).length : 0;
   const added = ["the cover", dividers && "a contents page", dividers && `${dividers} section dividers`, appendix && "an appendix divider"].filter(Boolean);
   const total = body + appendix + 1 + (dividers ? dividers + 1 : 0) + (appendix ? 1 : 0);
+  // The build draws only the dividers the pages file holds, and `--scaffold` writes them: pages written without them, by
+  // a scaffold from before it wrote dividers or by hand, are told so. The A350F deck was counted at 122 and built 101.
+  const held = written.filter((p) => p.kind === "section").length;
+  const unwritten = written.length && held < dividers ? ` The pages file holds ${held ? `${held} of the ${dividers} section dividers` : `none of the ${dividers} section dividers yet`}: \`storyline WORK --scaffold\` writes ${held ? `the other ${dividers - held}` : "them"}; until then the build draws only the dividers the pages file holds.` : "";
   const r = storyline.reader;
-  const lines = [`Storyline: ${body} page${body === 1 ? "" : "s"} (${parts.join(" · ")})${appendix ? ` + appendix of ${appendix}` : ""}. The build adds ${added.join(", ").replace(/, ([^,]*)$/, " and $1")}: ${total} pages in all, ${total + 1} if the deck carries photographs (a credits page).`,
+  const lines = [`Storyline: ${body} page${body === 1 ? "" : "s"} (${parts.join(" · ")})${appendix ? ` + appendix of ${appendix}` : ""}. The build adds ${added.join(", ").replace(/, ([^,]*)$/, " and $1")}: ${total} pages in all, ${total + 1} if the deck carries photographs (a credits page).${unwritten}`,
     `Reader: ${r.audience} · knows: ${r.readerKnows} · for: ${r.decision} · read as: ${r.density}`,
     `Question: ${storyline.question}`, `Answer: ${storyline.answer}`, ...[wordsTally(pages)].filter(Boolean), ""];
   let n = 0, a = 0, finding = 0;
@@ -234,6 +239,9 @@ export function uniformWords(storyline) {
   return found;
 }
 
+/** The pages file's pages, body and appendix. */
+const writtenPages = (doc) => [...(doc.pages || []), ...(doc.appendix || [])];
+
 /** What a new argument still needs before pages: a storyline, its shape, the user's approval of this version. Null when held. */
 export function storylineNeed(work) {
   if (work.project?.argument !== "new") return null;
@@ -242,9 +250,9 @@ export function storylineNeed(work) {
     message: "Write the `storyline` block in the pages file - question, answer, reader, sections and their pages, one alternative length - then run `storyline WORK` and show the user its message. No page is written before they approve it." };
   const problems = storylineProblems(storyline);
   if (problems.length) return { kind: "storyline", target: work.file, problems, message: `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}` };
-  if (!storyline.approval) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck),
+  if (!storyline.approval) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck, writtenPages(work.doc)),
     ask: "Show the user this message and end your turn. Record their reply with `storyline WORK --approve \"<their words>\"`. A request to make a deck is not approval." };
-  if (storyline.approval.hash !== storylineHash(storyline)) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck),
+  if (storyline.approval.hash !== storylineHash(storyline)) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck, writtenPages(work.doc)),
     ask: "The storyline changed after the user approved it: show them this version and record their reply with `--approve`." };
   return null;
 }
@@ -252,7 +260,7 @@ export function storylineNeed(work) {
 /** The body pages that differ from the approved storyline: added, dropped, retitled. */
 export function storylineDrift(work) {
   const approved = storylinePages(work.doc.storyline);
-  const written = [...work.doc.pages, ...(work.doc.appendix || [])].filter((page) => !(page.kind && STRUCTURAL.has(page.kind)));
+  const written = writtenPages(work.doc).filter((page) => !(page.kind && STRUCTURAL.has(page.kind)));
   const ids = new Set(approved.map((p) => p.id)), have = new Set(written.map((p) => String(p.id)));
   const titles = new Map(approved.map((p) => [p.id, p.title]));
   return { missing: approved.filter((p) => !have.has(p.id)).map((p) => p.id), added: written.filter((p) => !ids.has(String(p.id))).map((p) => String(p.id)),
@@ -289,7 +297,7 @@ export async function showStoryline(work, results) {
   if (problems.length) return results.blocked("STORYLINE_INVALID", `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}`);
   const detail = path.join(path.dirname(work.file), "storyline.md");
   await fs.writeFile(detail, approvalDetail(work.doc.storyline));
-  const message = `${approvalMessage(work.doc.storyline, work.doc.deck)}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
+  const message = `${approvalMessage(work.doc.storyline, work.doc.deck, writtenPages(work.doc))}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
   const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline)];
   const approved = work.doc.storyline.approval?.hash === storylineHash(work.doc.storyline);
   return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: message, artifacts: [detail], ...(advisories.length ? { advisories } : {}) })
