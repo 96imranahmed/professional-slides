@@ -80,7 +80,7 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 | `so-what-bar` | one implication in a filled bar under the exhibit (`bar`) |
 | `none` | the exhibit carries the page (types that hold one; `--types` lists each type's placements) |
 
-**The point goes on the exhibit.** Strong decks annotate four chart pages in five and set a column of points beside under one in five: the title states the finding, and the mark it rests on carries a callout (`annotations`), a change mark (`changeAnnotations`, `cagr`) or a labelled reference line, with `commentary: "on-exhibit"`; a table carries it in an implication column (`in-exhibit`). Points over a chart or a table go where the page says - `beside` or `below` - and a page that writes them without saying is refused (`COMMENTARY_UNCHOSEN`): ask for the column where the page needs one, for instance two or three mechanisms the chart cannot show.
+**The point goes on the exhibit.** Strong decks annotate four chart pages in five and set a column of points beside under one in five: the title states the finding, and the mark it rests on carries a callout (`annotations`), a change mark (`changeAnnotations`, `cagr`) or a labelled reference line, with `commentary: "on-exhibit"`; a table carries it in an implication column (`in-exhibit`). Points over a chart or a table go where the page says - `beside` or `below` - and a page that writes them without saying is refused (`COMMENTARY_UNCHOSEN`): ask for the column where the page needs one, for instance the mechanisms the chart cannot show, as many as there are.
 
 **A table carries its explanation in a column of the table, not a band under it.** Strong decks set nothing under a table but its notes: what a row means goes in a closing column (`implication: true`, with `commentary: "in-exhibit"`) or a description column, and a claim the whole table supports goes in its title, or in points beside the table (`beside`) where it needs more than the title holds.
 
@@ -89,6 +89,8 @@ A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines
 ## What a page holds
 
 The frame sets hard limits - a chart's three callouts, a rail's eight lines, a pie's five parts, a labelled-rows page's five rows - and `--types` and `--limits <type>/<form>` print them. A page that does not fit is refused with what to change; a table past the rows a page holds continues on the next page with its header repeated (`PAGE_SPLITS`, advised). Text that overlaps, a heading that wraps where it should fit, type too small for its role or set where it cannot be read is refused at the build with the page and the element.
+
+**A short chart takes a partner.** A chart of three or four members in one series, set across the page, reads thin; about three chart pages in ten in strong decks carry two to four exhibits. Pair it with a second exhibit for the same claim - another cut of the same data, the table behind it, the figures it rests on - as a `panels` `row`, the second taken from the page's candidates. A second chart that does not bear on the title is padding.
 
 A band of the page left empty is advised (`SCENE_VOID`). On cards, tiles and small multiples the first lever is the count a row, `exhibit.columns`: fewer a row stand taller and take the height, more a row take the width. Elsewhere, give the exhibit the height or move the commentary beside it.
 

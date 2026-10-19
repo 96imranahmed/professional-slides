@@ -4,7 +4,7 @@
 // document's columns of prose.
 import { textWords, proseParts } from "./text-contract.mjs";
 import { SIZE, PANEL_MIN_WIDTH, BODY_WIDTH, COLUMN_GAP, HUG, deckDensity } from "./compose-body.mjs";
-import { proseOf, proseBeside, proseFillRange, pointsItem, documentItem, summaryLedger, sideTreatment } from "./compose-points.mjs";
+import { proseOf, proseBeside, proseFillRange, pointsItem, documentItem, summaryLedger, sideTreatment, pointBullets } from "./compose-points.mjs";
 import { exhibitItem } from "./compose-exhibits.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 
@@ -56,7 +56,7 @@ export function textPage(items, { id, slide, fill, pointsStyle }) {
   // take three columns; four take two rows of two, each row a band of the
   // body so the second pair starts level; five and more take two columns.
   const developed = points.length >= 3 && !(slide.paragraphs || []).length
-    && points.every((point) => textWords(typeof point === "string" ? point : point?.text) >= 20);
+    && points.every((point) => textWords(typeof point === "string" ? point : [point?.text, ...(pointBullets(point) ?? [])].filter(Boolean).join(" ")) >= 20);
   const numberedAt = (point, at) => (pointsStyle !== "numbered" ? point
     : typeof point === "string" ? { text: point, number: at + 1 } : point?.number === undefined ? { ...point, number: at + 1 } : point);
   const cell = (point, at) => pointsItem([numberedAt(point, at)], `${id}-points-${String.fromCharCode(97 + at)}`, tone, fill, false, pointsStyle);

@@ -17,6 +17,18 @@ const DENSITIES = ["live-pitch", "executive", "pre-read"];
 // Pages the runtime draws from the sections and the deck: they are not part of the argument the user approves.
 const STRUCTURAL = new Set(["section", "contents", "agenda", "cover"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+// What a page's words are, planned with the page from its content: how many there are and in what shape. The A350F rebuild
+// planned none and wrote three led sentences on 27 of its 28 commentary pages; strong decks spread a page's groups from two
+// to six and more, and set no one form on more than a sixth of their text pages.
+const SAYS_SHAPES = Object.freeze({
+  callouts: "callouts on the exhibit", "lead-text": "title over its sentence", "lead-inline": "bold lead: sentence",
+  highlighted: "highlighted sentences", "lead-bullets": "title over bullets", rows: "labelled rows", columns: "headed columns",
+  steps: "numbered steps", quotes: "quotes", paragraphs: "paragraphs", figures: "figures", none: "the exhibit alone",
+});
+// The four ways a strong deck sets a page's points, which a deck varies page by page from what each carries.
+const POINT_STYLES = ["lead-text", "lead-inline", "highlighted", "lead-bullets"];
+// Shapes whose count is a page's groups of words: callouts are capped by the frame, figures and the bare exhibit are not words.
+const GROUPED = new Set([...POINT_STYLES, "rows", "columns", "steps", "quotes", "paragraphs"]);
 
 export const STORYLINE_SCHEMA = Object.freeze({
   type: "object", required: ["question", "answer", "reader", "sections", "alternative"],
@@ -37,7 +49,11 @@ export const STORYLINE_SCHEMA = Object.freeze({
         series: { type: "integer", default: 1, description: "for a chart: how many series" },
         candidates: { type: "array", items: { type: "string" }, description: "for a chart: the charts that draw its comparison, best first" },
         data: { type: "object", required: ["status", "what"], properties: {
-          status: { enum: ["found", "to-find", "derived"] }, what: { type: "string" }, source: { type: "string" } } } } } } } } },
+          status: { enum: ["found", "to-find", "derived"] }, what: { type: "string" }, source: { type: "string" } } },
+        says: { type: "object", required: ["shape"], description: "the page's words, planned from its content: how many and in what shape", properties: {
+          shape: { enum: Object.keys(SAYS_SHAPES) },
+          count: { type: "integer", minimum: 1, description: "how many the content has - its reasons, risks, steps, statements - not a house number; required unless the shape is none" },
+          of: { type: "string", description: "what each one is: reasons, risks, steps, callouts" } } } } } } } } },
     alternative: { type: "string", description: "one other length and what it drops or adds" },
     approval: { type: "object", description: "written by `storyline WORK --approve`, never by hand" },
   },
@@ -83,6 +99,9 @@ export function storylineProblems(storyline) {
       if (!text(id) || !ID.test(id)) problems.push(`${at}: \`id\` is a filename-safe identifier`);
       else if (seen.has(id)) problems.push(`${at}: the id is used twice`); else seen.add(id);
       if (!text(page?.title)) problems.push(`${at}: \`title\` is missing`);
+      const says = page?.says;
+      if (!says || typeof says !== "object" || !SAYS_SHAPES[says.shape]) problems.push(`${at}: \`says\` plans the page's words from its content: { shape: ${Object.keys(SAYS_SHAPES).join(" | ")}, count, of }`);
+      else if (says.shape !== "none" && (!Number.isInteger(says.count) || says.count < 1)) problems.push(`${at}: \`says.count\` is how many ${text(says.of) ? says.of : "items"} the content has`);
       const { name, form } = formOf(page?.type);
       if (!PAGE_TYPES[name] || !PAGE_TYPES[name].forms[form]) { problems.push(`${at}: \`type\` "${page?.type ?? ""}" is not a type/form from \`catalog\``); continue; }
       if (holdsData(page.type)) {
@@ -107,6 +126,25 @@ export const drawsContents = (storyline, deck = {}) => deck.contents !== false &
 /** A page whose data is still to find: its title's figures are a guess until the research is done. */
 const unverified = (page) => page.data?.status === "to-find";
 
+/** A page's planned words in a few: "4 × lead + bullets (risks)", or "the exhibit alone". */
+const saysLine = (says) => !says || !SAYS_SHAPES[says.shape] ? null : says.shape === "none" ? `words: ${SAYS_SHAPES.none}`
+  : `words: ${says.count} × ${SAYS_SHAPES[says.shape]}${typeof says.of === "string" && says.of.trim() ? ` (${says.of.trim()})` : ""}`;
+
+/**
+ * The deck's words in one line: each shape and the pages planning it, then how many groups a page carries. A storyline
+ * whose pages all plan one shape and one count shows it here, at approval, where it costs a line to change.
+ */
+function wordsTally(pages) {
+  const planned = pages.map((p) => p.says).filter((s) => s && SAYS_SHAPES[s.shape]);
+  if (!planned.length) return null;
+  const shapes = new Map();
+  for (const s of planned) shapes.set(s.shape, (shapes.get(s.shape) ?? 0) + 1);
+  const groups = new Map();
+  for (const s of planned.filter((s) => GROUPED.has(s.shape) && Number.isInteger(s.count))) { const n = s.count >= 5 ? "5+" : String(s.count); groups.set(n, (groups.get(n) ?? 0) + 1); }
+  const order = ["1", "2", "3", "4", "5+"].filter((n) => groups.has(n));
+  return `Words: ${[...shapes].sort((a, b) => b[1] - a[1]).map(([shape, n]) => `${SAYS_SHAPES[shape]} ${n}`).join(" · ")}${order.length ? `. Groups a page: ${order.map((n) => `${n} (${groups.get(n)} page${groups.get(n) === 1 ? "" : "s"})`).join(" · ")}` : ""}.`;
+}
+
 /**
  * The approval message: the count and its breakdown with the pages the build adds, the reader, the answer, the argument
  * tree a line or two a page, the alternative. One shape at every length: each page's comparison, candidates and data are
@@ -127,7 +165,7 @@ export function approvalMessage(storyline, deck = {}) {
   const r = storyline.reader;
   const lines = [`Storyline: ${body} page${body === 1 ? "" : "s"} (${parts.join(" · ")})${appendix ? ` + appendix of ${appendix}` : ""}. The build adds ${added.join(", ").replace(/, ([^,]*)$/, " and $1")}: ${total} pages in all, ${total + 1} if the deck carries photographs (a credits page).`,
     `Reader: ${r.audience} · knows: ${r.readerKnows} · for: ${r.decision} · read as: ${r.density}`,
-    `Question: ${storyline.question}`, `Answer: ${storyline.answer}`, ""];
+    `Question: ${storyline.question}`, `Answer: ${storyline.answer}`, ...[wordsTally(pages)].filter(Boolean), ""];
   let n = 0, a = 0, finding = 0;
   for (const section of storyline.sections) {
     const role = section.role ?? "finding";
@@ -136,7 +174,7 @@ export function approvalMessage(storyline, deck = {}) {
       const number = role === "appendix" ? `A${++a}` : String(++n);
       const first = page.candidates?.[0];
       const detail = [page.type, Number.isInteger(page.members) && `${page.members} members${(page.series ?? 1) > 1 ? ` × ${page.series} series` : ""}`,
-        first && first !== page.type && `not its first candidate, ${first}`, page.data && `data ${page.data.status}`].filter(Boolean).join(" · ");
+        first && first !== page.type && `not its first candidate, ${first}`, page.data && `data ${page.data.status}`, saysLine(page.says)].filter(Boolean).join(" · ");
       lines.push(`   ${number.padStart(3)}${unverified(page) ? "*" : " "} ${page.title}`, `        ${detail}`);
     }
   }
@@ -157,6 +195,7 @@ export function approvalDetail(storyline) {
       lines.push(`${number}. **${page.title}**${unverified(page) ? " (data still to find)" : ""}`, `   - ${page.type}${page.compares ? `, compares ${page.compares}` : ""}${Number.isInteger(page.members) ? ` (${page.members} members${(page.series ?? 1) > 1 ? ` × ${page.series} series` : ""})` : ""}`);
       if (page.candidates) lines.push(`   - candidates, best first: ${page.candidates.join(", ")}`);
       if (page.data) lines.push(`   - data ${page.data.status}: ${page.data.what}${page.data.source ? ` (${page.data.source})` : ""}`);
+      if (saysLine(page.says)) lines.push(`   - ${saysLine(page.says)}`);
     }
     lines.push("");
   }
@@ -172,7 +211,27 @@ export function approvalDetail(storyline) {
 export function shortPages(storyline) {
   return storylinePages(storyline).filter((page) => isChart(page.type) && Number.isInteger(page.members) && page.members <= 3 && (page.series ?? 1) <= 1)
     .map((page) => ({ code: "STORYLINE_SHORT_PAGE", id: page.id, severity: "advisory",
-      repair: `${page.id}: ${page.members} member${page.members === 1 ? "" : "s"} in one series leave the page short: plan its commentary beside it (\`commentary: "beside"\`), more members or a second series, or another page's panel` }));
+      repair: `${page.id}: ${page.members} member${page.members === 1 ? "" : "s"} in one series leave the page short: pair it with a second exhibit for the same claim (\`panels/row\`: a second cut, a table or figures beside it), plan its commentary beside it (\`commentary: "beside"\`), or add members or a second series` }));
+}
+
+/**
+ * A storyline whose points are planned in one style, or at one count, on more than half the pages that carry them: said
+ * at the storyline, where each page's style is chosen, as an advisory. The A350F rebuild set a lead over its sentence,
+ * three to a page, on 27 of 28 commentary pages; strong decks use no one style on more than a sixth of their text pages.
+ */
+export function uniformWords(storyline) {
+  const planned = storylinePages(storyline).map((page) => page.says).filter((says) => says && SAYS_SHAPES[says.shape]);
+  const most = (values) => { const tally = new Map(); for (const v of values) tally.set(v, (tally.get(v) ?? 0) + 1); return [...tally].sort((a, b) => b[1] - a[1])[0] ?? [null, 0]; };
+  const found = [];
+  const styled = planned.filter((says) => POINT_STYLES.includes(says.shape));
+  const [style, styleCount] = most(styled.map((says) => says.shape));
+  if (styled.length >= 6 && styleCount > styled.length / 2) found.push({ code: "STORYLINE_WORDS_UNIFORM", severity: "advisory",
+    repair: `${styleCount} of ${styled.length} pages with points plan them as ${SAYS_SHAPES[style]}: vary the styles page by page from what each carries - a title over its sentence, a bold lead before a colon, a sentence with its phrase highlighted, a title over bullets` });
+  const grouped = planned.filter((says) => GROUPED.has(says.shape) && Number.isInteger(says.count));
+  const [count, countPages] = most(grouped.map((says) => Math.min(says.count, 5)));
+  if (grouped.length >= 6 && countPages > grouped.length / 2) found.push({ code: "STORYLINE_WORDS_UNIFORM", severity: "advisory",
+    repair: `${countPages} of ${grouped.length} pages plan ${count === 5 ? "five or more" : count} groups of words: plan each page's count from what its content holds` });
+  return found;
 }
 
 /** What a new argument still needs before pages: a storyline, its shape, the user's approval of this version. Null when held. */
@@ -230,8 +289,8 @@ export async function showStoryline(work, results) {
   if (problems.length) return results.blocked("STORYLINE_INVALID", `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}`);
   const detail = path.join(path.dirname(work.file), "storyline.md");
   await fs.writeFile(detail, approvalDetail(work.doc.storyline));
-  const message = `${approvalMessage(work.doc.storyline, work.doc.deck)}\n\nEach page's comparison, candidate charts and data: ${detail}`;
-  const advisories = shortPages(work.doc.storyline);
+  const message = `${approvalMessage(work.doc.storyline, work.doc.deck)}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
+  const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline)];
   const approved = work.doc.storyline.approval?.hash === storylineHash(work.doc.storyline);
   return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: message, artifacts: [detail], ...(advisories.length ? { advisories } : {}) })
     : results.needed([{ kind: "storyline-approval", message,

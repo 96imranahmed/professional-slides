@@ -24,9 +24,22 @@
    "title": "Northvale can reach 60 million journeys by FY31 by filling the off-peak",
    "highlight": "frequency, not fares, is the main lever",
    "points": [
-    "Journeys recovered to 48.3 million in FY26 but growth slowed to 1.7%: peak trains run above 90% of their seats, off-peak trains at 38%. Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly ones, so frequency, not fares, is the main lever.",
-    "Electrifying the Eastern line costs £390 million, beats bi-mode trains on cost per journey from year six and frees diesel units for the Dales line. The £640 million plan pays back in eleven years if the power upgrade lands by 2029.",
-    "Two of the seven 2027 milestones are at risk, both on electrification; the 5.1 million off-peak journeys depend on neither. Start the timetable now and release electrification capital milestone by milestone, so a late grid connection risks the last six million journeys, not the first five."
+    {
+     "lead": "Frequency, not fares, is the lever",
+     "text": "Journeys recovered to 48.3 million in FY26 but growth slowed to 1.7%: peak trains run above 90% of their seats, off-peak trains at 38%. Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly ones."
+    },
+    {
+     "lead": "Electrify the Eastern line",
+     "text": "Electrification costs £390 million, beats bi-mode trains on cost per journey from year six and frees diesel units for the Dales line. The £640 million plan pays back in eleven years if the power upgrade lands by 2029."
+    },
+    {
+     "lead": "The risk sits in one place",
+     "text": "Two of the seven 2027 milestones are at risk, both on electrification; the 5.1 million off-peak journeys depend on neither, so the timetable can start before the wires are up."
+    },
+    {
+     "lead": "Start now, release capital in stages",
+     "text": "Start the timetable now and release electrification capital milestone by milestone, so a late grid connection risks the last six million journeys, not the first five."
+    }
    ],
    "exhibit": {
     "type": "table",
@@ -473,7 +486,8 @@
     }
    ],
    "pointsHeading": false,
-   "source": "Source: illustrative data for a fictional operator; FY26 on-train survey, 11,400 responses"
+   "source": "Source: illustrative data for a fictional operator; FY26 on-train survey, 11,400 responses",
+   "pointsStyle": "inline"
   },
   {
    "id": "p06b",

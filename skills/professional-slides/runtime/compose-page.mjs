@@ -74,7 +74,7 @@ export const SLIDE_KEYS = Object.freeze({
   // the commentary
   points: "the commentary column: a lead and a sentence per point",
   pointsHeading: "the heading over that column, or false for none",
-  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered, bulleted or checklist",
+  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered, bulleted, inline (a bullet, its bold lead before a colon) or checklist",
   pointsTone: "open, dark, muted, tint or primary",
   pointsAlign: "middle to centre the points on the exhibit",
   paragraphs: "body prose, on a text page",

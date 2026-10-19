@@ -236,19 +236,20 @@
    },
    "points": [
     {
-     "lead": "The network fills before it fails",
-     "text": "Punctuality fell three points while train-km rose from 15.4 million to 18.2 million, because the added trains share the same two-track approach into Leeds. Each late train now delays the one behind it, which did not happen when the timetable had gaps."
+     "text": "The network fills before it fails: punctuality fell three points while train-km rose from 15.4 million to 18.2 million, because the added trains share the same two-track approach into Leeds.",
+     "highlight": "punctuality fell three points"
     },
     {
-     "lead": "Where the margin returns",
-     "text": "The Eastern line runs at 86.1%, the weakest on the network, and its diesel units account for half of all fleet failures. Electric trains from 2030 remove those failures, which is how the plan adds a fifth more service and still holds the 90% floor."
+     "text": "The Eastern line runs at 86.1%, the weakest on the network, and its diesel units account for half of all fleet failures; electric trains from 2030 remove them, so the plan can add a fifth more service and hold the 90% floor.",
+     "highlight": "half of all fleet failures"
     },
     {
-     "lead": "What the plan must not do",
-     "text": "Adding off-peak trains before the depot extension opens would park units on running lines overnight and cost another point. The timetable change therefore waits for the twelve new sidings in December 2027."
+     "text": "Adding off-peak trains before the depot extension opens would park units on running lines and cost another point, so the timetable change waits for the twelve new sidings in December 2027.",
+     "highlight": "waits for the twelve new sidings"
     }
    ],
-   "source": "Source: illustrative data for a fictional operator; performance reports"
+   "source": "Source: illustrative data for a fictional operator; performance reports",
+   "pointsStyle": "prose"
   },
   {
    "id": "f-trend-slope",
@@ -1554,16 +1555,25 @@
    "takeaway": false,
    "points": [
     {
-     "lead": "Frequency",
-     "text": "Half of riders disagree that trains run often enough, the only statement where disagreement outweighs agreement."
+     "lead": "Frequency is the complaint",
+     "points": [
+      "Half of riders disagree that trains run often enough",
+      "The only statement where disagreement outweighs agreement"
+     ]
     },
     {
-     "lead": "Fares",
-     "text": "Fares split riders: 44% agree they are fair for the journey and 32% disagree, with a quarter undecided."
+     "lead": "Fares split riders",
+     "points": [
+      "44% agree they are fair for the journey and 32% disagree",
+      "A quarter are undecided"
+     ]
     },
     {
-     "lead": "Safety and information",
-     "text": "Six riders in ten agree that stations feel safe, and almost two-thirds that information is clear."
+     "lead": "Safety and information hold up",
+     "points": [
+      "Six riders in ten agree that stations feel safe",
+      "Almost two-thirds say information is clear"
+     ]
     }
    ]
   },
@@ -4406,7 +4416,11 @@
     },
     {
      "lead": "The bid fixes the date",
-     "text": "Paths are allocated twice a year. A bid accepted in June 2027 puts the service in the December timetable; one that misses it waits until May 2028 and costs 0.9 million journeys."
+     "text": "Paths are allocated twice a year, and a bid accepted in June 2027 puts the service in the December timetable, the first after the sidings open."
+    },
+    {
+     "lead": "A missed bid costs a season",
+     "text": "A bid that misses June waits for the May 2028 timetable, five months later, and the service loses 0.9 million journeys in the months it does not run."
     }
    ],
    "pointsHeading": false,
@@ -5795,15 +5809,27 @@
    "points": [
     {
      "lead": "Cheapest first",
-     "text": "The first three stages need only crews, sidings and a bid, and pay back within 26 months, funding the fourth."
+     "points": [
+      "The first three stages need only crews, sidings and a bid",
+      "They pay back within 26 months and fund the fourth"
+     ]
     },
     {
-     "lead": "The fourth stage is the bet",
-     "text": "Electrification takes £390 million and waits on a power upgrade; placed fourth, a slip delays a third of the journeys."
-    },
-    {
-     "lead": "Fares come late",
-     "text": "Fare reform waits a year, so its products fit how people then travel."
+     "lead": "The costly and the uncertain come later",
+     "points": [
+      {
+       "lead": "Electrification",
+       "text": "£390 million, and it waits on a power upgrade"
+      },
+      {
+       "lead": "Its place",
+       "text": "fourth, so a slip delays a third of the journeys"
+      },
+      {
+       "lead": "Fare reform",
+       "text": "a year later, so its products fit how people then travel"
+      }
+     ]
     }
    ],
    "pointsHeading": false,
@@ -6711,16 +6737,25 @@
    },
    "points": [
     {
-     "lead": "Leisure leads",
-     "text": "More weekend and off-peak trips added £31m, the largest driver, and the trend has run for five years."
+     "lead": "Growth is leisure",
+     "points": [
+      "Weekend and off-peak trips added £31m, the largest driver",
+      "The trend has run for five years"
+     ]
     },
     {
-     "lead": "Seasons fall",
-     "text": "Season sales fell another £14m as office days held at three a week; the fall is slowing but not over."
+     "lead": "Seasons still fall",
+     "points": [
+      "Sales fell another £14m as office days held at three a week",
+      "The fall is slowing but not over"
+     ]
     },
     {
-     "lead": "One-offs",
-     "text": "The £18m regulated fares rise will not repeat at that size next year, and delay repay depends on punctuality holding above 90%."
+     "lead": "One-offs flatter the year",
+     "points": [
+      "The £18m regulated fares rise will not repeat at that size",
+      "Delay repay depends on punctuality holding above 90%"
+     ]
     }
    ],
    "source": "Source: illustrative data for a fictional operator; synthetic"

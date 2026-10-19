@@ -647,7 +647,7 @@ function readableCategories(ex) {
 export function accentTexts(page) {
   const texts = [];
   const add = (value) => { if (typeof value === "string" && value.trim()) texts.push(value); };
-  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(add); } };
+  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(point); } };
   const cell = (c) => (Array.isArray(c) ? c.forEach(add) : point(c));
   (page.points || []).forEach(point);
   (page.blocks || []).forEach((block) => (block?.points || []).forEach(point));

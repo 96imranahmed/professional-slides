@@ -22,6 +22,12 @@ export const ledParagraph = (id, p, highlight) => {
   const marked = own.length ? [...[highlight ?? []].flat(), ...own] : highlight;
   return paragraph(id, text, marked, lead ? { heading: lead } : {});
 };
+/** A point's short bullets under its lead (`points: [string]`), or null: the shape strong decks use most for a claim and its facts. */
+export const pointBullets = (point) => (point && typeof point === "object" && Array.isArray(point.points) && point.points.length ? point.points : null);
+/** A bullet's words: a string, or a `{ lead, text }` bullet as "lead: text". */
+export const bulletText = (sub) => (typeof sub === "string" ? sub : [sub?.lead, sub?.text].filter(Boolean).join(": "));
+/** A point's words as one run - lead, sentence and its bullets - for measuring it. */
+export const pointRun = (point) => (typeof point === "string" ? point : [point?.lead, point?.text, ...(pointBullets(point) ?? []).map(bulletText)].filter(Boolean).join(" "));
 /** The page's authored `paragraphs`, each carrying the page's highlight. */
 export const proseOf = (slide, id) => (slide.paragraphs || []).map((p, at) => ledParagraph(`${id}-p${at}`, p, slide.highlight));
 // Points set in columns run up to three across, four two by two and more
@@ -282,6 +288,7 @@ function pointsHeight(points, width) {
     const text = String(object ? point.text ?? "" : point ?? "");
     const body = text ? measureText(text, textWidth, { fontFamily: "Arial", fontSize: LIST_BODY_PX, wrapWidthRatio: ENGINE_RESERVE }) : null;
     total += (lead ? lead.height + (body ? LIST_LEAD_GAP : 0) : 0) + (body ? body.height : 0);
+    for (const sub of pointBullets(point) ?? []) total += LIST_LEAD_GAP + measureText(bulletText(sub), Math.max(60, textWidth - LIST_MARKER_OFFSET), { fontFamily: "Arial", fontSize: LIST_BODY_PX, wrapWidthRatio: ENGINE_RESERVE }).height;
     if (index < (points || []).length - 1) total += LIST_ITEM_GAP;
   });
   return total;
@@ -313,6 +320,9 @@ const POINT_STYLES = {
   numbered: { marker: "number" },
   // The plain house bullet.
   bulleted: { marker: "auto" },
+  // A bullet whose bold lead runs into its sentence after a colon - "Engines: the XWB-97 is shared ..." - the
+  // fourth way a strong deck sets a point, beside a lead above its sentence, a highlighted sentence and a lead over bullets.
+  inline: { marker: "dot", inlineLead: true, leadStop: ":", leadAccent: false },
   // A box per item: questions to answer, criteria to meet. An item may set
   // `state: "yes"` or `"no"` once it is judged; unset, the box stays open.
   checklist: { marker: "check" },

@@ -317,7 +317,7 @@ const BOUND = Object.freeze({
 });
 // The page's own fields the placements read, each with the placements that read it.
 const PLACED = Object.freeze({
-  points: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text, icon?, highlight? }] - the commentary: a column beside, or up to 3 across under the exhibit" },
+  points: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text?, points?, icon?, highlight? }] - the commentary, as many points as the content has: a column beside, or across under the exhibit (three a row, four two by two); a point is a sentence with its phrase highlighted (`{ text, highlight }`), a lead over its sentence, a bold lead running into its sentence after a colon (`pointsStyle: \"inline\"`), or a lead over two to four bullets (`points: [string | { lead, text }]`)" },
   paragraphs: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text }] - prose in place of points" },
   rail: { in: ["rail"], line: "string - one claim in a filled side panel, eight lines at most" },
   bar: { in: ["so-what-bar"], line: "string - the implication across the foot, 2 lines" },

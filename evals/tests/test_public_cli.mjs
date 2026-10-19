@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execute, COMMANDS } from '../../skills/professional-slides/runtime/command.mjs';
 import { newWorkspace, editWorkspace, openWorkspace, fingerprint, digest, contentSignature, renderedSlide, rankedAdvisories } from '../../skills/professional-slides/runtime/public/workspace.mjs';
-import { approvalMessage, shortPages } from '../../skills/professional-slides/runtime/public/storyline.mjs';
+import { approvalMessage, shortPages, storylineProblems, uniformWords } from '../../skills/professional-slides/runtime/public/storyline.mjs';
 import { ownerOf } from '../../skills/professional-slides/runtime/public/setup.mjs';
 import { privateAddress, readSite } from '../../skills/professional-slides/runtime/site-design.mjs';
 import { applyCandidate } from '../../skills/professional-slides/runtime/public/candidates.mjs';
@@ -88,9 +88,9 @@ test('the shipped reference example compiles to editable text rather than a flat
 // A new deck waits for an approved storyline: asking for a deck is not approval.
 const storyline=()=>({question:'How much upside?',answer:'150-250 units, $60-100m at list',
   reader:{audience:'strategy team',readerKnows:'the market basics',decision:'size the opportunity',density:'pre-read'},
-  sections:[{role:'opening',pages:[{id:'summary',title:'Executive summary',type:'summary/executive-summary'}]},
+  sections:[{role:'opening',pages:[{id:'summary',title:'Executive summary',type:'summary/executive-summary',says:{shape:'lead-text',count:4,of:'statements'}}]},
     {claim:'The installed base must be replaced',pages:[{id:'fleet',title:'Older units are ageing out',type:'ranking/bar',compares:'seven types by age',members:7,
-      candidates:['ranking/bar','lookup/table'],data:{status:'to-find',what:'installed base by type and build year'}}]}],
+      candidates:['ranking/bar','lookup/table'],data:{status:'to-find',what:'installed base by type and build year'},says:{shape:'lead-bullets',count:2,of:'reasons'}}]}],
   alternative:'10 pages: drops the installed-base detail'});
 test('a new deck takes no page until the user approves its storyline, and builds only the pages they approved',async t=>{
   const dir=await temp();t.after(()=>fs.rm(dir,{recursive:true,force:true}));
@@ -216,7 +216,7 @@ test('author-deck and build-deck hold a new argument to its approved storyline t
   const { buildDeck } = await import('../../skills/professional-slides/runtime/build-deck.mjs');
   const { readPagesFileSync, compiledFrom } = await import('../../skills/professional-slides/runtime/pages-file.mjs');
   const author=(file)=>spawnSync(process.execPath,[path.resolve('skills/professional-slides/runtime/author-deck.mjs'),file],{encoding:'utf8'});
-  const one={...storyline(),sections:[{claim:'The decision is clear',pages:[{id:'one',title:'The decision is clear',type:'statement/statement'}]}]};
+  const one={...storyline(),sections:[{claim:'The decision is clear',pages:[{id:'one',title:'The decision is clear',type:'statement/statement',says:{shape:'highlighted',count:1}}]}]};
   const file=path.join(dir,'deck.pages.json');
   await fs.writeFile(file,JSON.stringify({...doc(),storyline:one}));
   const refused=author(file);
@@ -282,13 +282,13 @@ test('the picture libraries report which have a key, and never the key',async t=
 test('the storyline message counts the pages the build adds, marks pages whose data is unchecked and names a skipped candidate',()=>{
   const plan={question:'How large is the market?',answer:'Large enough to enter',alternative:'10 pages',
     reader:{audience:'executives',readerKnows:'the sector',decision:'whether to enter',density:'executive'},
-    sections:[{role:'opening',pages:[{id:'exec',title:'Executive summary',type:'summary/executive-summary'}]},
+    sections:[{role:'opening',pages:[{id:'exec',title:'Executive summary',type:'summary/executive-summary',says:{shape:'lead-text',count:5,of:'statements'}}]},
       {role:'finding',name:'Demand',claim:'Demand is large',pages:[
-        {id:'forecast',title:'Demand doubles by 2035',type:'composition/stacked-bar',compares:'demand by segment',members:3,series:2,candidates:['composition/stacked-bar'],data:{status:'found',what:'a forecast'}},
-        {id:'pair',title:'Product A costs 20% less',type:'ranking/bar',compares:'two products',members:2,candidates:['ranking/bar'],data:{status:'to-find',what:'claims'}}]},
+        {id:'forecast',title:'Demand doubles by 2035',type:'composition/stacked-bar',compares:'demand by segment',members:3,series:2,candidates:['composition/stacked-bar'],data:{status:'found',what:'a forecast'},says:{shape:'callouts',count:2}},
+        {id:'pair',title:'Product A costs 20% less',type:'ranking/bar',compares:'two products',members:2,candidates:['ranking/bar'],data:{status:'to-find',what:'claims'},says:{shape:'lead-bullets',count:2,of:'reasons'}}]},
       {role:'finding',name:'Traction',claim:'Customers choose it',pages:[
-        {id:'orders',title:'Orders by year',type:'trend/line',compares:'orders by year',members:6,candidates:['trend/stacked-column','trend/line'],data:{status:'to-find',what:'order book'}}]},
-      {role:'appendix',pages:[{id:'glossary',title:'Glossary',type:'lookup/table',compares:'terms',data:{status:'found',what:'definitions'}}]}]};
+        {id:'orders',title:'Orders by year',type:'trend/line',compares:'orders by year',members:6,candidates:['trend/stacked-column','trend/line'],data:{status:'to-find',what:'order book'},says:{shape:'lead-text',count:3,of:'drivers'}}]},
+      {role:'appendix',pages:[{id:'glossary',title:'Glossary',type:'lookup/table',compares:'terms',data:{status:'found',what:'definitions'},says:{shape:'none'}}]}]};
   const withContents=approvalMessage(plan,{contents:'once'}),without=approvalMessage(plan,{contents:false});
   assert.ok(withContents.includes('The build adds the cover, a contents page, 2 section dividers and an appendix divider: 10 pages in all, 11 if the deck carries photographs'));
   assert.ok(without.includes('The build adds the cover and an appendix divider: 7 pages in all'));
@@ -296,6 +296,56 @@ test('the storyline message counts the pages the build adds, marks pages whose d
   assert.ok(withContents.includes('not its first candidate, trend/stacked-column'));
   assert.ok(withContents.includes('* The data behind this page is still to find'));
   assert.deepEqual(shortPages(plan).map(f=>f.id),['pair']);
+  // Each page's planned words on its line, and the deck's shapes and counts in one line, where a storyline of one shape shows.
+  assert.match(withContents,/Product A costs 20% less\n\s+ranking\/bar · 2 members · data to-find · words: 2 × title over bullets \(reasons\)/);
+  assert.ok(withContents.includes('Words: title over its sentence 2 · callouts on the exhibit 1 · title over bullets 1 · the exhibit alone 1. Groups a page: 2 (1 page) · 3 (1 page) · 5+ (1 page).'));
+  const unplanned={...plan,sections:plan.sections.map(s=>({...s,pages:s.pages.map(({says,...p})=>p)}))};
+  assert.ok(storylineProblems(unplanned).some(p=>p.includes('`says` plans the page\'s words')));
+  assert.ok(storylineProblems({...plan,sections:[plan.sections[0],{...plan.sections[1],pages:[{...plan.sections[1].pages[1],says:{shape:'rows'}}]}]}).some(p=>p.includes('`says.count` is how many items')));
+});
+
+test('a storyline that plans one point style or one count on most of its pages is advised there, and a varied one is not',()=>{
+  const page=(id,says)=>({id,title:`Page ${id}`,type:'statement/statement',says});
+  const plan=(says)=>({sections:[{claim:'c',pages:says.map((s,i)=>page(`p${i}`,s))}]});
+  const same=uniformWords(plan(Array.from({length:7},()=>({shape:'lead-text',count:3}))));
+  assert.deepEqual(same.map(a=>a.code),['STORYLINE_WORDS_UNIFORM','STORYLINE_WORDS_UNIFORM']);
+  assert.match(same[0].repair,/7 of 7 pages with points plan them as title over its sentence/);
+  assert.match(same[1].repair,/7 of 7 pages plan 3 groups of words/);
+  const varied=[{shape:'lead-text',count:2},{shape:'lead-inline',count:4},{shape:'highlighted',count:3},{shape:'lead-bullets',count:2},{shape:'lead-text',count:5},{shape:'lead-inline',count:3},{shape:'rows',count:6}];
+  assert.deepEqual(uniformWords(plan(varied)),[]);
+});
+
+test('a point can carry short bullets under its lead, beside a chart or under it',()=>{
+  const page=(commentary)=>({id:'p',type:'ranking',form:'bar',title:'Alpha leads the field on the measures that matter',commentary,source:'Source: test',
+    exhibit:{heading:'Share of routes',unit:'%',categories:['Alpha','Bravo','Charlie','Delta','Echo'],series:[{name:'Share',values:[23.4,21.5,7.4,4.1,1.9]}]},
+    points:[{lead:'Alpha wins on cost',points:['Lowest fare on four routes in five','Fuel hedged to the end of the decade']},{lead:'Bravo holds the hubs',points:['Slots at three hubs in four','A loyalty base twice the size of Alpha\'s']}]});
+  for(const commentary of ['beside','below']){
+    const {spec}=compileDeck({deck:{schema:'professional-slides.deck/v3',id:'d',contents:false,assets:{fetch:'none',reason:'test'}},pages:[page(commentary)]},{partial:true});
+    const texts=composeAll(spec).deck.slides[0].nodes.map(n=>n.text).filter(Boolean);
+    for(const line of ['Alpha wins on cost','Lowest fare on four routes in five','Fuel hedged to the end of the decade','Bravo holds the hubs','A loyalty base twice the size of Alpha\'s'])
+      assert.ok(texts.includes(line),`${commentary}: "${line}" is drawn`);
+  }
+});
+
+test('a point can run its bold lead into its sentence after a colon, and a bullet can carry a lead of its own',()=>{
+  const page=(commentary)=>({id:'p',type:'ranking',form:'bar',title:'Alpha leads the field on the measures that matter',commentary,source:'Source: test',pointsStyle:'inline',
+    exhibit:{heading:'Share of routes',unit:'%',categories:['Alpha','Bravo','Charlie','Delta','Echo'],series:[{name:'Share',values:[23.4,21.5,7.4,4.1,1.9]}]},
+    points:[{lead:'Cost',text:'Alpha has the lowest fare on four routes in five and has hedged its fuel to the end of the decade.'},
+      {lead:'Hubs',text:'Bravo holds slots at three hubs in four and a loyalty base twice the size of Alpha\'s.'}]});
+  for(const commentary of ['beside','below']){
+    const {spec}=compileDeck({deck:{schema:'professional-slides.deck/v3',id:'d',contents:false,assets:{fetch:'none',reason:'test'}},pages:[page(commentary)]},{partial:true});
+    const nodes=composeAll(spec).deck.slides[0].nodes;
+    const node=nodes.find(n=>typeof n.text==='string'&&n.text.replace(/\n/g,' ').startsWith('Cost: Alpha has the lowest fare'));
+    assert.ok(node,`${commentary}: the lead runs into its sentence after a colon`);
+    assert.ok(node.runs?.some(r=>r.bold&&/^Cost:/.test(r.text)),`${commentary}: the lead is bold`);
+    assert.ok(node.runs?.some(r=>!r.bold&&r.text.startsWith('Alpha has')),`${commentary}: its sentence is not`);
+  }
+  const bullets={id:'q',type:'ranking',form:'bar',title:'Alpha leads the field on the measures that matter',commentary:'beside',source:'Source: test',
+    exhibit:{heading:'Share of routes',unit:'%',categories:['Alpha','Bravo','Charlie','Delta','Echo'],series:[{name:'Share',values:[23.4,21.5,7.4,4.1,1.9]}]},
+    points:[{lead:'Alpha wins on cost',points:[{lead:'Fares',text:'the lowest on four routes in five'},'Fuel hedged to the end of the decade']},{lead:'Bravo holds the hubs',points:['Slots at three hubs in four','A loyalty base twice Alpha\'s']}]};
+  const {spec}=compileDeck({deck:{schema:'professional-slides.deck/v3',id:'d',contents:false,assets:{fetch:'none',reason:'test'}},pages:[bullets]},{partial:true});
+  const sub=composeAll(spec).deck.slides[0].nodes.find(n=>n.role==='list-subitem'&&n.text.replace(/\n/g,' ').startsWith('Fares: the lowest'));
+  assert.ok(sub&&sub.runs?.some(r=>r.bold&&r.text.startsWith('Fares:')),'a bullet\'s own lead is bold before its colon');
 });
 
 test('advisories put a changed title first and merge untraced numbers into one line',()=>{

@@ -26,6 +26,27 @@ Read the titles down the deck alone, as the reader in `readerKnows`: they should
 
 The approval message counts the pages the build adds too - the cover, a contents page and a divider a named section where the deck draws one, an appendix divider, a credits page where a photograph is used - so the total it states is the deck's. Count the argument's from the storyline: the executive summary; the setup this reader lacks; one page per distinct analysis each section's claim needs, usually two to four (a one-page section is a claim with one piece of evidence; a six-page section is two sections); one or two closing pages; and an appendix for method, sources and full tables. Then hold the count to the occasion - eight to fifteen body pages presented live, fifteen to thirty for a pre-read, thirty or more for a reference or diligence deck. A tree longer than the occasion moves detail to the appendix; a shorter one is missing analyses, not pages. When the user names a length, plan the analyses that fill it and say where it would pad. Never split one table or chart to make pages. The approval message states the count, its breakdown and one alternative length with what it drops or adds.
 
+## Plan each page's words
+
+Each storyline page says what its words will be (`says`): their `shape`, how many there are (`count`) and what each one is (`of`) - `{ "shape": "rows", "count": 5, "of": "risks" }`. The count is what the content has - five risks, two sides, four steps - never a house number: strong decks set two groups on a quarter of their text pages, three on a quarter, four on a fifth and five or more on a quarter. The shape follows what the words carry:
+
+| The content | `shape` | Drawn as |
+| --- | --- | --- |
+| the number the title rests on | `callouts` | `annotations` or `changeAnnotations` on the chart, `commentary: "on-exhibit"` |
+| reasons or mechanisms, each with its evidence | `lead-text` | a title over its sentence: points `{ lead, text }` |
+| findings scanned by a label | `lead-inline` | a bullet whose bold lead runs into its sentence after a colon: `pointsStyle: "inline"` |
+| a finding carried by one phrase | `highlighted` | a sentence with that phrase highlighted: `{ text, highlight }`, `pointsStyle: "prose"` |
+| a claim with several facts under it | `lead-bullets` | a title over two to four bullets: `{ lead, points: [...] }`, each bullet a string or `{ lead, text }` |
+| parallel items scanned by name - risks, options, segments | `rows` | `parallel/labelled-rows`, or a table with an implication column |
+| two sides - facts and implications, benefits and risks, now and next | `columns` | `options/compare`, or two exhibits in a `panels` `row` |
+| a sequence | `steps` | `mechanism/steps`, or points with `pointsStyle: "numbered"` |
+| what people said | `quotes` | `speech` beside the evidence, in a `panels` `row` |
+| an argument read in full | `paragraphs` | `argument/memo` or `argument/sidebar` |
+| headline numbers | `figures` | `numbers/fact-grid` or `numbers/hero-number` |
+| nothing the chart does not say | `none` | the exhibit carries the page |
+
+The first four are the point styles, and a deck varies them page by page - and within a page, a title's bullets can carry their own bold lead. Strong decks set no one shape on more than a sixth of their text pages. Choose each page's style here, at the storyline: the approval message tallies shapes and counts in one line, and a storyline that plans one style or one count on more than half its pages is advised (`STORYLINE_WORDS_UNIFORM`) before a page is written. Words follow the page's job, not a deck-wide size. An evidence page carries its exhibit and what explains it, often under 150 words; an argument page - the summary, a section's case, the risks, the recommendation - carries 200 to 300 words in rows, columns or a table of text. Strong decks run from about 65 to 275 words a page.
+
 ## Find the data first
 
 The titles a deck can prove depend on the data it has. Before writing them, name for each section's claim the analyses that would convince a sceptic: **size** it in the reader's units; **split** it by segment, type, customer or region; **compare** it with every alternative the reader would name, not one; **trend** it, history and forecast; **explain** it - the drivers, as a bridge, a tree or a process. A claim with one analysis behind it is a hypothesis: give it a second cut, or narrow it. A chart of the deck's own arithmetic - one input times assumed rates - is a sensitivity, not evidence.
@@ -63,14 +84,14 @@ A summary carries the answer and the case for it, in four to six developed state
 
 - **A page says one thing.** The title is the claim; the exhibit is the evidence; the commentary says what the exhibit cannot - the mechanism, the cause, the consequence. It does not read the chart back.
 - **Points are sentences**, each a claim with its evidence: "Agent A finished in half the time on the long tasks, where the others timed out" rather than "Agent A: faster".
-- **Prose runs in short paragraphs**, each under a bold `lead` the reader can scan: `{ "lead": "Timing is the real exposure", "text": "..." }`.
+- **Every block is signposted and developed**, in one of four styles varied across the deck: a title over its sentence (`{ "lead": "Timing is the real exposure", "text": "..." }`), a bold lead running into its sentence after a colon (`pointsStyle: "inline"`), a sentence whose key phrase is highlighted (`{ "text": "...", "highlight": "..." }`), or a title over two to four bullets (`{ "lead": "...", "points": ["...", { "lead": "...", "text": "..." }] }`). A block carries 20 to 40 words; a lead over a twelve-word sentence reads as a caption.
 - **Numbers are exact and consistent.** One figure has one value on every page, at one precision. Say the unit once, in the exhibit's heading.
 - **Notes carry method and caveats**, in `note` or a footnote, not in the title or the points.
 - **Labels are short**: a chart's heading names the measure and the population; an axis names its unit; a table's header names what its column holds.
 
 ## Approve the storyline
 
-The `storyline` block of the pages file holds the argument (`catalog --type storyline --schema`); `storyline WORK` prints it as the approval message - the count and its breakdown, the reader, the tree, each page's comparison, candidate charts and data. Show it to the user and wait: they can reorder, cut, merge or add pages there, where it is cheap. A chart page's candidates are the charts that draw its claim, best first ([Drawing](drawing.md#pick-the-obvious-chart)); where the deck needs variety, take a page's next candidate, not a chart that draws its claim less directly.
+The `storyline` block of the pages file holds the argument (`catalog --type storyline --schema`); `storyline WORK` prints it as the approval message - the count and its breakdown, the reader, the tally of planned words, the tree, each page's comparison, candidate charts, data and words. Show it to the user and wait: they can reorder, cut, merge or add pages there, where it is cheap. A chart page's candidates are the charts that draw its claim, best first ([Drawing](drawing.md#pick-the-obvious-chart)); where the deck needs variety, take a page's next candidate, not a chart that draws its claim less directly.
 
 A request to make a deck is not approval: approval is the user's reply to the storyline, or their explicit words that they do not want to see it, recorded verbatim with `--approve`. Once approved, write each page once; change a title afterwards only when the evidence changes. A page added or dropped is a new storyline to approve.
 

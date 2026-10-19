@@ -323,13 +323,13 @@ const TABLE_LEVER = "a table stands as tall as its rows: add the rows or columns
 const FORM_LEVERS = {
   lookup: TABLE_LEVER, scorecard: TABLE_LEVER, matrix: TABLE_LEVER,
   "schedule/timeline": "a timeline sets its items in one band: take `form: \"roadmap\"`, one row an item down the page, or add items",
-  "options/compare": "each side stands as tall as its points: give each five or six, or a `caption` under the panels",
+  "options/compare": "each side stands as tall as its points: give each side every point the comparison has, or a `caption` under the panels",
   "summary/executive-summary": "add a figure strip (`metrics`, three to five figures) under the points",
   "argument/sidebar": "the paragraphs set the height beside the panel: add a paragraph, or say more in the panel",
-  "numbers/hero-number": "the figure's column fills with its points: three developed points `beside` it",
+  "numbers/hero-number": "the figure's column fills with its points: the points the figure needs `beside` it, each a lead with its evidence or a lead over short bullets",
   picture: "a picture keeps its shape: add a `kpi` under it, or set the points `below`",
-  ranking: "a few bars stand short: set the points `below` (up to three across), or add the members the comparison leaves out",
-  trend: "a short run stands short: set the points `below`, or add the periods or series the comparison needs",
+  ranking: "a few bars stand short: pair the chart with a second exhibit for the same claim (`type: \"panels\", form: \"row\"`), set the points `below`, or add the members the comparison leaves out",
+  trend: "a short run stands short: pair the chart with a second exhibit for the same claim (`type: \"panels\", form: \"row\"`), set the points `below`, or add the periods or series the comparison needs",
 };
 function withFormLever(found, doc) {
   const byId = new Map([...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page?.id !== undefined && PAGE_TYPES[page.type]).map((page) => [String(page.id), page]));
