@@ -1330,7 +1330,8 @@ export function describeTypes() {
     `Capacities: a chart callout holds about ${calloutCapacity()} words and a chart ${CALLOUTS_MAX} callouts (a bridge over commentary \`below\`, ${WATERFALL_BELOW_CALLOUTS}); a rail about ${railCapacity()} words; a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; a single column never stretches) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row.`, "",
     `Icons (a point's, a card's, a row label's \`icon\`): ${ICON_NAMES.join(", ")}. \`author-deck --icons\` lists the other words each answers to.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type>` prints a page of that type that compiles, to fill in.", ""];
-  for (const [name, t] of Object.entries(PAGE_TYPES)) {
+  // `reference` rebuilds a supplied slide image as native elements; it is not a page a deck is written with.
+  for (const [name, t] of Object.entries(PAGE_TYPES).filter(([name]) => name !== "reference")) {
     const n = (Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits) + Object.keys(t.forms).filter((form) => FORM_EXHIBITS[`${name}/${form}`] !== undefined).map((form) => ` (form ${form}: ${exhibitRange(name, form).join("-").replace(/^(\d+)-\1$/, "$1")})`).join("");
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target, { type: name, form })]).filter(([, keys]) => keys.length);
     const sparing = Object.keys(t.forms).filter((form) => SPARING_FORMS[`${name}/${form}`]);

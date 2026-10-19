@@ -6,4 +6,4 @@ Run `npm run package:plugin` for a local plugin, `npm pack` for npm, and `npm ru
 
 Public submission still validates manifests, file hashes and archive integrity and rejects app/server bindings. The submission includes the public CLI, its runtime dependencies, `PRIVACY.md`, `TERMS.md` and `LICENSE`. It does not require a rewritten skill prompt or a repository checkout at runtime.
 
-Packaging is not publication. An npm tarball is tested with `npm exec --package /absolute/path/to/professional-slides-0.0.1.tgz -- professional-slides setup --agent codex`; a public release additionally requires registry authentication and publication. Plugin-directory submission remains its own publisher workflow.
+Packaging is not publication. An npm tarball is tested with `npm exec --package /absolute/path/to/professional-slides-0.0.2.tgz -- professional-slides setup --agent codex`; a public release additionally requires registry authentication and publication. Plugin-directory submission remains its own publisher workflow.

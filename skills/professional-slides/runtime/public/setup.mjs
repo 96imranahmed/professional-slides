@@ -23,11 +23,27 @@ export async function checkEnvironment({probe=false,renderer="auto"}={}) {
   return complete({environment:report,probe:probe?"passed":"not-run"});
 }
 
+/** Where setup keeps installations, the Python environment and environment.json: the CLI reads it from here too. */
+export const setupHome = () => process.env.PROFESSIONAL_SLIDES_HOME || path.join(os.homedir(), ".professional-slides");
+
+/** What a skill link already at `target` is: nothing, this setup's own link (to `install` or an older installation), or someone else's. */
+export async function ownerOf(target, install, base) {
+  const previous = await fs.lstat(target).catch((e) => (e.code === "ENOENT" ? null : Promise.reject(e)));
+  if (!previous) return "free";
+  if (!previous.isSymbolicLink()) return "foreign";
+  // A link left by a deleted installation dangles: read where it points rather than resolving it.
+  const pointed = path.resolve(path.dirname(target), await fs.readlink(target));
+  const real = await fs.realpath(pointed).catch(() => pointed);
+  const installations = path.join(await fs.realpath(base).catch(() => base), "installations");
+  if (real === path.join(await fs.realpath(install).catch(() => install), "skills/professional-slides")) return "current";
+  const relative = path.relative(installations, real);
+  return relative && !relative.startsWith("..") && !path.isAbsolute(relative) ? "ours" : "foreign";
+}
+
 export async function setup({agent,scope="user",renderer="auto"}={}) {
   if(!["codex","claude","both"].includes(agent))throw new Error("setup requires --agent codex|claude|both");
   if(!["user","project"].includes(scope))throw new Error("scope must be user or project");
-  const home=process.env.PROFESSIONAL_SLIDES_HOME||path.join(os.homedir(),".professional-slides");
-  const base=scope==="project"?path.join(process.cwd(),".professional-slides"):home;
+  const base=scope==="project"?path.join(process.cwd(),".professional-slides"):setupHome();
   const pkg=await readJson(path.join(packageRoot,"package.json"));
   const distribution=await readJson(path.join(packageRoot,"distribution.json"));
   const files=[];
@@ -35,32 +51,36 @@ export async function setup({agent,scope="user",renderer="auto"}={}) {
   for(const rel of [...distribution.files,...distribution.roots])await collect(rel);
   const hash=digest(await Promise.all(files.sort().map(async f=>[f,digest(await fs.readFile(path.join(packageRoot,f)))])));
   const install=path.join(base,"installations",`${pkg.version}-${hash.slice(0,12)}`);
+  // Every agent's skill folder is checked before anything is copied, installed or rendered: a skill this setup does not
+  // own is refused up front, and no agent is linked when another is refused.
+  const agents=agent==="both"?["codex","claude"]:[agent];
+  const targets=agents.map(name=>path.join(scope==="user"?os.homedir():process.cwd(),name==="codex"?".agents/skills/professional-slides":".claude/skills/professional-slides"));
+  const owners=await Promise.all(targets.map(target=>ownerOf(target,install,base)));
+  const foreign=targets.filter((_,i)=>owners[i]==="foreign");
+  if(foreign.length)return blocked("INSTALLATION_CONFLICT",`Existing skill at ${foreign.join(" and ")} is not owned by this setup; preserve or remove it explicitly.`);
   await fs.mkdir(install,{recursive:true});
   for(const file of files){const target=path.join(install,file);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(path.join(packageRoot,file),target);}
-  let report=await diagnose({renderer});
-  // Prepare a task-owned venv rather than pip-installing into the system Python.
+  const report=await diagnose({renderer});
+  // An environment of the skill's own, not the system Python's: pip brings it to requirements.txt on every setup, so a
+  // requirement added later is installed, and a run that finds them met changes nothing.
   const py=report.python.chosen||report.python.candidates.find(c=>c.version)?.command||"python3";
   const venv=path.join(base,"python"), executable=path.join(venv,process.platform==="win32"?"Scripts/python.exe":"bin/python");
-  try{await fs.access(executable);}catch{await runProcess(py,["-m","venv","--system-site-packages",venv]);}
-  const imports=await runProcess(executable,["-c","import pptx,lxml,PIL,numpy,pypdf"],{expect:[0,1]});
-  if(imports.code)await runProcess(executable,["-m","pip","install","-r",path.join(install,"requirements.txt")]);
+  try{await fs.access(executable);}catch{
+    const made=await runProcess(py,["-m","venv",venv],{expect:[0,1]});
+    if(made.code)return blocked("PYTHON_VENV_FAILED",`${py} could not create a virtual environment${process.platform==="linux"?" (on Debian or Ubuntu, install python3-venv)":""}: ${made.stderr||made.stdout}`);
+  }
+  await runProcess(executable,["-m","pip","install","--quiet","-r",path.join(install,"requirements.txt")]);
   process.env.RUNTIME_PYTHON=executable;
   process.env.PROFESSIONAL_SLIDES_RENDERER=renderer;
   const ready=await checkEnvironment({probe:true,renderer});
   if(ready.status!=="complete")return ready;
-  await writeJsonWhole(path.join(install,"environment.json"),{python:executable,renderer});
-  const agents=agent==="both"?["codex","claude"]:[agent], destinations=[];
-  for(const name of agents){
-    const target=path.join(scope==="user"?os.homedir():process.cwd(),name==="codex"?".agents/skills/professional-slides":".claude/skills/professional-slides");
+  // The installed skill reads its own copy; `npx professional-slides` from the package reads the one in the setup home.
+  for(const dir of [install,base])await writeJsonWhole(path.join(dir,"environment.json"),{python:executable,renderer});
+  const destinations=[];
+  for(const [i,target] of targets.entries()){
+    if(owners[i]==="current"){destinations.push(target);continue;}
     await fs.mkdir(path.dirname(target),{recursive:true});
-    const previous=await fs.lstat(target).catch(e=>e.code==="ENOENT"?null:Promise.reject(e));
-    if(previous){
-      const real=await fs.realpath(target);
-      if(real===path.join(install,"skills/professional-slides")){destinations.push(target);continue;}
-      const relative=path.relative(path.join(base,"installations"),real);
-      if(!previous.isSymbolicLink()||relative.startsWith("..")||path.isAbsolute(relative))return blocked("INSTALLATION_CONFLICT",`Existing skill at ${target} is not owned by this setup; preserve or remove it explicitly.`);
-      await fs.unlink(target);
-    }
+    if(owners[i]==="ours")await fs.unlink(target);
     await fs.symlink(path.join(install,"skills/professional-slides"),target,process.platform==="win32"?"junction":"dir");
     destinations.push(target);
   }

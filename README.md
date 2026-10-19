@@ -49,7 +49,7 @@ git clone https://github.com/96imranahmed/professional-slides.git
 cd professional-slides
 npm ci
 npm pack --pack-destination /tmp
-npm exec --package /tmp/professional-slides-0.0.1.tgz -- professional-slides setup --agent codex
+npm exec --package /tmp/professional-slides-0.0.2.tgz -- professional-slides setup --agent codex
 ```
 
 To diagnose an installation without changing it:
@@ -64,9 +64,9 @@ A `blocked` result includes the missing pieces or export failure. Install or rep
 
 | Your goal | Give the agent | You receive |
 | --- | --- | --- |
-| Create a new deck | Brief, audience, decision and evidence | Proposed storyline, editable slides, rendered checks |
+| Create a new deck | Brief, audience, decision and evidence | A storyline with its page count to approve, then editable slides checked before they render |
 | See alternatives for one slide | Deck or workspace and slide number | Labelled comparison image, individual previews and editable candidates |
-| Redesign or “consultingify” a slide | Existing deck, target slide and desired style | Before/after previews and a revised PPTX preserving unrelated slides |
+| Redesign or “consultingify” a slide | Existing deck, target slide and desired style | Before/after previews and a revised PPTX; carried slides stay as they were |
 | Convert an image to editable PowerPoint | Slide screenshot, scan or PDF | Editable reconstruction, source/output comparison and explicit uncertainty |
 | Develop a business stylesheet/template | Reference deck, website or brand assets | Named house profile, editable style guide and reusable template slides |
 
@@ -79,19 +79,22 @@ Use the supplied evidence and our reference deck's house style.
 Propose the storyline and slide titles before building.
 ```
 
-The agent establishes what the audience already knows, develops the argument and proposes titles before drawing pages, unless you already authorised it to proceed. Design preferences already supplied are reused. Missing evidence is stated rather than invented.
+The agent asks who reads the deck, what they already know and what it is for, then shows you the storyline - the page count and its breakdown, the argument section by section, and the comparison and data behind each page - and waits for your reply before drawing any page. Asking for a deck is not approving its storyline. Design preferences you have stored are reused. Missing evidence is stated rather than invented.
 
-**Manual CLI equivalent:** start a workspace, discover a suitable page schema/example, fill `deck.pages.json`, then build:
+**Manual CLI equivalent:** start a workspace, write the `storyline` block in `deck.pages.json`, show it for approval, then write the approved pages and build:
 
 ```bash
 npx professional-slides init ./board-work
-npx professional-slides catalog --type trend/line --schema --json
+npx professional-slides catalog --type storyline --schema --json
+npx professional-slides storyline ./board-work                 # the approval message
+npx professional-slides storyline ./board-work --approve "Approved as proposed"
+npx professional-slides storyline ./board-work --scaffold      # the approved pages
 npx professional-slides catalog --type trend/line --example --json
-npx professional-slides inspect ./board-work --json
+npx professional-slides check ./board-work                     # compile and layout checks, no render
 npx professional-slides build ./board-work --out ./board-output
 ```
 
-`init` creates an empty document. It does not invent your argument or data. Your agent supplies these inputs.
+`init` creates an empty document whose pages wait for an approved storyline; `build` refuses pages added or dropped since. `check` and `build` stop before rendering on a page with an empty band or content its layout sets aside. The CLI does not invent your argument or data; your agent supplies them.
 
 ### Show variant images for a particular slide
 
@@ -111,7 +114,7 @@ npx professional-slides apply ./revision-work --candidate <returned-candidate-id
 npx professional-slides build ./revision-work --out ./revised-output
 ```
 
-Import initially carries existing slides unchanged and infers a source house profile for pages you later redraw. Mapping is an authoring task for the agent, using the imported text, tables, chart data and image assets. The CLI reports the required input; it does not pretend to understand an arbitrary drawing automatically. Selection uses a saved candidate ID and rejects stale or modified candidate records. Keep the workspace's `candidates/` directory: a selected redesign may depend on its preserved baseline deck.
+Import initially carries existing slides unchanged and infers a source house profile for pages you later redraw. Mapping is an authoring task for the agent, using the imported text, tables, chart data and image assets. The CLI reports the required input; it does not pretend to understand an arbitrary drawing automatically. Selection uses a saved candidate ID and rejects stale or modified candidate records. Applying one changes that slide and nothing else.
 
 ### Generate an alternate design: “consultingify”
 
@@ -126,7 +129,7 @@ npx professional-slides apply ./revision-work --candidate <returned-candidate-id
 npx professional-slides build ./revision-work --out ./consulting-output
 ```
 
-The same candidate mechanism handles `consulting`, `editorial`, `journal` and `keynote`, or `--style ./acme.house.json`. A style change preserves other slides from the exact baseline PPTX; it does not restyle the whole deck. The selected target needs a unique title in that baseline so it can be matched safely.
+The same candidate mechanism handles `consulting`, `editorial`, `journal` and `keynote`, or `--style ./acme.house.json`. A design or style is the deck's: applying one restyles every page the deck composes, keeping their words and numbers, while slides carried from an imported deck stay byte for byte as they were. Consultingifying one slide of an imported deck therefore leaves the others alone; the result names any other page it restyles.
 
 Design scope preserves wording, numbers and citations. If you want a shorter title or different argument too, say so: that is a content revision. The source presentation is never overwritten.
 
@@ -235,7 +238,7 @@ npm run package:submission
 
 npm and plugin distributions share [distribution.json](distribution.json), versioned manifests and the same runtime. The npm tarball contains runtime files, policies, instructions and assets; evaluation tooling, private workspaces and developer dependencies are excluded. The public submission ZIP remains a separate validated artifact; building it does not publish to npm or a plugin directory.
 
-[Runtime reference](skills/professional-slides/runtime/README.md) · [Evaluation guide](evals/README.md) · [Submission packaging](submission/README-DISTRIBUTION.md)
+[Runtime reference](skills/professional-slides/runtime/README.md) · [Evaluation guide](https://github.com/96imranahmed/professional-slides/blob/main/evals/README.md) · [Submission packaging](https://github.com/96imranahmed/professional-slides/blob/main/submission/README-DISTRIBUTION.md)
 
 ## Support and policies
 

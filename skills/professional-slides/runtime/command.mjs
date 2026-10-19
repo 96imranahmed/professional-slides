@@ -11,7 +11,7 @@ import { complete, blocked, needed, newWorkspace, openWorkspace, inspectWorkspac
 import { STORYLINE_SCHEMA, showStoryline, approveStoryline, scaffoldStoryline } from "./public/storyline.mjs";
 import { makeOptions, applyCandidate } from "./public/candidates.mjs";
 import { importStyle, buildStyle, HOUSE_SCHEMA } from "./public/styles.mjs";
-import { checkEnvironment, setup } from "./public/setup.mjs";
+import { checkEnvironment, setup, setupHome } from "./public/setup.mjs";
 
 const flag = (type="string") => ({type});
 export const COMMANDS = Object.freeze({
@@ -45,7 +45,8 @@ export async function execute(argv) {
   const {values:v,positionals:p}=parseCli(args,{...definition.flags,json:flag("boolean"),help:flag("boolean")},{usage:commandHelp(command),strict:true});
   if(v.help)return complete({help:commandHelp(command)});
   if(p.length!==definition.args)throw new Error(commandHelp(command));
-  const config=await readJson(path.join(packageRoot,"environment.json"),{optional:true});
+  // The installation's own environment, else the one setup prepared in its home (an `npx` run from the package).
+  const config=await readJson(path.join(packageRoot,"environment.json"),{optional:true})??await readJson(path.join(setupHome(),"environment.json"),{optional:true});
   if(!process.env.RUNTIME_PYTHON&&config?.python)process.env.RUNTIME_PYTHON=config.python;
   if(!process.env.PROFESSIONAL_SLIDES_RENDERER&&config?.renderer)process.env.PROFESSIONAL_SLIDES_RENDERER=config.renderer;
   if(v.renderer)process.env.PROFESSIONAL_SLIDES_RENDERER=v.renderer;
@@ -60,7 +61,8 @@ export async function execute(argv) {
     if(type&&!PAGE_TYPES[type])throw new Error(`Unknown type ${type}`);
     if(v.schema)return complete({schemaDefinition:form?formFields(type,form):pageSchema(type||null)});
     if(v.example){const examples=type==="reference"?[referenceExample()]:workedExamples().pages.filter(p=>(!type||p.type===type)&&(!form||p.form===form));return complete({examples});}
-    return complete({types:type?{[type]:PAGE_TYPES[type]}:PAGE_TYPES});
+    // `reference` rebuilds a slide image; it is listed only when asked for by name.
+    return complete({types:type?{[type]:PAGE_TYPES[type]}:Object.fromEntries(Object.entries(PAGE_TYPES).filter(([name])=>name!=="reference"))});
   }
   if(command==="init"){
     const work=await newWorkspace(p[0],null,{argument:"new"});

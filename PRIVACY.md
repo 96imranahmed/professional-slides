@@ -2,7 +2,7 @@
 
 Last updated 18 October 2026
 
-Professional Slides runs inside your own AI coding agent. It has no server, account or tracking of its own, and we never receive the briefs, evidence or decks you work on. This policy covers the Professional Slides npm package, skill and plugin, including what leaves your computer when you use them.
+Professional Slides runs inside your own AI coding agent. It has no server, account or tracking of its own, and we never receive the briefs, evidence or decks you work on. This policy covers the Professional Slides npm package, skill and plugin, including what leaves your computer when you use them, and what the shiphappens.xyz website that shows them collects.
 
 ## Who we are
 
@@ -34,14 +34,22 @@ The skill's own requests identify themselves as `professional-slides/1.0` and se
 
 The setup command stores persistent runtime installations and an isolated Python environment under ~/.professional-slides/ (or a project-local .professional-slides/ with --scope project), and registers the skill in the selected agent's skill directory. Its environment.json records the Python executable and selected renderer. Runtime work remains outside the installed skill. Deleting an installation also requires removing its agent skill link; keep deck workspaces you want to retain.
 
+## The shiphappens.xyz website
+
+- shiphappens.xyz uses Google Analytics to count visits and see which pages are used. It sets cookies and records details such as the pages you view, your approximate location, your device and browser, and the site that sent you. We look at this only in aggregate. You can block it in your browser's cookie settings or with Google's [opt-out add-on](https://tools.google.com/dlpage/gaoptout).
+- Fonts on these pages load from Google Fonts, which receives your IP address and browser details.
+- The policy and terms pages load their text from this repository on GitHub, which receives your IP address and browser details.
+- There are no accounts, forms or comments. "Copy prompt" uses your browser's clipboard and sends nothing to us, and the downloads are plain files.
+- The site's hosting provider processes standard request data, such as IP addresses, to serve pages and keep the site secure.
+
 ## Children
 
-The package, skill and plugin are made for professional use and are not directed at children under 13.
+The package, skill, plugin and website are made for professional use and are not directed at children under 13.
 
 ## Changes
 
-We will update this page, and the date at the top, when the package, skill or plugin changes how data is handled.
+We will update this page, and the date at the top, when the package, skill, plugin or website changes how data is handled.
 
 ## Contact
 
-Questions or requests: open an issue at [github.com/96imranahmed/professional-slides/issues](https://github.com/96imranahmed/professional-slides/issues). Our [Terms of Use](TERMS.md) cover how you may use the skill and the samples.
+Questions or requests: open an issue at [github.com/96imranahmed/professional-slides/issues](https://github.com/96imranahmed/professional-slides/issues). Our [Terms of Use](https://github.com/96imranahmed/professional-slides/blob/main/TERMS.md) cover how you may use the skill and the samples.

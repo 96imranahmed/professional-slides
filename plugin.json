@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "professional-slides",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Create and revise editable PowerPoint decks.",
   "author": {
     "name": "Imran Ahmed"
@@ -11,7 +11,7 @@
       "interface": {
         "displayName": "Professional Slides",
         "shortDescription": "Editable PowerPoint workflows",
-        "longDescription": "Professional Slides creates and revises editable PowerPoint decks in Codex or Claude Code. Start from a brief, an existing presentation, or a slide image. Preview alternative layouts for a selected slide, redesign it while preserving its content and unrelated slides, reconstruct an image as native editable elements, or develop a named brand profile with editable template and style-guide slides.\n\nThe npm setup command installs a persistent portable skill and checks the local environment with a real Office export. Desktop Microsoft PowerPoint or LibreOffice and Poppler must be installed locally; the npm package does not supply them.\n\nAll workflows use the shared layout, PowerPoint emission, rendering, readback and validation pipeline. The agent inspects the saved output. Image reconstruction is agent-assisted; uncertain content stays explicit. Eligible charts have embedded workbooks; custom chart treatments use editable shapes. An independent review is available when requested.",
+        "longDescription": "Professional Slides creates and revises editable PowerPoint decks in Codex or Claude Code. Start from a brief, an existing presentation, or a slide image. A new deck starts from a storyline you approve - the reader, the answer, the page count and the data behind each page - before any page is built. Preview alternative layouts for a selected slide, restyle the deck while keeping every word and number, reconstruct an image as native editable elements, or develop a named brand profile with editable template and style-guide slides.\n\nThe npm setup command installs a persistent portable skill and checks the local environment with a real Office export. Desktop Microsoft PowerPoint or LibreOffice and Poppler must be installed locally; the npm package does not supply them.\n\nAll workflows use the shared layout, PowerPoint emission, rendering, readback and validation pipeline. The agent inspects the saved output. Image reconstruction is agent-assisted; uncertain content stays explicit. Eligible charts have embedded workbooks; custom chart treatments use editable shapes. An independent review is available when requested.",
         "developerName": "Imran Ahmed",
         "brandColor": "#183D36",
         "composerIcon": "./assets/icon.png",

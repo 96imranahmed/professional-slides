@@ -6,7 +6,7 @@ These terms cover the Professional Slides npm package, skill and plugin, and the
 
 ## What Professional Slides is
 
-An AI skill that plans and builds editable PowerPoint decks inside Claude Code or Codex. It is a development release (version 0.0.1), so its page types, checks and outputs may change without notice.
+An AI skill that plans and builds editable PowerPoint decks inside Claude Code or Codex. It is a development release (version 0.0.2), so its page types, checks and outputs may change without notice.
 
 ## Using the skill
 
@@ -35,21 +35,27 @@ The skill is built to argue from your evidence: it asks for sources, flags missi
 
 Bundled examples use illustrative content and figures to demonstrate slide designs. Do not present them as evidence for a real business decision. Third-party names and assets retain their existing rights and attribution requirements.
 
+## The samples on the website
+
+- The gallery slides, house-style examples and storyline decks on shiphappens.xyz use invented companies and figures to show what the skill can do. The light-hearted storylines about real organisations are opinion and jokes, not statements of fact.
+- The British Airways deck is an independent analysis built from public sources to show the skill's output. It is not affiliated with or endorsed by British Airways or International Airlines Group, and its figures may be out of date. Names and logos belong to their owners, and its photographs are credited on its last slide.
+- You may download and look at the samples. Do not present them as your own work or as official material of any company they name.
+
 ## No warranty
 
-The package, skill, plugin and bundled examples are provided "as is", without warranties of any kind, to the extent the law allows.
+The package, skill, plugin, bundled examples, the samples and the website are provided "as is", without warranties of any kind, to the extent the law allows.
 
 ## Liability
 
-To the extent the law allows, we are not liable for any loss arising from the skill, the decks it produces, the bundled examples, including lost profits, data or business, or decisions made on a deck's contents. Nothing in these terms limits liability that cannot be limited by law.
+To the extent the law allows, we are not liable for any loss arising from the skill, the decks it produces, the bundled examples, the samples or the website, including lost profits, data or business, or decisions made on a deck's contents. Nothing in these terms limits liability that cannot be limited by law.
 
 ## Privacy
 
-How the package, skill and plugin handle data is set out in the [Privacy Policy](PRIVACY.md).
+How the package, skill, plugin and website handle data is set out in the [Privacy Policy](https://github.com/96imranahmed/professional-slides/blob/main/PRIVACY.md).
 
 ## Changes
 
-We may update these terms and will change the date at the top when we do. Continuing to use the package, skill or plugin after a change means you accept the updated terms.
+We may update these terms and will change the date at the top when we do. Continuing to use the package, skill, plugin or website after a change means you accept the updated terms.
 
 ## Contact
 

@@ -2,10 +2,11 @@ import hashlib
 import importlib.util
 import json
 import re
+import shutil
 import struct
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import tempfile
 import unittest
 
@@ -124,7 +125,8 @@ class PluginDistributionTests(unittest.TestCase):
                 p=source/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_text('{}')
             packager.package(source,dest)
             files=json.loads((dest/'package-manifest.json').read_text())['files']
-            # Development tooling under evals/ and the Node dev manifest never ship.
+            # Development tooling under evals/, the lockfile and dependencies never ship (package.json is a
+            # distribution file now, but this fixture writes none).
             self.assertEqual(set(files),{*MANIFESTS,'skills/demo/SKILL.md'})
             self.assertFalse((dest/'output').exists())
             packager.package(source,dest)
@@ -148,6 +150,24 @@ class PluginDistributionTests(unittest.TestCase):
                 packager.shutil.copyfile = copy
             files = json.loads((dest/'package-manifest.json').read_text())['files']
             self.assertEqual(set(files), {*MANIFESTS, 'skills/demo/SKILL.md'})
+
+    @unittest.skipUnless(shutil.which('npm'), 'npm is not installed')
+    def test_npm_packs_the_files_the_plugin_ships(self):
+        # A root .npmignore does not narrow package.json's `files`; what npm actually packs is held to the plugin's
+        # allowlist over tracked files, so the two installs carry the same skill.
+        listed = subprocess.run(['npm', 'pack', '--dry-run', '--json', '--ignore-scripts'], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+        npm = {f['path'] for f in json.loads(listed)[0]['files']}
+        tracked = subprocess.run(['git', 'ls-files'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split('\n')
+        plugin = {t for t in tracked if t and packager.shipped(PurePosixPath(t)) and not packager.compiled_example(ROOT, PurePosixPath(t))}
+        untracked = {f for f in npm - plugin if f not in tracked}
+        self.assertEqual(npm - plugin - untracked, set())
+        self.assertEqual(plugin - npm, set())
+
+    def test_the_website_reads_the_policy_and_terms_the_package_ships(self):
+        # shiphappens.xyz loads .codex-plugin/{PRIVACY,TERMS}.md from main; the package and the manifests use the root
+        # copies. Moving them broke the live pages, so they are kept byte for byte the same.
+        for name in ('PRIVACY.md', 'TERMS.md'):
+            self.assertEqual((ROOT/'.codex-plugin'/name).read_text(), (ROOT/name).read_text(), name)
 
     def test_the_allowlist_admits_the_skill_and_refuses_what_only_the_suite_uses(self):
         ships = lambda rel: packager.shipped(packager.PurePosixPath(rel))

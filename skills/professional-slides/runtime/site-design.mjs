@@ -6,6 +6,7 @@
 // hundred-page deck on an airline read its palette and its typeface off the
 // airline's site by hand, which this does in one command. Nothing is stored
 // until the user sets it.
+import dns from "node:dns/promises";
 
 const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-sans-serif", "ui-serif", "ui-monospace",
   "-apple-system", "blinkmacsystemfont", "inherit", "initial", "unset", "revert", "emoji", "math", "fangsong"]);
@@ -91,13 +92,47 @@ export function stylesOf(html, base) {
 }
 
 const UA = "professional-slides/1.0 (design intake from a brand's site)";
+const TIMEOUT_MS = 15000, MAX_BYTES = 2_000_000, MAX_REDIRECTS = 5;
+
+/** Whether an address is the machine's own, its network's or a cloud's metadata service: never fetched for a page's sake. */
+export function privateAddress(address) {
+  const v4 = /^(?:::ffff:)?(\d+)\.(\d+)\.(\d+)\.(\d+)$/i.exec(address);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  }
+  const v6 = address.toLowerCase();
+  return v6 === "::" || v6 === "::1" || /^f[cd]/.test(v6) || /^fe[89ab]/.test(v6);
+}
+
+/**
+ * `fetch` for addresses a page names: http and https to public hosts only, each redirect checked the same way, a
+ * timeout, and a body read to a size. The site and the stylesheets it links are the user's choice of brand, but the
+ * stylesheet URLs are the page's, and a page can point anywhere.
+ */
+async function publicFetch(url) {
+  let at = new URL(url);
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (!["http:", "https:"].includes(at.protocol)) throw new Error(`${at.href} is not an http or https address`);
+    const host = at.hostname.replace(/^\[|\]$/g, "");
+    const addresses = host === "localhost" ? [{ address: "127.0.0.1" }] : await dns.lookup(host, { all: true });
+    if (addresses.some(({ address }) => privateAddress(address))) throw new Error(`${at.host} is a private or local address; only public sites are read`);
+    const response = await fetch(at, { headers: { "User-Agent": UA }, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (response.status >= 300 && response.status < 400 && response.headers.get("location")) { at = new URL(response.headers.get("location"), at); continue; }
+    if (Number(response.headers.get("content-length")) > MAX_BYTES) throw new Error(`${at.href} is larger than ${MAX_BYTES} bytes`);
+    const text = (await response.text()).slice(0, MAX_BYTES);
+    return { ok: response.ok, status: response.status, url: at.href, text: async () => text };
+  }
+  throw new Error(`${url} redirects more than ${MAX_REDIRECTS} times`);
+}
 
 /** The site read: its page and up to eight linked stylesheets fetched, and `siteDesign` of what they hold. */
-export async function readSite(url, { fetcher = fetch } = {}) {
+export async function readSite(url, { fetcher = publicFetch } = {}) {
   const page = await fetcher(url, { headers: { "User-Agent": UA }, redirect: "follow" });
   if (!page.ok) throw new Error(`${url} answered ${page.status}`);
   const html = await page.text();
   const { inline, linked } = stylesOf(html, page.url || url);
-  const sheets = await Promise.all(linked.slice(0, 8).map((href) => fetcher(href, { headers: { "User-Agent": UA } }).then((r) => (r.ok ? r.text() : "")).catch(() => "")));
+  const sheets = await Promise.all(linked.filter((href) => /^https?:/i.test(href)).slice(0, 8)
+    .map((href) => fetcher(href, { headers: { "User-Agent": UA } }).then((r) => (r.ok ? r.text() : "")).catch(() => "")));
   return { url, sheets: linked.length, ...siteDesign([...inline, ...sheets]) };
 }

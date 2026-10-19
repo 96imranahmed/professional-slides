@@ -2,6 +2,7 @@
 from pathlib import Path
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -36,7 +37,7 @@ class SubmissionPackageTests(unittest.TestCase):
     def test_public_manifest_matches_source_and_confirmed_publication_details(self):
         data = json.loads((self.package / 'plugin.json').read_text())
         self.assertEqual(data, json.loads((ROOT / 'plugin.json').read_text()))
-        self.assertEqual(data['version'], '0.0.1')
+        self.assertEqual(data['version'], '0.0.2')
         interface = data['extensions']['com.openai']['interface']
         self.assertLessEqual(len(interface['longDescription']), 4000)
         self.assertLessEqual(len(interface['shortDescription']), 30)
@@ -60,8 +61,12 @@ class SubmissionPackageTests(unittest.TestCase):
         self.assertNotIn('test_cases', data['extensions']['com.openai']['review'])
 
     def test_public_copy_has_standalone_readme_and_dependency_command(self):
-        self.assertEqual((self.package / 'README.md').read_text(), public_readme(ROOT))
-        self.assertNotIn('](evals/', (self.package / 'README.md').read_text())
+        readme = (self.package / 'README.md').read_text()
+        self.assertEqual(readme, public_readme(ROOT))
+        self.assertNotIn('](evals/', readme)
+        # Every relative link in the shipped README leads to a file the package carries.
+        for target in re.findall(r'\]\((?!https?:|#|mailto:)([^)#\s]+)', readme):
+            self.assertTrue((self.package / target).exists(), target)
         for excluded in ['.app.json', 'mcp.json', '.mcp.json', 'package-lock.json', 'evals', 'submission']:
             self.assertFalse((self.package / excluded).exists(), excluded)
 
