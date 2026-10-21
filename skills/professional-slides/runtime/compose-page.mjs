@@ -4,6 +4,7 @@
 // fixed shapes (`KINDS`), and an analytical page takes the layout chosen for it
 // (compose-layouts.mjs) built from the arrangements (compose-arrangements.mjs).
 import { SIZE, HUG, LAYOUT } from "./compose-body.mjs";
+import { referencePlan } from "./reference-page.mjs";
 import { GROUNDS as GROUND_TONES } from "./palettes.mjs";
 import { imageProps, normalizePictures, sourcedPicture } from "./compose-pictures.mjs";
 import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem } from "./compose-points.mjs";
@@ -34,6 +35,9 @@ function inlineChartUnits(items) {
  * business of whichever pass reads it.
  */
 export const SLIDE_KEYS = Object.freeze({
+  reference: "supplied image reconstructed on this page",
+  nodes: "bounded editable reference nodes",
+  uncertainties: "unresolved observations of the reference image",
   // what the page is
   id: "the page's own id; one is derived from its position when absent",
   kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
@@ -70,7 +74,7 @@ export const SLIDE_KEYS = Object.freeze({
   // the commentary
   points: "the commentary column: a lead and a sentence per point",
   pointsHeading: "the heading over that column, or false for none",
-  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered, bulleted or checklist",
+  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered, bulleted, inline (a bullet, its bold lead before a colon) or checklist",
   pointsTone: "open, dark, muted, tint or primary",
   pointsAlign: "middle to centre the points on the exhibit",
   paragraphs: "body prose, on a text page",
@@ -208,6 +212,7 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
 function composePage(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = [], deck = {}) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
+  if (slide.kind === "reference") return referencePlan(slide, baseDir);
   // `deck`: what the deck holds across its pages - its conventions and the players they name (conventions.mjs).
   const ctx = { id, baseDir, fill, conventions: deck.conventions ?? null, players: deck.players ?? null };
 

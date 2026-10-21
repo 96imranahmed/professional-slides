@@ -14,7 +14,7 @@
 //   node runtime/author-deck.mjs <id>.pages.json  compile, check and write the deck
 
 import { REGISTRY } from "./registry.mjs";
-import { readablePeriod } from "./time-axis.mjs";
+import { readablePeriod, isPeriodLabel } from "./time-axis.mjs";
 import { playerEntries, playerNames, plannedMark, planPlayerMarks } from "./players.mjs";
 import { isTable, rowCells, finite, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { textWordList, proseParts } from "./text-contract.mjs";
@@ -22,6 +22,7 @@ import { measureInsight } from "./registry-text.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase } from "./text-layout.mjs";
+import { validateReference, REFERENCE_SCHEMA } from "./reference-page.mjs";
 import { sourceDate } from "./sources-registry.mjs";
 import { halvesProblems } from "./compose-layouts.mjs";
 import { checkPictures } from "./compose-pictures.mjs";
@@ -207,6 +208,7 @@ export const PAGE_TYPES = Object.freeze({
     forms: { "executive-summary": "executive-summary", takeaways: "takeaways" },
     commentary: ["none"], exhibits: [0, 1],
   },
+  reference: { task: "reconstruct a supplied slide image as editable native elements", forms: { native: "reference" }, commentary: ["none"], exhibits: 0 },
 });
 
 /**
@@ -480,6 +482,31 @@ function formExhibit(id, page, ex, adjusted) {
     ex.annotations = notes.slice(0, keep);
     setAside(`${notes.length - keep} callout${notes.length - keep === 1 ? "" : "s"}`, why);
   };
+  // A trend runs over time. Members measured at one time drawn as a trend read as a change that never happened: the
+  // A350F deck's e-commerce page joined four shares - international, worldwide, two lanes - with a rising line.
+  if (page.type === "trend" && !["sparklines", "model"].includes(page.form) && cats.length >= 2) {
+    const odd = cats.filter((category) => !isPeriodLabel(category));
+    if (odd.length) throw new Error(`TREND_NOT_TIME: ${id}: a trend runs over periods, and ${odd.length === cats.length ? "none of its categories is one" : `${odd.slice(0, 3).map((c) => `"${c}"`).join(", ")}${odd.length > 3 ? ` and ${odd.length - 3} more` : ""} ${odd.length === 1 ? "is" : "are"} not`}: members compared at one time are a ranking (\`ranking/bar\`), the parts of a whole a composition`);
+  }
+  // A ranking is read in order: its bars are set largest first, as a distribution's are, unless the order is the
+  // author's (\`order: "given"\`) or runs it brackets (\`categoryGroups\`). Four of the A350F deck's ranked pages came out
+  // in the order their measures listed their members.
+  if (page.type === "ranking" && ["bar", "column", "lollipop"].includes(page.form)) {
+    const given = ex.order === "given";
+    delete ex.order;
+    const key = series[0]?.values || [];
+    if (!given && !ex.categoryGroups && cats.length > 2 && key.length === cats.length && key.every(finite)) {
+      const order = cats.map((_, i) => i).sort((a, b) => Number(key[b]) - Number(key[a]) || a - b);
+      if (order.some((at, i) => at !== i)) {
+        const reorder = (list) => (Array.isArray(list) && list.length === cats.length ? order.map((i) => list[i]) : list);
+        ex.categories = reorder(ex.categories);
+        ex.series = series.map((item) => ({ ...item, values: reorder(item.values) }));
+        for (const k of ["categoryNotes", "rowNotes"]) if (ex[k] !== undefined) ex[k] = reorder(ex[k]);
+        if (Array.isArray(ex.deltas) && ex.deltas.every((d) => typeof d !== "object")) ex.deltas = reorder(ex.deltas);
+        if (Array.isArray(ex.dataTable)) ex.dataTable = ex.dataTable.map((row) => ({ ...row, values: reorder(row.values) }));
+      }
+    }
+  }
   if (page.type === "trend" && page.form === "indexed") {
     const base = ex.indexBase ?? cats[0], subject = ex.subject ?? series[0]?.name;
     const at = cats.indexOf(String(base));
@@ -620,7 +647,7 @@ function readableCategories(ex) {
 export function accentTexts(page) {
   const texts = [];
   const add = (value) => { if (typeof value === "string" && value.trim()) texts.push(value); };
-  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(add); } };
+  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(point); } };
   const cell = (c) => (Array.isArray(c) ? c.forEach(add) : point(c));
   (page.points || []).forEach(point);
   (page.blocks || []).forEach((block) => (block?.points || []).forEach(point));
@@ -807,6 +834,13 @@ export function compilePage(pageIn, index = 0, { players = null, spineOnly = fal
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
+  if (page.type === "reference") {
+    validateReference(page);
+    // A reconstruction standing in for a slide of an imported deck names it, as a typed page does, so the revision keeps
+    // its place and section and does not count the original as dropped.
+    return { id, kind: "reference", title: page.title, reference: page.reference, nodes: page.nodes, notes: page.notes,
+      uncertainties: page.uncertainties || [], ...(page.hidden ? { hidden: true } : {}), ...(page.sourceSlide !== undefined ? { sourceSlide: page.sourceSlide } : {}) };
+  }
   if (!page.type) {
     // A section's number is the divider's numeral and the tracker's marker;
     // "01 / " written into its title as well numbers it three ways.
@@ -930,6 +964,15 @@ function checkExhibitData({ page, id, slide, exhibits, primary, adjusted }) {
   // An icon over a chart's heading (`headingIcon`, registry-chart-title.mjs) names the panel by its picture before its
   // words. It needs a heading to stand over - a table heads its columns with `columns[].headerIcon` - and panels side
   // by side share one heading band, so an icon over one heading and not the next sets their headings at two heights.
+  // The unit prints beside the heading: a heading that already says it reads it twice - "Fuel burn for the same job,
+  // 777F = 100, index (777F = 100)" on the A350F deck.
+  for (const ex of exhibitsOf(slide)) {
+    const heading = String(ex.heading ?? ""), unit = typeof ex.unit === "string" ? ex.unit : "";
+    const plain = (text) => text.toLowerCase().replace(/[^a-z0-9%$£€=]+/g, " ").trim();
+    const parts = [unit, ...[...unit.matchAll(/\(([^)]+)\)/g)].map((m) => m[1])].map(plain).filter((part) => part.includes(" ") || part.includes("="));
+    const repeated = parts.find((part) => ` ${plain(heading)} `.includes(` ${part} `));
+    if (heading && repeated) throw new Error(`HEADING_REPEATS_UNIT: ${id}: the heading "${heading}" already says "${repeated}", and the unit "${unit}" prints beside it; say it once - in \`unit\`, and the heading names the measure`);
+  }
   const iconed = exhibitsOf(slide).filter((ex) => ex.headingIcon !== undefined);
   for (const ex of iconed) {
     if (!String(ex.type ?? "").startsWith("chart.")) throw new Error(`${id}: \`headingIcon\` stands over a chart's heading, and a ${ex.type} exhibit draws none${ex.type === "table" ? "; a table sets an icon over a column's header as `columns[].headerIcon`" : ""}`);
@@ -1323,7 +1366,8 @@ export function describeTypes() {
     `Capacities: a chart callout holds about ${calloutCapacity()} words and a chart ${CALLOUTS_MAX} callouts (a bridge over commentary \`below\`, ${WATERFALL_BELOW_CALLOUTS}); a rail about ${railCapacity()} words; a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; a single column never stretches) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row.`, "",
     `Icons (a point's, a card's, a row label's \`icon\`): ${ICON_NAMES.join(", ")}. \`author-deck --icons\` lists the other words each answers to.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type>` prints a page of that type that compiles, to fill in.", ""];
-  for (const [name, t] of Object.entries(PAGE_TYPES)) {
+  // `reference` rebuilds a supplied slide image as native elements; it is not a page a deck is written with.
+  for (const [name, t] of Object.entries(PAGE_TYPES).filter(([name]) => name !== "reference")) {
     const n = (Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits) + Object.keys(t.forms).filter((form) => FORM_EXHIBITS[`${name}/${form}`] !== undefined).map((form) => ` (form ${form}: ${exhibitRange(name, form).join("-").replace(/^(\d+)-\1$/, "$1")})`).join("");
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target, { type: name, form })]).filter(([, keys]) => keys.length);
     const sparing = Object.keys(t.forms).filter((form) => SPARING_FORMS[`${name}/${form}`]);
@@ -1377,10 +1421,11 @@ const FORM_SCHEMA = {
  * generation: the pages file, or with `only` the page schema of one type.
  */
 export function pageSchema(only = null) {
+  if (only === "reference") return REFERENCE_SCHEMA;
   if (only !== null && !PAGE_TYPES[only]) throw new Error(`unknown page type "${only}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   // Any page, typed or structural, may be hidden.
   const hidden = { type: "boolean", description: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide's page carries it, and a page composed where a hidden slide stood is hidden without it; false shows the slide again" };
-  const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => ({
+  const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => name === "reference" ? REFERENCE_SCHEMA : ({
     type: "object",
     required: ["id", "type", "title"],
     properties: {

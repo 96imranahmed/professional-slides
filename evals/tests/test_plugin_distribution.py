@@ -2,10 +2,11 @@ import hashlib
 import importlib.util
 import json
 import re
+import shutil
 import struct
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import tempfile
 import unittest
 
@@ -117,14 +118,15 @@ class PluginDistributionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source, dest = Path(tmp)/'source', Path(tmp)/'package'
             for name in [*MANIFESTS, 'skills/demo/SKILL.md', 'evals/scripts/check.py', 'output/private.pptx',
-                         'tmp/input.json', 'deliverables/report.json', '.context-engine.toml', 'package.json',
+                         'tmp/input.json', 'deliverables/report.json', '.context-engine.toml',
                          'package-lock.json', 'node_modules/pkg/package.json', 'skills/demo/__pycache__/x.py',
                          'skills/demo/runtime/__pycache__/x.py', 'skills/demo/output/data.json',
                          'skills/demo/outputs/data.json', 'skills/demo/dist/package.json', 'skills/demo/notes.txt']:
                 p=source/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_text('{}')
             packager.package(source,dest)
             files=json.loads((dest/'package-manifest.json').read_text())['files']
-            # Development tooling under evals/ and the Node dev manifest never ship.
+            # Development tooling under evals/, the lockfile and dependencies never ship (package.json is a
+            # distribution file now, but this fixture writes none).
             self.assertEqual(set(files),{*MANIFESTS,'skills/demo/SKILL.md'})
             self.assertFalse((dest/'output').exists())
             packager.package(source,dest)
@@ -149,6 +151,24 @@ class PluginDistributionTests(unittest.TestCase):
             files = json.loads((dest/'package-manifest.json').read_text())['files']
             self.assertEqual(set(files), {*MANIFESTS, 'skills/demo/SKILL.md'})
 
+    @unittest.skipUnless(shutil.which('npm'), 'npm is not installed')
+    def test_npm_packs_the_files_the_plugin_ships(self):
+        # A root .npmignore does not narrow package.json's `files`; what npm actually packs is held to the plugin's
+        # allowlist over tracked files, so the two installs carry the same skill.
+        listed = subprocess.run(['npm', 'pack', '--dry-run', '--json', '--ignore-scripts'], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+        npm = {f['path'] for f in json.loads(listed)[0]['files']}
+        tracked = subprocess.run(['git', 'ls-files'], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split('\n')
+        plugin = {t for t in tracked if t and packager.shipped(PurePosixPath(t)) and not packager.compiled_example(ROOT, PurePosixPath(t))}
+        untracked = {f for f in npm - plugin if f not in tracked}
+        self.assertEqual(npm - plugin - untracked, set())
+        self.assertEqual(plugin - npm, set())
+
+    def test_the_website_reads_the_policy_and_terms_the_package_ships(self):
+        # shiphappens.xyz loads .codex-plugin/{PRIVACY,TERMS}.md from main; the package and the manifests use the root
+        # copies. Moving them broke the live pages, so they are kept byte for byte the same.
+        for name in ('PRIVACY.md', 'TERMS.md'):
+            self.assertEqual((ROOT/'.codex-plugin'/name).read_text(), (ROOT/name).read_text(), name)
+
     def test_the_allowlist_admits_the_skill_and_refuses_what_only_the_suite_uses(self):
         ships = lambda rel: packager.shipped(packager.PurePosixPath(rel))
         for rel in ['requirements.txt', 'README.md', 'assets/icon.png', 'skills/s/SKILL.md', 'skills/s/agents/openai.yaml',
@@ -161,7 +181,7 @@ class PluginDistributionTests(unittest.TestCase):
                     # The build runs the scene design checks, so the overlap module ships with what it imports.
                     'skills/s/runtime/validate-overlap.mjs', 'skills/s/runtime/text-layout.mjs']:
             self.assertTrue(ships(rel), rel)
-        for rel in ['package.json', 'package-lock.json', 'evals/run.sh', 'evals/support/compose.mjs', 'assets/notes/icon.png',
+        for rel in ['package-lock.json', 'evals/run.sh', 'evals/support/compose.mjs', 'assets/notes/icon.png',
                     'skills/s/runtime/gates/.gitignore', 'skills/s/examples/page-types.author-log.jsonl',
                     'skills/s/examples/gallery-acceptance.deck.json', 'skills/s/examples/assets/notes.txt',
                     'skills/s/scratch/x.mjs', 'skills/s/.DS_Store']:
@@ -238,7 +258,9 @@ class ShippedPackageTests(RealPackage, unittest.TestCase):
         for name in (*MANIFESTS, 'README.md', 'requirements.txt', 'assets/icon.png',
                      'skills/professional-slides/SKILL.md'):
             self.assertIn(name, self.files)
-        self.assertNotIn('package.json', self.files, 'the dev manifest names devDependencies and scripts into evals/')
+        self.assertIn('package.json', self.files, 'npm and plugin installs share the versioned public CLI metadata')
+        self.assertIn('PRIVACY.md', self.files)
+        self.assertIn('TERMS.md', self.files)
         self.assertIn('python-pptx', (self.dest/'requirements.txt').read_text())
 
     def test_it_leaves_out_what_only_the_suite_uses(self):

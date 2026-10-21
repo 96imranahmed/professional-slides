@@ -235,7 +235,7 @@ function highlightThePhrase(slide) {
 function quotedPrecision(slide) {
   const texts = [];
   const add = (value) => { if (typeof value === "string" || typeof value === "number") texts.push(String(value)); };
-  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(add); } };
+  const point = (p) => { if (typeof p === "string") add(p); else if (p && typeof p === "object") { add(p.lead); add(p.text); (p.points || []).forEach(point); } };
   const tile = (m) => { if (m && typeof m === "object") { add(m.value); add(m.label); add(m.sublabel); add(m.delta); } else add(m); };
   add(slide.title); add(slide.subtitle); add(slide.panel?.text); add(typeof slide.soWhat === "string" ? slide.soWhat : slide.soWhat?.text);
   (slide.points || []).forEach(point); (slide.paragraphs || []).forEach(point); (slide.metrics || []).forEach(tile); tile(slide.kpi);

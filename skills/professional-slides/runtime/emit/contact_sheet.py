@@ -101,13 +101,30 @@ def main(argv=None):
         images = tile_images(tile, header)
         rows.append((tile, images, sum(im.width for im in images) + GAP * (len(images) - 1), max(im.height for im in images)))
     width = MARGIN * 2 + max(row[2] for row in rows)
+    measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    def wrapped(value, font):
+        lines, line = [], ""
+        for word in value.split():
+            trial = f"{line} {word}".strip()
+            if line and measure.textlength(trial, font=font) > width - MARGIN * 2:
+                lines.append(line)
+                line = word
+            else:
+                line = trial
+        return lines + ([line] if line else [])
+    title_lines = wrapped(layout["title"], title_font)
+    subtitle_lines = wrapped(layout.get("subtitle", ""), sub_font)
+    title_height = max(1, len(title_lines)) * 38 + 6
+    subtitle_height = max(1, len(subtitle_lines)) * 26 + 4
     caption = 34
-    height = MARGIN + 44 + 30 + GAP + sum(caption + row[3] + GAP * 2 for row in rows) + MARGIN
+    height = MARGIN + title_height + subtitle_height + GAP + sum(caption + row[3] + GAP * 2 for row in rows) + MARGIN
     sheet = Image.new("RGB", (width, height), BACKGROUND)
     draw = ImageDraw.Draw(sheet)
-    draw.text((MARGIN, MARGIN), layout["title"], font=title_font, fill=INK)
-    draw.text((MARGIN, MARGIN + 44), layout.get("subtitle", ""), font=sub_font, fill=MUTED)
-    y = MARGIN + 44 + 30 + GAP * 2
+    for i, line in enumerate(title_lines):
+        draw.text((MARGIN, MARGIN + i * 38), line, font=title_font, fill=INK)
+    for i, line in enumerate(subtitle_lines):
+        draw.text((MARGIN, MARGIN + title_height + i * 26), line, font=sub_font, fill=MUTED)
+    y = MARGIN + title_height + subtitle_height + GAP * 2
     for tile, images, _, row_height in rows:
         draw.text((MARGIN, y), tile["label"], font=label_font, fill=INK)
         label_width = draw.textlength(tile["label"], font=label_font)

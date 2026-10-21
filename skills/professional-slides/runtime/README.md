@@ -1,5 +1,7 @@
 # Runtime
 
+The public entry point is `node runtime/command.mjs --help`, also exposed as `professional-slides` by npm. Prefer it for ordinary agent work; the lower-level commands below remain available for development. A local PowerPoint or LibreOffice installation and Poppler are required for public builds. See the root README for setup, slide options/redesign, image reconstruction and brand template flows.
+
 Node lays the page out; Python writes, renders and checks the file. The order the commands run in is the [process](../SKILL.md#the-process); this page is the command and module map.
 
 ## Commands

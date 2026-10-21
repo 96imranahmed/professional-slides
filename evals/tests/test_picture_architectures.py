@@ -222,5 +222,19 @@ console.log(JSON.stringify({{ok:true}}));
         self.assertTrue(result["ok"])
 
 
+
+class PictureRefTests(unittest.TestCase):
+    def test_an_embedded_picture_composes_and_a_bare_path_is_refused_in_words(self):
+        result = run_node('''
+import { imageProps } from './skills/professional-slides/runtime/compose-pictures.mjs';
+const embedded = imageProps({ dataUri: 'data:image/jpeg;base64,AAAA', width: 10, height: 5, alt: 'A product photograph', authorization: 'Photo: x, CC BY 2.0' }, '/deck');
+let refused = null;
+try { imageProps('assets/pictures/a.jpg', '/deck'); } catch (e) { refused = e.message; }
+console.log(JSON.stringify({ embedded, refused }));
+''')
+        self.assertEqual(result["embedded"]["authorization"], "Photo: x, CC BY 2.0")
+        self.assertIn("a picture is { path, alt, credit }", result["refused"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@
 from pathlib import Path
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -9,7 +10,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'evals/scripts'))
-from package_submission import build_submission, validate, verify
+from package_submission import build_submission, public_readme, validate, verify
 
 
 class SubmissionPackageTests(unittest.TestCase):
@@ -36,16 +37,16 @@ class SubmissionPackageTests(unittest.TestCase):
     def test_public_manifest_matches_source_and_confirmed_publication_details(self):
         data = json.loads((self.package / 'plugin.json').read_text())
         self.assertEqual(data, json.loads((ROOT / 'plugin.json').read_text()))
-        self.assertEqual(data['version'], '0.0.1')
+        self.assertEqual(data['version'], '0.0.2')
         interface = data['extensions']['com.openai']['interface']
         self.assertLessEqual(len(interface['longDescription']), 4000)
         self.assertLessEqual(len(interface['shortDescription']), 30)
         # The published pages load the policy and terms kept beside the store manifest.
-        self.assertEqual(interface['privacyPolicyURL'], 'https://shiphappens.xyz/slides/privacy')
-        self.assertEqual(interface['termsOfServiceURL'], 'https://shiphappens.xyz/slides/terms')
+        self.assertEqual(interface['privacyPolicyURL'], 'https://github.com/96imranahmed/professional-slides/blob/main/PRIVACY.md')
+        self.assertEqual(interface['termsOfServiceURL'], 'https://github.com/96imranahmed/professional-slides/blob/main/TERMS.md')
         for document in ['PRIVACY.md', 'TERMS.md']:
-            self.assertTrue((ROOT / '.codex-plugin' / document).is_file(), document)
-            self.assertFalse((self.package / '.codex-plugin' / document).exists(), document)
+            self.assertTrue((ROOT / document).is_file(), document)
+            self.assertEqual((self.package / document).read_bytes(), (ROOT / document).read_bytes())
         self.assertEqual(data['author']['name'], 'Imran Ahmed')
         self.assertEqual(interface['developerName'], 'Imran Ahmed')
         self.assertEqual(interface['websiteURL'], 'https://shiphappens.xyz/slides')
@@ -60,10 +61,13 @@ class SubmissionPackageTests(unittest.TestCase):
         self.assertNotIn('test_cases', data['extensions']['com.openai']['review'])
 
     def test_public_copy_has_standalone_readme_and_dependency_command(self):
-        self.assertEqual((self.package / 'README.md').read_bytes(),
-                         (ROOT / 'submission/README-DISTRIBUTION.md').read_bytes())
-        self.assertNotIn('](evals/', (self.package / 'README.md').read_text())
-        for excluded in ['.app.json', 'mcp.json', '.mcp.json', 'package.json', 'package-lock.json', 'evals', 'submission']:
+        readme = (self.package / 'README.md').read_text()
+        self.assertEqual(readme, public_readme(ROOT))
+        self.assertNotIn('](evals/', readme)
+        # Every relative link in the shipped README leads to a file the package carries.
+        for target in re.findall(r'\]\((?!https?:|#|mailto:)([^)#\s]+)', readme):
+            self.assertTrue((self.package / target).exists(), target)
+        for excluded in ['.app.json', 'mcp.json', '.mcp.json', 'package-lock.json', 'evals', 'submission']:
             self.assertFalse((self.package / excluded).exists(), excluded)
 
     def test_app_bindings_are_refused_without_changing_the_source(self):

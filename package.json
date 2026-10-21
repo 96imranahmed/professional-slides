@@ -1,19 +1,22 @@
 {
   "name": "professional-slides",
-  "private": true,
+  "private": false,
   "type": "module",
   "scripts": {
     "check:syntax": "node evals/scripts/check_source_quality.mjs",
     "test": "node evals/scripts/run_tests.mjs",
     "test:strict": "node evals/scripts/run_tests.mjs --strict",
     "test:serial": "node evals/scripts/run_tests.mjs --serial",
-    "check": "npm run check:syntax && npm test",
+    "check": "npm run check:syntax && npm test && npm run test:cli",
     "check:gates": "bash evals/run.sh",
     "import:maps": "node evals/scripts/import_natural_earth_maps.mjs",
     "package:plugin": "python3 evals/scripts/package_plugin.py",
     "package:submission": "python3 evals/scripts/package_submission.py --output dist/submission",
     "build:deck": "node skills/professional-slides/runtime/build-deck.mjs",
-    "prune:output": "python3 evals/scripts/prune_output.py"
+    "prune:output": "python3 evals/scripts/prune_output.py",
+    "test:cli": "node --test evals/tests/test_public_cli.mjs",
+    "prepack": "python3 evals/scripts/prepare_npm.py",
+    "test:cli:render": "node --test --test-concurrency=1 evals/tests/test_public_cli_render.mjs"
   },
   "engines": {
     "node": ">=20.9"
@@ -22,5 +25,52 @@
   "devDependencies": {
     "playwright": "^1.61.1",
     "sharp": "^0.35.4"
-  }
+  },
+  "version": "0.0.2",
+  "bin": {
+    "professional-slides": "skills/professional-slides/runtime/command.mjs"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/96imranahmed/professional-slides.git"
+  },
+  "files": [
+    "README.md",
+    "requirements.txt",
+    "distribution.json",
+    "LICENSE",
+    "PRIVACY.md",
+    "TERMS.md",
+    "plugin.json",
+    ".codex-plugin/plugin.json",
+    ".claude-plugin/plugin.json",
+    "assets/*.png",
+    "assets/*.jpg",
+    "assets/*.jpeg",
+    "assets/*.webp",
+    "assets/*.svg",
+    "skills/*/SKILL.md",
+    "skills/*/agents/*.yaml",
+    "skills/*/agents/*.yml",
+    "skills/*/runtime/**/*.mjs",
+    "skills/*/runtime/**/*.py",
+    "skills/*/runtime/**/*.json",
+    "skills/*/runtime/**/*.md",
+    "skills/*/references/**/*.md",
+    "skills/*/references/**/*.json",
+    "skills/*/examples/*.json",
+    "skills/*/examples/assets/**/*.png",
+    "skills/*/examples/assets/**/*.jpg",
+    "skills/*/examples/assets/**/*.jpeg",
+    "skills/*/examples/assets/**/*.webp",
+    "skills/*/examples/assets/**/*.svg",
+    "skills/*/assets/**/*.png",
+    "skills/*/assets/**/*.jpg",
+    "skills/*/assets/**/*.jpeg",
+    "skills/*/assets/**/*.webp",
+    "skills/*/assets/**/*.svg",
+    "skills/*/assets/**/*.json",
+    "skills/*/assets/**/LICENSE*"
+  ]
 }

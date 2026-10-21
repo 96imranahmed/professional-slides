@@ -214,6 +214,14 @@ function addsUp(column, values = []) {
   return !NOT_ADDITIVE.test(label) && !NOT_ADDITIVE_UNIT.test(unit.trim());
 }
 
+/** The unit a column's figures are in: its `unit`, else the one its label names in brackets or after a comma, else none. */
+const unitOfColumn = (column) => {
+  const unit = typeof column === "object" ? String(column?.unit ?? "").trim() : "";
+  if (unit) return unit.toLowerCase();
+  const label = columnLabel(column);
+  return (/\(([^)]+)\)\s*$/.exec(label)?.[1] ?? /,\s*([^,]{1,12})$/.exec(label)?.[1] ?? "").trim().toLowerCase();
+};
+
 function totalRow(ex) {
   if (ex.total !== true && ex.total !== "auto") return ex;
   const rows = ex.rows.map((row) => (Array.isArray(row) ? { cells: row, plain: true } : { ...row }));
@@ -224,6 +232,7 @@ function totalRow(ex) {
     throw new Error("The table already carries a total row");
   }
   const label = typeof ex.totalLabel === "string" && ex.totalLabel.trim() ? ex.totalLabel.trim() : "Total";
+  const summed = new Set();
   const cells = ex.columns.map((column, index) => {
     if (index === 0) return label;
     const derived = typeof column === "object" ? column.derived : null;
@@ -245,10 +254,16 @@ function totalRow(ex) {
     const values = body.map((row) => (bars ? (Number.isFinite(row.cells[index]?.values?.[0]) ? row.cells[index].values[0] : null) : numberOf(row.cells[index])));
     if (!addsUp(column, values)) return " ";
     if (values.some((value) => value === null)) return " ";
+    summed.add(unitOfColumn(column));
     const sum = String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
     return bars || heat ? { type: "text", text: sum } : sum;
   });
   const { total: _t, totalLabel: _l, ...rest } = ex;
+  // The preset's total ("auto") closes a table of parts of one whole: every column it sums counts one thing, in one
+  // unit. A table of members measured in different units - payload in tonnes, volume in m3, range in nm, one row an
+  // aircraft type - adds up column by column and means nothing in total: the A350F deck's spec table closed on
+  // "Total 781.8", its types' payloads summed. A total the author asks for (`total: true`) is theirs.
+  if (ex.total === "auto" && summed.size > 1) return rest;
   // A total row is its totals. The measure-table preset's total ("auto") is
   // added only where a column sums, so a table of text never closes on a
   // "Total" label over a blank row, and one the author asks for where none
@@ -439,6 +454,14 @@ export function inferredTreatments(ex) {
       if (!total || values.some((v) => !v)) continue;
       const sum = values.reduce((a, v) => a + v.value, 0);
       const decimals = Math.max(...[...values, total].map((v) => String(v.value).split(".")[1]?.length ?? 0));
+      // A total of parts that are none of them negative is at least the largest part, and a column of zeros sums to its
+      // zero whatever the row is: the rounding margin, half a unit a row, let a 16-row fleet table's last row (0 under
+      // 7) pass as its total.
+      const parts = values.map((v) => v.value);
+      if ((sum === 0 && total.value === 0) || (parts.every((x) => x >= 0) && total.value < Math.max(...parts))) {
+        if (total.value < Math.min(...parts) || total.value > Math.max(...parts)) fits = false;
+        continue;
+      }
       if (Math.abs(sum - total.value) <= Math.max(0.5 * 10 ** -decimals * values.length, Math.abs(total.value) * 0.005)) sums += 1;
       else if (total.value < Math.min(...values.map((v) => v.value)) || total.value > Math.max(...values.map((v) => v.value))) fits = false;
     }

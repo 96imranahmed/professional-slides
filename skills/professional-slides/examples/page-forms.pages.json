@@ -236,19 +236,20 @@
    },
    "points": [
     {
-     "lead": "The network fills before it fails",
-     "text": "Punctuality fell three points while train-km rose from 15.4 million to 18.2 million, because the added trains share the same two-track approach into Leeds. Each late train now delays the one behind it, which did not happen when the timetable had gaps."
+     "text": "The network fills before it fails: punctuality fell three points while train-km rose from 15.4 million to 18.2 million, because the added trains share the same two-track approach into Leeds.",
+     "highlight": "punctuality fell three points"
     },
     {
-     "lead": "Where the margin returns",
-     "text": "The Eastern line runs at 86.1%, the weakest on the network, and its diesel units account for half of all fleet failures. Electric trains from 2030 remove those failures, which is how the plan adds a fifth more service and still holds the 90% floor."
+     "text": "The Eastern line runs at 86.1%, the weakest on the network, and its diesel units account for half of all fleet failures; electric trains from 2030 remove them, so the plan can add a fifth more service and hold the 90% floor.",
+     "highlight": "half of all fleet failures"
     },
     {
-     "lead": "What the plan must not do",
-     "text": "Adding off-peak trains before the depot extension opens would park units on running lines overnight and cost another point. The timetable change therefore waits for the twelve new sidings in December 2027."
+     "text": "Adding off-peak trains before the depot extension opens would park units on running lines and cost another point, so the timetable change waits for the twelve new sidings in December 2027.",
+     "highlight": "waits for the twelve new sidings"
     }
    ],
-   "source": "Source: illustrative data for a fictional operator; performance reports"
+   "source": "Source: illustrative data for a fictional operator; performance reports",
+   "pointsStyle": "prose"
   },
   {
    "id": "f-trend-slope",
@@ -1100,7 +1101,7 @@
    "type": "ranking",
    "form": "range",
    "commentary": "on-exhibit",
-   "takeaway": false,
+   "takeaway": "At £440m the bid sits inside four of the five ranges and £80m under the cash-flow ceiling",
    "title": "The five methods value the Coast concession at £300m to £520m; our bid is £440m",
    "exhibit": {
     "heading": "Value of the Coast concession by method",
@@ -1554,16 +1555,25 @@
    "takeaway": false,
    "points": [
     {
-     "lead": "Frequency",
-     "text": "Half of riders disagree that trains run often enough, the only statement where disagreement outweighs agreement."
+     "lead": "Frequency is the complaint",
+     "points": [
+      "Half of riders disagree that trains run often enough",
+      "The only statement where disagreement outweighs agreement"
+     ]
     },
     {
-     "lead": "Fares",
-     "text": "Fares split riders: 44% agree they are fair for the journey and 32% disagree, with a quarter undecided."
+     "lead": "Fares split riders",
+     "points": [
+      "44% agree they are fair for the journey and 32% disagree",
+      "A quarter are undecided"
+     ]
     },
     {
-     "lead": "Safety and information",
-     "text": "Six riders in ten agree that stations feel safe, and almost two-thirds that information is clear."
+     "lead": "Safety and information hold up",
+     "points": [
+      "Six riders in ten agree that stations feel safe",
+      "Almost two-thirds say information is clear"
+     ]
     }
    ]
   },
@@ -2969,7 +2979,7 @@
     },
     {
      "type": "chart.column",
-     "heading": "Peak trains over capacity",
+     "heading": "Peak trains with a seat for all",
      "headingIcon": "people",
      "unit": "%",
      "categories": [
@@ -2981,13 +2991,13 @@
      ],
      "series": [
       {
-       "name": "Over capacity",
+       "name": "Seat for all",
        "values": [
-        24,
-        26,
-        27,
-        15,
-        9
+        76,
+        74,
+        73,
+        85,
+        91
        ]
       }
      ],
@@ -3035,7 +3045,7 @@
     },
     {
      "lead": "Crowding followed",
-     "text": "With a train every twenty minutes the peak spread out: trains over capacity fell from 27% to 9%, though the line carries more riders than before."
+     "text": "With a train every twenty minutes the peak spread out: peak trains with a seat for everyone rose from 73% to 91%, though the line carries more riders than before."
     },
     {
      "lead": "Revenue came last",
@@ -3044,7 +3054,7 @@
    ],
    "highlight": [
     "81.2% to 91.8%",
-    "27% to 9%",
+    "73% to 91%",
     "£44m to £55m"
    ],
    "source": "Source: illustrative data for a fictional operator; synthetic performance and revenue records"
@@ -4406,7 +4416,11 @@
     },
     {
      "lead": "The bid fixes the date",
-     "text": "Paths are allocated twice a year. A bid accepted in June 2027 puts the service in the December timetable; one that misses it waits until May 2028 and costs 0.9 million journeys."
+     "text": "Paths are allocated twice a year, and a bid accepted in June 2027 puts the service in the December timetable, the first after the sidings open."
+    },
+    {
+     "lead": "A missed bid costs a season",
+     "text": "A bid that misses June waits for the May 2028 timetable, five months later, and the service loses 0.9 million journeys in the months it does not run."
     }
    ],
    "pointsHeading": false,
@@ -4429,7 +4443,8 @@
        "Half-hourly on the Dales and Valley lines",
        "Later last trains from Skipton",
        "Units and crews released from the peak",
-       "Adds 5.1 million journeys"
+       "Starts with the December 2027 timetable",
+       "Adds 5.1 million journeys a year by FY31"
       ]
      },
      {
@@ -4438,7 +4453,8 @@
        "Overhead wires from Leeds to Hull",
        "Fourteen electric trains in 2030",
        "Eleven diesel units freed for other lines",
-       "Adds 3.8 million journeys"
+       "Cuts the cost of a train-km by a quarter",
+       "Adds 3.8 million journeys a year by FY31"
       ]
      },
      {
@@ -4447,7 +4463,8 @@
        "Flexible part-time season tickets",
        "Off-peak day returns on every line",
        "Four station sites with 9,800 homes",
-       "Adds 2.8 million journeys"
+       "£80 million of developer contributions",
+       "Adds 2.8 million journeys a year by FY31"
       ]
      }
     ],
@@ -4491,6 +4508,10 @@
     {
      "lead": "Electrification changes two",
      "text": "Electric trains' lower fuel and maintenance bills cut the Eastern line from £21.40 a train-km to £15.80, and the network average to £16.40."
+    },
+    {
+     "lead": "Fixed layers need more riders",
+     "text": "Track access, stations and overheads, £7.30 of every £17.60, stay whether trains run or not, so the plan spreads them over more journeys rather than cutting trains."
     }
    ],
    "pointsHeading": false,
@@ -5788,15 +5809,27 @@
    "points": [
     {
      "lead": "Cheapest first",
-     "text": "The first three stages need only crews, sidings and a bid, and pay back within 26 months, funding the fourth."
+     "points": [
+      "The first three stages need only crews, sidings and a bid",
+      "They pay back within 26 months and fund the fourth"
+     ]
     },
     {
-     "lead": "The fourth stage is the bet",
-     "text": "Electrification takes £390 million and waits on a power upgrade; placed fourth, a slip delays a third of the journeys."
-    },
-    {
-     "lead": "Fares come late",
-     "text": "Fare reform waits a year, so its products fit how people then travel."
+     "lead": "The costly and the uncertain come later",
+     "points": [
+      {
+       "lead": "Electrification",
+       "text": "£390 million, and it waits on a power upgrade"
+      },
+      {
+       "lead": "Its place",
+       "text": "fourth, so a slip delays a third of the journeys"
+      },
+      {
+       "lead": "Fare reform",
+       "text": "a year later, so its products fit how people then travel"
+      }
+     ]
     }
    ],
    "pointsHeading": false,
@@ -6130,6 +6163,10 @@
      {
       "label": "Housing sites are delayed",
       "text": "Two of four sites open after FY31. The plan loses 0.6 million journeys and £40 million of developer contributions, covered by contingency."
+     },
+     {
+      "label": "Crew training runs late",
+      "text": "The 36 extra crew qualify in June 2028, not December 2027. The half-hourly service waits six months, losing 0.4 million journeys in FY28, all recovered by FY29."
      },
      {
       "label": "Off-peak demand beats the trial",
@@ -6700,16 +6737,25 @@
    },
    "points": [
     {
-     "lead": "Leisure leads",
-     "text": "More weekend and off-peak trips added £31m, the largest driver, and the trend has run for five years."
+     "lead": "Growth is leisure",
+     "points": [
+      "Weekend and off-peak trips added £31m, the largest driver",
+      "The trend has run for five years"
+     ]
     },
     {
-     "lead": "Seasons fall",
-     "text": "Season sales fell another £14m as office days held at three a week; the fall is slowing but not over."
+     "lead": "Seasons still fall",
+     "points": [
+      "Sales fell another £14m as office days held at three a week",
+      "The fall is slowing but not over"
+     ]
     },
     {
-     "lead": "One-offs",
-     "text": "The £18m regulated fares rise will not repeat at that size next year, and delay repay depends on punctuality holding above 90%."
+     "lead": "One-offs flatter the year",
+     "points": [
+      "The £18m regulated fares rise will not repeat at that size",
+      "Delay repay depends on punctuality holding above 90%"
+     ]
     }
    ],
    "source": "Source: illustrative data for a fictional operator; synthetic"

@@ -165,5 +165,46 @@ console.log(JSON.stringify({ title: said('2019 level'), nowhere: said('never wri
                 self.assertTrue(any("set aside" in note and "nowhere an accent is drawn" in note for note in result[case]["advisories"]), result[case]["advisories"])
 
 
+
+class ExhibitOrderTests(unittest.TestCase):
+    def test_a_trend_over_members_rather_than_periods_is_refused(self):
+        result = run_node('''
+import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
+const page = (categories) => ({ id: 'p', type: 'trend', form: 'column', title: 'Online is a fifth of sales', commentary: 'on-exhibit', source: 'Source: test',
+  exhibit: { heading: 'Online share', unit: '%', categories, series: [{ name: 'Share', values: categories.map((_, i) => 10 + i * 5) }] } });
+let refused = null;
+try { compilePage(page(['Region A, 2025', 'All regions, 2024', 'Region B to Region C, 2024'])); } catch (e) { refused = e.message; }
+compilePage(page(['End 2021', 'End 2022', 'End 2023']));
+console.log(JSON.stringify({ refused }));
+''')
+        self.assertTrue(result["refused"].startswith("TREND_NOT_TIME"))
+
+    def test_a_ranking_is_set_largest_first_unless_its_order_is_given(self):
+        result = run_node('''
+import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
+const page = (more = {}) => ({ id: 'p', type: 'ranking', form: 'bar', title: 'Alpha carries the most', commentary: 'on-exhibit', source: 'Source: test',
+  exhibit: { heading: 'Share of routes', unit: '%', categories: ['Bravo', 'Charlie', 'Alpha', 'Delta'], series: [{ name: 'Share', values: [21.5, 7.4, 23.4, 1.9] }],
+    categoryNotes: ['b', 'c', 'a', 'd'], ...more } });
+const ex = (slide) => slide.exhibit ?? slide.exhibits?.[0];
+const sorted = ex(compilePage(page())), given = ex(compilePage(page({ order: 'given' })));
+console.log(JSON.stringify({ sorted: sorted.categories, notes: sorted.categoryNotes, given: given.categories }));
+''')
+        self.assertEqual(result["sorted"], ["Alpha", "Bravo", "Charlie", "Delta"])
+        self.assertEqual(result["notes"], ["a", "b", "c", "d"])
+        self.assertEqual(result["given"], ["Bravo", "Charlie", "Alpha", "Delta"])
+
+    def test_a_heading_that_repeats_its_unit_is_refused_and_a_measure_named_by_its_unit_is_not(self):
+        result = run_node('''
+import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
+const page = (heading, unit) => ({ id: 'p', type: 'ranking', form: 'bar', title: 'Model A costs a fifth less', commentary: 'on-exhibit', source: 'Source: test',
+  exhibit: { heading, unit, categories: ['Model A', 'Model B', 'Model C'], series: [{ name: 'Cost', values: [80, 93, 100] }] } });
+let refused = null;
+try { compilePage(page('Cost of the same job, Model C = 100', 'index (Model C = 100)')); } catch (e) { refused = e.message; }
+compilePage(page('Peak trains per hour on the main line', 'trains'));
+console.log(JSON.stringify({ refused }));
+''')
+        self.assertTrue(result["refused"].startswith("HEADING_REPEATS_UNIT"))
+
+
 if __name__ == "__main__":
     unittest.main()

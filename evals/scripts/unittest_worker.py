@@ -33,8 +33,13 @@ def reset_gate_state() -> None:
     """
     gates = sys.modules.get("page_gates")
     if gates is not None:
-        gates.configure()
-        gates.configure_rules()
+        # Current gates take deck settings as arguments. Older revisions used
+        # mutable module configuration; retain their reset without calling an
+        # API the current gate module no longer exports.
+        for name in ("configure", "configure_rules"):
+            reset = getattr(gates, name, None)
+            if callable(reset):
+                reset()
 
 
 def run_module(name: str) -> dict:

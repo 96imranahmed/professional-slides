@@ -238,8 +238,11 @@ console.log(JSON.stringify({
   notPng: await run([['api.php', reply(answer(commonsFile('File:Platform.svg')))], ['330px-render.png', reply(Buffer.from('<svg/>'))]]),
 }));
 ''')
-        self.assertEqual(result["unlicensed"], {"failed": ["Passengers on a platform: no freely licensed illustration among the search's results; set `search` to the words a drawing of it would be filed under, or supply the file"], "path": None})
-        self.assertEqual(result["searchDown"], {"failed": ["Passengers on a platform: Commons API 500"], "path": None})
+        # An illustration is Commons' alone; the message names what was asked, where it looked, and what to do.
+        self.assertIsNone(result["unlicensed"]["path"])
+        self.assertRegex(result["unlicensed"]["failed"][0], r'^PICTURE_UNMATCHED: Passengers on a platform: no freely licensed illustration that matches "Passengers on a platform" in commons - set `search` to the words a drawing of it would be filed under')
+        self.assertIsNone(result["searchDown"]["path"])
+        self.assertIn("in commons (Commons API 500)", result["searchDown"]["failed"][0])
         self.assertEqual(result["downloadFailed"], {"failed": ["Passengers on a platform: download 404"], "path": None})
         self.assertEqual(result["notPng"], {"failed": ["Passengers on a platform: the rendering of File:Platform.svg is not a PNG"], "path": None})
 
@@ -277,6 +280,63 @@ console.log(JSON.stringify({ series: wb.summary.series, chart: wb.summary.chart,
         self.assertEqual(result['chart']['categories'], ['2020', '2022'])  # 2021 is missing for A
         self.assertIn('2021,,60', result['csv'])
         self.assertEqual(result['korea'], [[2020, 5]])
+
+
+
+class PictureLibraryTests(unittest.TestCase):
+    def test_a_file_is_taken_only_where_it_names_what_the_search_asks_for(self):
+        result = run_node('''
+import { relevance, searchTerms, namedCandidates } from './skills/professional-slides/runtime/picture-providers.mjs';
+const files = [{ title: 'File:M50-900 full flight simulator cockpit.jpg' }, { title: 'File:M50-900 of Example Air.jpg' },
+  { title: 'File:Example Air, Z9-ABC, Maker M50-1041 (49588621913).jpg' }];
+console.log(JSON.stringify({
+  terms: searchTerms('Maker M50F first flight 2026'),
+  model: namedCandidates(files, 'Maker M50F').map((f) => f.title),
+  registration: namedCandidates(files, 'Example Air Z9-ABC Maker M50-1041').map((f) => f.title),
+  spaced: relevance('Maker 300 8X rollout', 'Maker 300-8X').named,
+  generic: relevance('Warehouse Shelving (8336053)', 'warehouse shelving').named,
+}));
+''')
+        self.assertEqual(result["terms"]["identity"], ["m50f"], "a model is identifying; a year is not")
+        self.assertEqual(result["model"], [], "a sibling model is not the model asked for")
+        self.assertEqual(result["registration"], ["File:Example Air, Z9-ABC, Maker M50-1041 (49588621913).jpg"])
+        self.assertTrue(result["spaced"])
+        self.assertTrue(result["generic"])
+
+    def test_the_libraries_are_searched_in_order_and_the_next_only_when_the_last_named_nothing(self):
+        result = run_node('''
+import { searchLibraries } from './skills/professional-slides/runtime/picture-providers.mjs';
+const requests = [];
+const fetch = async (url) => { requests.push(new URL(url).host); return { ok: true, json: async () => ({ results: [
+  { title: 'Warehouse shelving', creator: 'A. Photographer', license: 'by', license_version: '2.0', license_url: 'https://creativecommons.org/licenses/by/2.0/',
+    foreign_landing_url: 'https://flickr.com/x', url: 'https://live.staticflickr.com/x.jpg', width: 2048, height: 1365, tags: [{ name: 'warehouse' }, { name: 'shelving' }], filetype: 'jpg' }] }) }; };
+const commons = async () => [{ title: 'File:Office desk.jpg', text: 'Office desk' }];
+const found = await searchLibraries('warehouse shelving', { commons, fetch, keys: {} });
+const first = await searchLibraries('warehouse shelving', { commons: async () => [{ title: 'File:Warehouse shelving.jpg', text: 'Warehouse shelving' }], fetch, keys: {} });
+console.log(JSON.stringify({ provider: found[0]?.provider, credit: found[0]?.credit, tried: found.tried, requests, firstTried: first.tried }));
+''')
+        self.assertEqual(result["provider"], "openverse")
+        self.assertEqual(result["credit"], "Photo: A. Photographer, CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/), via Openverse: https://flickr.com/x")
+        self.assertEqual(result["tried"], ["commons", "openverse"])
+        self.assertEqual(result["firstTried"], ["commons"], "a search Commons answers costs one request")
+
+
+class PictureKeyTests(unittest.TestCase):
+    def test_a_key_is_read_from_its_variable_first_and_the_keys_file_is_the_users_alone(self):
+        result = run_node('''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { pictureKeys, setPictureKey, keysPath, keyStatus } from './skills/professional-slides/runtime/picture-keys.mjs';
+const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ps-keys-'));
+const env = { PROFESSIONAL_SLIDES_HOME: home };
+setPictureKey('pexels', 'from-file', env);
+setPictureKey('unsplash', 'from-file-too', env);
+const both = pictureKeys({ ...env, PEXELS_API_KEY: 'from-env' });
+console.log(JSON.stringify({ pexels: both.pexels, unsplash: both.unsplash.from, status: keyStatus(env), mode: (fs.statSync(keysPath(env)).mode & 0o777).toString(8) }));
+''')
+        self.assertEqual(result["pexels"], {"key": "from-env", "from": "environment"})
+        self.assertEqual(result["unsplash"], "keys file")
+        self.assertEqual(result["status"], {"pexels": "keys file", "unsplash": "keys file", "pixabay": None})
+        self.assertEqual(result["mode"], "600")
 
 
 if __name__ == "__main__":

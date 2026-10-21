@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "professional-slides",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Create and revise editable PowerPoint decks.",
   "author": {
     "name": "Imran Ahmed"
@@ -10,8 +10,8 @@
     "com.openai": {
       "interface": {
         "displayName": "Professional Slides",
-        "shortDescription": "Create editable slide decks",
-        "longDescription": "Professional Slides turns a brief, analysis, or existing presentation into an editable PowerPoint deck. It helps you develop the argument first, then choose the charts, tables, and layouts that make each point clear.\n\nUse it for\n\u2022 Board and steering committee papers, project updates, and executive summaries.\n\u2022 Investor and pitch decks, due diligence, and competitive comparisons.\n\u2022 Improving a storyline, sharpening titles, or revising individual slides.\n\nHow it works\n\u2022 Share the audience, decision, evidence, and any reference deck or brand.\n\u2022 Review the proposed storyline and slide titles before building.\n\u2022 Create editable charts, tables, diagrams, and text in a consistent visual style.\n\u2022 Inspect the rendered deck and its checks before delivery.\n\nWhat you receive\nAn editable PPTX, with the argument, exhibits, and sources carried through the build. Revisions create a new file and preserve your original presentation. Supply your own evidence or ask for public research; the workflow records sources, separates facts from assumptions, and flags missing evidence.\n\nThe finished deck is rendered and independently reviewed. Check factual accuracy and source rights before sharing. This skill needs a local authoring environment; setup instructions, example slides, and a sample deck are available on the website.",
+        "shortDescription": "Editable PowerPoint workflows",
+        "longDescription": "Professional Slides creates and revises editable PowerPoint decks in Codex or Claude Code. Start from a brief, an existing presentation, or a slide image. A new deck starts from a storyline you approve - the reader, the answer, the page count and the data behind each page - before any page is built. Preview alternative layouts for a selected slide, restyle the deck while keeping every word and number, reconstruct an image as native editable elements, or develop a named brand profile with editable template and style-guide slides.\n\nThe npm setup command installs a persistent portable skill and checks the local environment with a real Office export. Desktop Microsoft PowerPoint or LibreOffice and Poppler must be installed locally; the npm package does not supply them.\n\nAll workflows use the shared layout, PowerPoint emission, rendering, readback and validation pipeline. The agent inspects the saved output. Image reconstruction is agent-assisted; uncertain content stays explicit. Eligible charts have embedded workbooks; custom chart treatments use editable shapes. An independent review is available when requested.",
         "developerName": "Imran Ahmed",
         "brandColor": "#183D36",
         "composerIcon": "./assets/icon.png",
@@ -27,8 +27,8 @@
         "defaultPrompt": "Use $professional-slides to create or revise a decision-ready executive deck and verify the final editable artifact.",
         "websiteURL": "https://shiphappens.xyz/slides",
         "supportURL": "https://github.com/96imranahmed/professional-slides/issues",
-        "privacyPolicyURL": "https://shiphappens.xyz/slides/privacy",
-        "termsOfServiceURL": "https://shiphappens.xyz/slides/terms",
+        "privacyPolicyURL": "https://github.com/96imranahmed/professional-slides/blob/main/PRIVACY.md",
+        "termsOfServiceURL": "https://github.com/96imranahmed/professional-slides/blob/main/TERMS.md",
         "screenshots": [
           "./assets/sample-trend.png",
           "./assets/sample-comparison.png"

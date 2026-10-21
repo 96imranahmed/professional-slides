@@ -61,7 +61,7 @@ class RefusalTests(unittest.TestCase):
 import { REFUSAL_CODES } from './skills/professional-slides/runtime/build-deck.mjs';
 console.log(JSON.stringify(Object.fromEntries(Object.entries(REFUSAL_CODES).map(([code, about]) => [code, String(about).trim().length > 0]))));
 """)
-        self.assertEqual(codes, {"CONTENT_LOST": True, "DECK_OLDER_THAN_PAGES": True})
+        self.assertEqual(codes, {"CONTENT_LOST": True, "DECK_OLDER_THAN_PAGES": True, "STORYLINE_UNAPPROVED": True, "STORYLINE_PAGES_CHANGED": True})
 
     def test_a_deck_json_older_than_its_pages_is_refused_naming_the_compile(self):
         """On the BA retest the last `--check --render` wrote no deck.json, and

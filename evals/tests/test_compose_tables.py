@@ -844,3 +844,29 @@ console.log(JSON.stringify({ bars: deck.slides[0].nodes.filter((n) => n.role ===
         # And one type size across the page's tables.
         self.assertEqual(len(result['sizes']), 1)
         self.assertEqual(len(result['unitSizes']), 1)
+
+
+
+class AutoTotalTests(unittest.TestCase):
+    def test_an_automatic_total_closes_only_a_table_of_one_unit(self):
+        result = run_node('''
+import { styleTable } from './evals/support/compose.mjs';
+const mixed = styleTable({ total: 'auto', columns: ['Model', { label: 'Weight', unit: 'kg' }, { label: 'Volume', unit: 'l' }, { label: 'Range', unit: 'km' }],
+  rows: [['Model A', '111', '724', '4700'], ['Model B', '118', '766', '5000'], ['Model C', '107', '653', '4970']] });
+const single = styleTable({ total: 'auto', columns: ['Region', { label: 'Orders', unit: 'm' }, { label: 'Returns', unit: 'm' }],
+  rows: [['North', '14.2', '3.1'], ['South', '9.8', '2.2'], ['West', '8.1', '1.9']] });
+console.log(JSON.stringify({ mixedLast: mixed.rows.at(-1), singleLast: single.rows.at(-1) }));
+''')
+        mixed = result["mixedLast"]
+        self.assertNotEqual(mixed.get("style") if isinstance(mixed, dict) else None, "total")
+        self.assertEqual(result["singleLast"]["style"], "total")
+
+    def test_a_last_row_smaller_than_a_part_above_is_not_read_as_their_total(self):
+        result = run_node('''
+import { inferredTreatments } from './skills/professional-slides/runtime/compose-tables.mjs';
+const rows = [['Alpha', 56, 0, 29, 0, 85], ['Bravo', 18, 56, 0, 0, 74], ['Charlie', 0, 43, 0, 0, 43], ['Delta', 8, 22, 0, 7, 37],
+  ['Echo', 29, 0, 0, 0, 29], ['Foxtrot', 28, 0, 0, 0, 28], ['Golf', 5, 7, 0, 0, 12]];
+const out = inferredTreatments({ columns: ['Owner', 'Type A', 'Type B', 'Type C', 'Type D', 'All'], rows });
+console.log(JSON.stringify({ last: out.rows.at(-1) }));
+''')
+        self.assertIsInstance(result["last"], list, "the last row is a row, not a total")

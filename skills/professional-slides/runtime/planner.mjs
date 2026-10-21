@@ -486,6 +486,8 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   // is.
   const planned = mapAll(deckPlan.slides, (slide, index) => slide.kind === "cover"
     ? planCover(slide)
+    : slide.kind === "reference" ? { spec: { id: slide.id, notes: slide.notes, frame: { x: 0, y: 0, width: 1280, height: 720 },
+      composition: absolute({ id: `${slide.id}-reference`, children: [componentNode({ id: "reference", component: "reference-page", props: { nodes: slide.nodes, reference: slide.reference }, frame: { x: 0, y: 0, width: 1280, height: 720 } })] }) }, decision: { layout: "reference", density: { resolved: "executive" } } }
     : slide.kind === "tracker" ? planTracker(slide, registry)
     : slide.kind === "divider" ? planDivider(slide)
     : slide.kind === "takeaways" ? planTakeaways({ pageNumber: index + 1, ...slide })

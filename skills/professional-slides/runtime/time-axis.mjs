@@ -71,6 +71,10 @@ export function parsePeriod(label) {
 const QUALIFIER = /\((?:[^)]*)\)|\b(?:LTM|TTM|NTM|YTD|QTD|MTD|est(?:imate)?|forecast|budget|plan|target|actual|proj(?:ected)?)\b\.?/gi;
 const SPAN = /^(.+?)\s?(?:[-–/]|\bto\b)\s?(.+)$/i;
 const BARE_PART = /^(?:Q[1-4]|H[12]|[1-4]Q|[12]H)$/i;
+const NOW = /^(?:today|now|current|latest)$/i;
+const EDGE = /^(?:end(?: of)?|start(?: of)?|mid|year[- ]end|before|after|since|pre|post|by|as at)\s+(?=\S)/i;
+const TAIL = /\s+(?:or (?:later|earlier|after|before)|onwards?|and (?:after|later|earlier|before))$/i;
+const DAY = /^(?:0?[1-9]|[12]\d|3[01])\s+(?=[a-z])/i;
 
 /**
  * Is a label a period a trend can run over? The dates parsePeriod reads, and
@@ -85,7 +89,13 @@ const BARE_PART = /^(?:Q[1-4]|H[12]|[1-4]Q|[12]H)$/i;
 export function isPeriodLabel(label) {
   const s = String(label ?? "").trim().replace(/\s+/g, " ");
   if (!s) return false;
-  if (parsePeriod(s) || BARE_PART.test(s)) return true;
+  if (parsePeriod(s) || BARE_PART.test(s) || NOW.test(s)) return true;
+  // A period named by its edge or its run - End 2021, Before 1995, 2015 or later - or by a day in it (30 Sep 2026), or
+  // with its year first (2026 Mar): the A350F deck's cumulative orders and delivery bands are periods all the same.
+  const edged = s.replace(EDGE, "").replace(TAIL, "").replace(DAY, "");
+  if (edged !== s) return isPeriodLabel(edged);
+  const yearFirst = new RegExp(`^((?:19|20)\\d{2})\\s${MONTH}$`, "i").exec(s);
+  if (yearFirst) return isPeriodLabel(`${yearFirst[2]} ${yearFirst[1]}`);
   const bare = s.replace(QUALIFIER, " ").replace(/\s+/g, " ").trim();
   if (bare && bare !== s) return isPeriodLabel(bare);
   // A span: both ends periods, or a year and the two digits it runs to.

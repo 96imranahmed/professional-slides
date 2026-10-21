@@ -1,0 +1,9 @@
+{
+  "deck": { "schema": "professional-slides.deck/v3", "id": "reference-example", "contents": false },
+  "pages": [{
+    "id": "reference-1", "type": "reference", "title": "A native title",
+    "reference": "assets/reference.png",
+    "nodes": [{ "id": "title", "kind": "text", "text": "A native title", "frame": { "x": 64, "y": 64, "width": 1100, "height": 80 }, "style": { "fontSize": 32, "color": "#183D36" } }],
+    "uncertainties": []
+  }]
+}

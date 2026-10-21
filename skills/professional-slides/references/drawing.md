@@ -16,12 +16,12 @@ A page names its `type`; its `form` defaults to the type's first and its `commen
 
 Choose the chart a reader of this kind of document expects for this kind of claim. The obvious one is usually right: one scatter of runtime against score, one table of every category's scores, one waterfall for a change between two totals.
 
-For each page, name its candidates first: the charts below that draw its claim's comparison, best first. Take the best. Variety across the deck is settled among those candidates - a page takes its second candidate where the first would repeat its neighbour's - and never by a chart that is not one of them. Series compared over the same periods share one axis: "the Atlantic earned more than the Pacific every year" is two lines, or a line a region for each airline, not six panels of columns.
+A comparison draws every member the reader would ask about - every type, every customer, every year - not a pair. For each page, name its candidates first: the charts below that draw its claim's comparison, best first. Take the best. Variety across the deck is settled among those candidates - a page takes its second candidate where the first would repeat its neighbour's - and never by a chart that is not one of them. Series compared over the same periods share one axis: "the Atlantic earned more than the Pacific every year" is two lines, or a line a region for each airline, not six panels of columns.
 
 | The reader's question | Draw | Type, form |
 | --- | --- | --- |
-| Which is larger, and by how much? | Sorted bars | `ranking`, `bar` |
-| How did a measure move over time? | A line; columns for a few periods | `trend`, `line` or `column` |
+| Which is larger, and by how much? | Sorted bars (the runtime sorts them, largest first; `order: "given"` keeps yours) | `ranking`, `bar` |
+| How did a measure move over time? | A line; columns for a few periods. A trend runs over periods only: members measured at one time are refused (`TREND_NOT_TIME`) | `trend`, `line` or `column` |
 | Did one group stay ahead of another over time? | Lines on one axis, a line a group | `trend`, `line` |
 | How did members of different sizes move against their own starting point? | Indexed lines, the base period at 100 | `trend`, `indexed` |
 | How does a total divide into parts, and how does the mix differ? | Stacked bars | `composition`, `stacked-bar` |
@@ -45,13 +45,14 @@ A chart earns its page by showing a comparison the reader can see. Name it befor
 - **A run that barely moves** (`SERIES_FLAT`): every series moves less than a tenth of the axis it is drawn on - often because a zero baseline or a second series at another level blew the axis out. The chart reads as a level. Say the level in the title or as figures; set the latest period's values side by side as bars where the point is how they compare; or plot what moves - the change on the period before, each series indexed to its first period, or a line whose axis starts near its values. A level set against a target line or band is exempt: it compares.
 - **One comparison drawn as a long series** (`ONE_COMPARISON`): six periods or more whose only number marks are one change between the same two periods, while the periods between stay within those two and close to the straight line between them. Draw the two periods (two columns, or a `slope`) with the change on them, or give the periods between a mark of their own (a callout, an event, a band) where what happens there is the point.
 
-One value drawn as a chart, or one period on a chart that joins periods, compares nothing either (`NO_COMPARISON`): two figures for one year are two columns side by side, or the figures themselves.
+One value drawn as a chart, or one period on a chart that joins periods, compares nothing either (`NO_COMPARISON`). Two values in one series hold half a page, not a page: set the chart beside its insight column (`commentary: "beside"`) or as one of two panels, label the bars rather than drawing an axis, and bracket the change between them with its label (`changeAnnotations`, `style: "bracket"`). Across the full width they stand only with that change drawn; with nothing marked and nothing beside them they read as an empty page and are refused. Two entities with one value each read better among their peers with the subject highlighted, or as two figures with the difference stated; two values that barely differ are one number.
 
 ## Draw it honestly
 
 - **Every position encodes a measure.** A scatter's axes are two measured quantities with their units; categories sit at fixed positions as labels. Do not jitter or offset marks to separate them; label them instead.
 - **Bars and areas start at zero.** A line may start above zero when the change is the point; say so in the axis.
 - **Show what was measured, no more.** Only a start and an end known: two bars or a slope, not a line with invented points. A rate repeated over years is a scenario, not a trend.
+- **A scenario shows its drivers.** Market × share × price → volume and revenue, as a table of scenarios or a bridge, not one input times three assumed rates.
 - **Keep kinds apart.** Actuals, estimates, forecasts and targets look different (`forecastFrom`, `assumedFrom`, `targets`); say the basis of each in the heading or a note.
 - **Round for display, not before.** Compute from unrounded inputs; a total that disagrees with its parts as published keeps the published figures and a note.
 - **Totals are the runtime's.** A waterfall bound to a measure marks its first and last members as totals; stacked charts print each stack's total unless `stackTotals: false`.
@@ -79,7 +80,7 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 | `so-what-bar` | one implication in a filled bar under the exhibit (`bar`) |
 | `none` | the exhibit carries the page (types that hold one; `--types` lists each type's placements) |
 
-**The point goes on the exhibit.** Strong decks annotate four chart pages in five and set a column of points beside under one in five: the title states the finding, and the mark it rests on carries a callout (`annotations`), a change mark (`changeAnnotations`, `cagr`) or a labelled reference line, with `commentary: "on-exhibit"`; a table carries it in an implication column (`in-exhibit`). Points over a chart or a table go where the page says - `beside` or `below` - and a page that writes them without saying is refused (`COMMENTARY_UNCHOSEN`): ask for the column where the page needs one, for instance two or three mechanisms the chart cannot show.
+**The point goes on the exhibit.** Strong decks annotate four chart pages in five and set a column of points beside under one in five: the title states the finding, and the mark it rests on carries a callout (`annotations`), a change mark (`changeAnnotations`, `cagr`) or a labelled reference line, with `commentary: "on-exhibit"`; a table carries it in an implication column (`in-exhibit`). Points over a chart or a table go where the page says - `beside` or `below` - and a page that writes them without saying is refused (`COMMENTARY_UNCHOSEN`): ask for the column where the page needs one, for instance the mechanisms the chart cannot show, as many as there are.
 
 **A table carries its explanation in a column of the table, not a band under it.** Strong decks set nothing under a table but its notes: what a row means goes in a closing column (`implication: true`, with `commentary: "in-exhibit"`) or a description column, and a claim the whole table supports goes in its title, or in points beside the table (`beside`) where it needs more than the title holds.
 
@@ -89,13 +90,15 @@ A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines
 
 The frame sets hard limits - a chart's three callouts, a rail's eight lines, a pie's five parts, a labelled-rows page's five rows - and `--types` and `--limits <type>/<form>` print them. A page that does not fit is refused with what to change; a table past the rows a page holds continues on the next page with its header repeated (`PAGE_SPLITS`, advised). Text that overlaps, a heading that wraps where it should fit, type too small for its role or set where it cannot be read is refused at the build with the page and the element.
 
+**A short chart takes a partner.** A chart of three or four members in one series, set across the page, reads thin; about three chart pages in ten in strong decks carry two to four exhibits. Pair it with a second exhibit for the same claim - another cut of the same data, the table behind it, the figures it rests on - as a `panels` `row`, the second taken from the page's candidates. A second chart that does not bear on the title is padding.
+
 A band of the page left empty is advised (`SCENE_VOID`). On cards, tiles and small multiples the first lever is the count a row, `exhibit.columns`: fewer a row stand taller and take the height, more a row take the width. Elsewhere, give the exhibit the height or move the commentary beside it.
 
 **Components without a page form.** Seven components are strips or bands that cannot fill a page; each reaches one as an exhibit of a `panels` page: `journey` (stages and their touchpoints) and `highlight-strip` (numbered findings) across a short row of a dashboard; `icon-trends`, `speech` and `status-list` beside the exhibit they explain; `logo-collage` naming a set's members in a dashboard cell; and `worksheet`, blank by design, beside its worked example in a `panels` row.
 
 ## Pictures and maps
 
-A recognisable subject - a product, a place, a company - carries its pictures: `picture` pages, a photograph behind a statement, logos in tables. The build fetches the logos and photographs a deck plans, with their credits, unless the deck says `assets: { fetch: "none", reason }`; a frame left empty is refused (`UNSOURCED_PICTURE`). `place` form `map` draws a footprint, a network or a regional pattern; [Geography](geography.md) covers maps of regions the runtime does not ship.
+A recognisable subject - a product, a place, a company - carries its pictures: `picture` pages, a photograph behind a statement, logos in tables. The build fetches the logos and photographs a deck plans, with their credits, unless the deck says `assets: { fetch: "none", reason }`; a frame left empty is refused (`UNSOURCED_PICTURE`). A picture is `{ search, alt }` for the build to fetch, or `{ path, alt, credit }`, never a bare path. Its `search` names what the file must show - the model or registration it is filed under ("Qatar Airways A7-ANI Airbus A350-1041"), not only the type - since a file is taken only where it names those; where no library has one (a type first flown last month), show what it is built on and say so in the label. Look at `pictures WORK --candidates` before the build, and `pick` one. `place` form `map` draws a footprint, a network or a regional pattern; [Geography](geography.md) covers maps of regions the runtime does not ship.
 
 ## Look at the result
 

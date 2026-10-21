@@ -271,14 +271,31 @@ export function normalizeListItems(items) {
     const highlight = o.highlight === undefined || o.highlight === null ? null : o.highlight;
     // `points`: sub-points under the item, each a short line set at an indent
     // with a dash - the way a strong executive summary develops a statement
-    // into its parts ("the vision includes: - better data - planning ...").
-    if (o.points !== undefined && (!Array.isArray(o.points) || o.points.some((sub) => typeof sub !== "string" || !sub.trim()))) {
-      throw new Error("A point's sub-points are a list of nonempty strings");
+    // into its parts ("the vision includes: - better data - planning ..."). A
+    // sub-point is a string, or `{ lead, text }` whose bold lead runs into its
+    // text after a colon ("Engines: the XWB-97 is shared with ...").
+    const sub = (s) => (typeof s === "string" ? s.trim() : s && typeof s === "object" && !Array.isArray(s)
+      ? { lead: typeof s.lead === "string" ? s.lead.trim() : "", text: typeof s.text === "string" ? s.text.trim() : "" } : null);
+    if (o.points !== undefined && (!Array.isArray(o.points) || o.points.map(sub).some((s) => s === null || (typeof s === "string" ? !s : !s.lead && !s.text)))) {
+      throw new Error("A point's sub-points are nonempty strings or { lead, text }");
     }
-    const points = (o.points || []).map((sub) => sub.trim());
+    const points = (o.points || []).map(sub);
     return { lead, text, icon: o.icon ?? null, state: o.state ?? null, highlight, number: o.number ?? index + 1, points };
   });
 }
+
+/** A lead that runs into its text ends on a stop: its own, or the one given. */
+const stopped = (lead, stop) => (/[.:;!?\u2013\u2014-]$/.test(lead) ? lead : `${lead}${stop}`);
+/** A sub-point's runs: a `{ lead, text }` sub-point sets its lead in bold before a colon; a string is plain (null). */
+const subRuns = (sub) => (typeof sub === "string" ? null
+  : [...(sub.lead ? [{ text: `${stopped(sub.lead, ":")}${sub.text ? " " : ""}`, bold: true }] : []), ...(sub.text ? [{ text: sub.text, bold: false }] : [])]);
+const measureSub = (sub, width, font) => { const runs = subRuns(sub); return runs ? measureTextRuns(runs, Math.max(1, width), font) : measureText(sub, Math.max(1, width), font); };
+/** The runs a text node carries: bold or accented runs, the accent dropped on a dark ground where it would not read. */
+const drawnRuns = (layout, inverse) => {
+  const runs = layout?.runs;
+  if (!runs || !runs.some((run) => run.bold || (run.accent && !inverse))) return {};
+  return { runs: inverse ? runs.map(({ accent, ...run }) => run) : runs };
+};
 
 export function resolveListMarker(props) {
   const items = normalizeListItems(props.items);
@@ -320,17 +337,22 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   // than sitting above it in bold - the way a well-made icon list sets the
   // phrase that carries the finding. The item then measures as one block.
   const inlineLead = props.inlineLead === true;
+  // `leadStop` ends a run-in lead (a stop by default, a colon on a bulleted list); `leadAccent: false` sets it in bold
+  // ink rather than the house accent, so the reader sees a bold label and then the sentence it introduces.
+  const leadStop = typeof props.leadStop === "string" ? props.leadStop : ".";
+  const leadAccent = props.leadAccent !== false;
   const measured = items.map((item) => {
     if (inlineLead && item.lead && item.text) {
       // The lead keeps its accent beside a highlight in the text, and ends on a stop where it has none, so it never
       // reads as the first words of the sentence it runs into.
-      const lead = /[.:;!?\u2013\u2014-]$/.test(item.lead.trim()) ? item.lead.trim() : `${item.lead.trim()}.`;
+      const lead = stopped(item.lead.trim(), leadStop);
       const joined = `${lead} ${item.text}`;
       const highlights = [lead, ...[item.highlight ?? []].flat().filter((phrase) => phrase && phrase !== item.lead)];
-      const runs = accentRuns(joined, highlights, { bold: true, accent: true, strict: false })
-        || [{ text: joined }];
+      const runs = leadAccent
+        ? accentRuns(joined, highlights, { bold: true, accent: true, strict: false }) || [{ text: joined, bold: false }]
+        : [{ text: `${lead} `, bold: true }, ...(accentRuns(item.text, highlights.slice(1), { bold: true, accent: true, strict: false }) || [{ text: item.text, bold: false }])];
       const block = measureTextRuns(runs, width, font);
-      const subs = item.points.map((sub) => measureText(sub, Math.max(1, width - subIndent), font));
+      const subs = item.points.map((sub) => measureSub(sub, width - subIndent, font));
       const subHeight = subs.reduce((sum, sub) => sum + sub.height, 0) + (subs.length ? leadGap * subs.length : 0);
       return { item, lead: null, text: block, subs, textHeight: block.height + subHeight, height: Math.max(block.height + subHeight, markerWidth) };
     }
@@ -342,7 +364,7 @@ function bodyListLayout(frame, itemsIn, props = {}) {
     const textRuns = item.text && !(leadRuns && leadRuns.some((run) => run.accent)) ? accentRuns(item.text, item.highlight, { bold: houseStyle("style.labelWeight") !== "regular", strict: false }) : null;
     const lead = item.lead ? (leadRuns && leadRuns.some((run) => run.accent) ? measureTextRuns(leadRuns.map((run) => ({ ...run, bold: true })), width, font) : measureText(item.lead, width, { ...font, bold: true })) : null;
     const text = item.text ? (textRuns ? measureTextRuns(textRuns, width, font) : measureText(item.text, width, font)) : null;
-    const subs = item.points.map((sub) => measureText(sub, Math.max(1, width - subIndent), font));
+    const subs = item.points.map((sub) => measureSub(sub, width - subIndent, font));
     const subHeight = subs.reduce((sum, sub) => sum + sub.height, 0) + (subs.length ? leadGap * subs.length : 0);
     const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0) + subHeight;
     return { item, lead, text, subs, textHeight, height: Math.max(textHeight, markerWidth) };
@@ -444,7 +466,7 @@ function bodyListNodes({ id, frame, props }) {
           role: "list-item",
           frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.text.height },
           text: m.text.text,
-          ...(m.text.runs && m.text.runs.some((run) => run.accent) && !inverse ? { runs: m.text.runs } : {}),
+          ...drawnRuns(m.text, inverse),
           style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: m.text.lineHeight },
           data: { textLayout: m.text }
         })
@@ -454,7 +476,7 @@ function bodyListNodes({ id, frame, props }) {
       ty += layout.leadGap;
       const x = frame.x + layout.offset;
       nodes.push(rectPrimitive({ id: stableId(id, "sub-marker", index, k), role: "list-submarker", frame: { x: x + 4, y: ty + sub.lineHeight / 2 - 0.5, width: tokenValue(token("space.2")), height: 1 }, style: boxStyle(INK_, INK_, HAIRLINE, token("radius.none")) }));
-      nodes.push(textPrimitive({ id: stableId(id, "sub", index, k), role: "list-subitem", frame: { x: x + layout.subIndent, y: ty, width: frame.width - layout.offset - layout.subIndent, height: sub.height }, text: sub.text, style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: sub.lineHeight }, data: { textLayout: sub } }));
+      nodes.push(textPrimitive({ id: stableId(id, "sub", index, k), role: "list-subitem", frame: { x: x + layout.subIndent, y: ty, width: frame.width - layout.offset - layout.subIndent, height: sub.height }, text: sub.text, ...drawnRuns(sub, inverse), style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: sub.lineHeight }, data: { textLayout: sub } }));
       ty += sub.height;
     });
     y += m.height + layout.gap + extraGap;

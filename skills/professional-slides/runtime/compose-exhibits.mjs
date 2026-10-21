@@ -27,7 +27,11 @@ export function withStackTotals(ex) {
   const totals = categories.map((_, at) => Number(series.reduce((sum, s) => sum + s.values[at], 0).toFixed(places)));
   // Stacks of one height - shares of each answer, each summing to 100 within the segments' rounding - have no total to compare.
   if (Math.max(...totals) - Math.min(...totals) <= (series.length * 10 ** -places) / 2) return ex;
-  return { ...ex, stackTotals: categories.map((category, at) => ({ category, value: totals[at] })), stackTotalsComputed: true };
+  // A stack of one part is that part: its label already says its total, and a total over it printed the figure twice (the
+  // A350F deck's delivery profile, each year either firm orders or further wins).
+  const parted = categories.map((category, at) => ({ category, value: totals[at], parts: series.filter((s) => s.values[at] > 0).length })).filter((t) => t.parts >= 2);
+  if (!parted.length) return ex;
+  return { ...ex, stackTotals: parted.map(({ category, value }) => ({ category, value })), stackTotalsComputed: true };
 }
 
 /** Aliases that resolve to a table: compare (two headed columns), phase-table (chevron header, row labels), rows (label + text). */

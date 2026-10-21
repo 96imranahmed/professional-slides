@@ -1377,7 +1377,8 @@ function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, 
   for (const node of nodes) {
     const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
     node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,
-      isTokenReference(value) ? { tokenId: value.tokenId, ...nodeTokens[value.tokenId] } : value]));
+      isTokenReference(value) ? (node.data.referenceSource && value.reference === node.data.referenceSource && value.tokenId.startsWith("reference.")
+        ? value : { tokenId: value.tokenId, ...nodeTokens[value.tokenId] }) : value]));
   }
   assertStyleProvenance(nodes);
   assertSceneBounds(nodes);

@@ -44,6 +44,8 @@ import { assetFindings, assetNotice } from "./asset-needs.mjs";
 import { carriedEntries, carriedFindings, carriedProblem, isCarried, revisionChanges, revisionLine, revisionRecordFindings, revisionStatement, stampKept, unheldLine, withImportedCredits } from "./revision.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
+import { storylineHold, holdRefusal } from "./public/storyline.mjs";
+import { comparesTooLittle } from "./chart-sense.mjs";
 import { readPagesFile, withParts, compiledFrom, staleCompile } from "./pages-file.mjs";
 import { exhibitKinds, formFields, kindFields, unreadKeys } from "./form-fields.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
@@ -249,6 +251,7 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   add(failed.filter((f) => !f.unbound).map(({ id, message, code }) => ({ code: code ?? "COMPILE", id: idOfMessage(message) ?? id, severity: "blocker", repair: message })));
   add(unreadExhibitKeys(doc));
   add(bindingFindings);
+  add(twoValueFindings(spec, composed.deck));
   for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const note of slide?.pageType?.advisories ?? [])
     add([{ code: "PAGE_ADJUSTED", id: String(slide.id), severity: "advisory", repair: `${slide.id}: ${String(note).replace(/^PAGE_ADJUSTED:\s*/, "")}` }]);
   // A chart refused for what it shows says so by its own code (chart-sense.mjs, chart-line.mjs): the page composes, its chart compares nothing.
@@ -286,19 +289,58 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
 }
 
 /**
+ * A page whose one chart draws two values in one series across the page, with no insight column beside it and no change
+ * marked between them (chart-sense.mjs comparesTooLittle): refused before the render. Beside its column, as one of a
+ * page's panels, or with the change between them drawn and labelled, two bars hold their place. The width is read off
+ * the composed page - what the reader will see - not the placement asked for: the composer may set a short column under
+ * the chart.
+ */
+const TWO_VALUE_CHARTS = new Set(["chart.bar", "chart.column", "chart.lollipop"]);
+const SHARED_WIDTH = 0.75;
+function twoValueFindings(spec, scene) {
+  return [...(spec.slides || []), ...(spec.appendix || [])].flatMap((slide) => {
+    const chart = slide?.exhibit;
+    if (!chart || !TWO_VALUE_CHARTS.has(chart.type) || !Array.isArray(chart.categories) || !Array.isArray(chart.series)) return [];
+    const drawn = scene?.slides?.find((s) => String(s.id) === String(slide.id));
+    const frame = drawn?.componentInstances?.find((c) => c.id === `${slide.id}-exhibit`)?.frame;
+    const body = drawn?.contentFrame;
+    const shared = frame && body ? frame.width <= body.width * SHARED_WIDTH : ["exhibit-left", "exhibit-right", "sidebar"].includes(slide.layout);
+    const changed = Boolean(chart.cagr) || (Array.isArray(chart.changeAnnotations) && chart.changeAnnotations.length > 0);
+    const little = comparesTooLittle({ members: chart.categories.length, series: chart.series.length, shared, changed });
+    return little ? [{ code: "NO_COMPARISON", id: String(slide.id), severity: "blocker", repair: `${slide.id}: ${little}` }] : [];
+  });
+}
+
+/**
  * An empty band on a page whose form sets its items in rows of a count it publishes (`columns`: cards, tiles, panels a
  * row) is first that count's to close: the run that built the Spacebar deck spent three of its four rounds on the
  * generic advice before it found `columns`, which only `--schema parallel/cards` named.
  */
+// The lever each form's empty band answers to, first: what closed it on the A350F deck, where each short page took three
+// tries of the generic advice. A table's height is its rows, so commentary beside one changes nothing; a timeline's items
+// run in one band across, so its rows-down form fills the page.
+const TABLE_LEVER = "a table stands as tall as its rows: add the rows or columns the comparison needs, transpose a short wide table (its columns as rows), or set points `below` it - points `beside` a table leave its height as it is";
+const FORM_LEVERS = {
+  lookup: TABLE_LEVER, scorecard: TABLE_LEVER, matrix: TABLE_LEVER,
+  "schedule/timeline": "a timeline sets its items in one band: take `form: \"roadmap\"`, one row an item down the page, or add items",
+  "options/compare": "each side stands as tall as its points: give each side every point the comparison has, or a `caption` under the panels",
+  "summary/executive-summary": "add a figure strip (`metrics`, three to five figures) under the points",
+  "argument/sidebar": "the paragraphs set the height beside the panel: add a paragraph, or say more in the panel",
+  "numbers/hero-number": "the figure's column fills with its points: the points the figure needs `beside` it, each a lead with its evidence or a lead over short bullets",
+  picture: "a picture keeps its shape: add a `kpi` under it, or set the points `below`",
+  ranking: "a few bars stand short: pair the chart with a second exhibit for the same claim (`type: \"panels\", form: \"row\"`), set the points `below`, or add the members the comparison leaves out",
+  trend: "a short run stands short: pair the chart with a second exhibit for the same claim (`type: \"panels\", form: \"row\"`), set the points `below`, or add the periods or series the comparison needs",
+};
 function withFormLever(found, doc) {
   const byId = new Map([...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page?.id !== undefined && PAGE_TYPES[page.type]).map((page) => [String(page.id), page]));
   return found.map((f) => {
     const page = f.code === "SCENE_VOID" ? byId.get(String(f.id)) : null;
     if (!page) return f;
     const form = page.form ?? Object.keys(PAGE_TYPES[page.type].forms)[0];
+    const lever = FORM_LEVERS[`${page.type}/${form}`] ?? FORM_LEVERS[page.type];
     let count;
     try { count = formFields(page.type, form).exhibit?.columns; } catch { return f; }
-    if (typeof count !== "string" || !/^(int|\d+-\d+)\b/.test(count)) return f;
+    if (typeof count !== "string" || !/^(int|\d+-\d+)\b/.test(count)) return lever ? { ...f, repair: `On a ${page.type}/${form} page, ${lever}. ${f.repair}` } : f;
     const set = page.exhibit?.columns === undefined ? "it is set by the runtime" : `it is ${page.exhibit.columns}`;
     return { ...f, repair: `On a ${page.type}/${form} page the band is closed first by \`exhibit.columns\` (${count.replace(/^int - /, "")}; ${set}): fewer a row stand taller and take the height, more a row take the width. ${f.repair}` };
   });
@@ -354,7 +396,7 @@ function folderStamp(dir) {
  * assets/. A check that edits one page of a hundred composes that page alone.
  * Safe to delete.
  */
-async function openComposeCache(file, { doc, baseDir }) {
+export async function openComposeCache(file, { doc, baseDir }) {
   const stored = await readJson(file, { optional: true }).catch(() => null);
   const before = stored?.schema === COMPOSE_CACHE_SCHEMA && stored.slides && typeof stored.slides === "object" ? stored.slides : {};
   const context = digest([runtimeStamp(), folderStamp(path.join(baseDir, "assets")), doc.deck ?? null]);
@@ -432,7 +474,7 @@ export async function loggedSources(doc, dir, stem) {
   return readInsightLog(dir, stem).then((log) => logSources(dir, log)).catch(() => null);
 }
 
-const EXAMPLE_FILES = ["../examples/page-types.pages.json", "../examples/page-forms.pages.json"].map((file) => new URL(file, import.meta.url));
+const EXAMPLE_FILES = ["../examples/page-types.pages.json", "../examples/page-forms.pages.json", "../examples/reference.pages.json"].map((file) => new URL(file, import.meta.url));
 
 /** Every worked page, the worked deck's first, with the deck-level keys of that deck. */
 export function workedExamples() {
@@ -567,9 +609,20 @@ async function main(argv) {
   if (listed !== undefined) return listed;
   if (!file) throw new UsageError(USAGE);
   if (values.render && !values.check) throw new UsageError(`--render renders a check: --check --render\n${USAGE}`);
+  // The render runs the build's Python stages: under the Python the doctor finds with python-pptx, as the public CLI runs
+  // them, not whichever \`python3\` is first on the PATH (the A350F run's check rendered nothing for want of python-pptx).
+  if (values.render && !process.env.RUNTIME_PYTHON) {
+    const { diagnose } = await import("./doctor.mjs");
+    const report = await diagnose({ render: false });
+    if (report.python.chosen) process.env.RUNTIME_PYTHON = report.python.chosen;
+  }
   let doc;
   try { doc = await readPagesFile(file); } catch (error) { console.error(error.message); return 2; }
   const dir = path.dirname(path.resolve(file));
+  // A new argument's pages wait for the storyline the user approved, here as in the public CLI: compiling them through
+  // this script is not a way round it (storyline.mjs storylineHold).
+  const hold = storylineHold({ doc, file, project: readJsonSync(path.join(dir, "project.json"), { optional: true }) });
+  if (hold) { console.error(holdRefusal(hold)); return 2; }
   const stem = doc.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "");
   const named = values.page === undefined ? null : new Set(String(values.page).split(",").map((id) => id.trim()).filter(Boolean));
   const known = new Set([...doc.pages, ...(doc.appendix || [])].map((page, index) => idAt(page, index)));

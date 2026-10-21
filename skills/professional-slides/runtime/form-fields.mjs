@@ -61,6 +61,7 @@ const SERIES_EXTRAS = {
   split: "true - 2-4 series drawn as one panel each",
 };
 const COLUMN_EXTRAS = {
+  order: "\"given\" - a ranking keeps the members in the order written; unset, it is set largest first",
   categoryNotes: "(string|null)[] in category order - a second line under each label (\"n=412\")",
   categoryGroups: "[{ id, label, categories: 2+ contiguous }] - a bracket naming each run",
   deltas: "number[] | [{ category, value, significant? }] - a change pill over each column or a disc beside each bar; `deltaThreshold` (5), `deltasLabel`",
@@ -83,7 +84,9 @@ const LINE_EXTRAS = {
   directLabels: "\"end\" - each line named at its end (`endLabels: true` the same), no legend",
   area: "false - no fill under a lone line",
   "series[].rank": "true - a rank line, 1 at the top (every series a rank)",
-  xAxis: "{ unit, min, max, ticks: [{ value, label }] 2-12 } - a numeric x axis (sparse observations): then `series: [{ name, points: [{ key, x, y, breakBefore?, label? }], status?: before|after }]`, `gapPolicy` (connect-observations | explicit-breaks), `statusBoundary` { x, beforeLabel, afterLabel }",
+  xAxis: "{ unit, min, max, ticks: [{ value, label }] 2-12 } - a numeric x axis (sparse observations): then `series: [{ name, points: [{ key, x, y, breakBefore?, label? }], status?: before|after }]` and `gapPolicy` beside `xAxis`, a `unit` and `legend: true` (no `directLabels`; name a point with its `label`)",
+  gapPolicy: "\"connect-observations\" | \"explicit-breaks\" - with `xAxis`, required, at the exhibit's top level: join every observation, or break where a point says `breakBefore: true`",
+  statusBoundary: "{ x, beforeLabel, afterLabel } - with `xAxis`: where observed points give way to projected ones",
 };
 const POINTS = {
   points: "[{ name (unique), x, y, series?, showLabel?: false }] - required (or bound by `points: { x: { measure }, y: { measure } }`); every point a `series` or none",
@@ -135,7 +138,7 @@ export const KINDS = Object.freeze({
     items: "[{ label, values (null only for a line's gap), focus?: category, reference?: number }] 5-12 - one panel each; stacked: { label, series: [{ name, values }] }" },
     options: { scale: "\"shared\" (default) | \"own\"", reference: "\"average\" | number - a line on every panel", percent: "true - stacked marks as shares", centre: "part - a donut's centre figure", rowLabels: "string[] - with `columnLabels`, a grid read both ways", columnLabels: "string[]", columns: "int - panels a row" } },
   "chart.slope": { chart: true, bound: true, data: { categories: "string[2-4] - the periods", series: "[{ name, values }] 1-12 - one line each" }, options: { focusSeries: SERIES_EXTRAS.focusSeries, yMin: AXIS.yMin, yMax: AXIS.yMax } },
-  "chart.lollipop": { chart: true, bound: true, data: { categories: CATEGORICAL.categories, series: "[{ name, values }] exactly 1" }, options: { xMin: "number (takes 0)", xMax: "number" } },
+  "chart.lollipop": { chart: true, bound: true, data: { categories: CATEGORICAL.categories, series: "[{ name, values }] exactly 1" }, options: { xMin: "number (takes 0)", xMax: "number", order: COLUMN_EXTRAS.order } },
   "chart.dumbbell": { chart: true, bound: true, data: { categories: CATEGORICAL.categories, series: "[{ name, values }] exactly 2 - before, after" }, options: { legend: "boolean (on)", xMin: "number", xMax: "number", includeZero: "true", colorIndices: SERIES_EXTRAS.colorIndices } },
   "chart.bullet": { chart: true, bound: true, data: { categories: CATEGORICAL.categories, series: "[{ name, values }] exactly 1", targets: "number[one per category] | { measure } - required: the target line on each row", ranges: "[[poor, ok, good] per category] - the bands behind" },
     options: { xMin: "number (0)", xMax: "number" } },
@@ -314,7 +317,7 @@ const BOUND = Object.freeze({
 });
 // The page's own fields the placements read, each with the placements that read it.
 const PLACED = Object.freeze({
-  points: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text, icon?, highlight? }] - the commentary: a column beside, or up to 3 across under the exhibit" },
+  points: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text?, points?, icon?, highlight? }] - the commentary, as many points as the content has: a column beside, or across under the exhibit (three a row, four two by two); a point is a sentence with its phrase highlighted (`{ text, highlight }`), a lead over its sentence, a bold lead running into its sentence after a colon (`pointsStyle: \"inline\"`), or a lead over two to four bullets (`points: [string | { lead, text }]`)" },
   paragraphs: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text }] - prose in place of points" },
   rail: { in: ["rail"], line: "string - one claim in a filled side panel, eight lines at most" },
   bar: { in: ["so-what-bar"], line: "string - the implication across the foot, 2 lines" },
@@ -384,6 +387,8 @@ export function unreadKeys(exhibit, { type, form, kind = exhibit?.type } = {}) {
  * on a form the type does not have.
  */
 export function formFields(type, form) {
+  if (type === "reference" && form === "native") return { form: "reference/native", task: PAGE_TYPES.reference.task, draws: "editable reference nodes", exhibits: 0,
+    commentary: ["none"], page: { reference: "supplied source image path", nodes: "native elements on the 1280 x 720 canvas; catalog --type reference --schema", uncertainties: "unreadable content and uncertain values" } };
   const t = PAGE_TYPES[type];
   if (!t) throw new Error(`unknown page type "${type}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   if (!Object.hasOwn(t.forms, form)) throw new Error(`${type} has no form "${form}"; its forms: ${Object.keys(t.forms).join(", ")}`);

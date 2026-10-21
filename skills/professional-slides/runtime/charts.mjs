@@ -112,7 +112,9 @@ function chartExamples(id) {
       "single-bar-highlight": { props: { categories: ["Category A", "Category B", "Category C"], series: [{ name: "Measure", values: [48, 72, 56] }], highlights: [{ category: "Category B", style: "bar" }], annotations: [], referenceLines: [] } },
       "region-box-highlight": { props: { categories: ["Category A", "Category B", "Category C"], series: [{ name: "Measure A", values: [52, 68, 74] }, { name: "Measure B", values: [44, 61, 63] }], highlights: [{ category: "Category C", style: "region-box" }], annotations: [], referenceLines: [] } },
       "region-tint-highlight": { props: { categories: ["Category A", "Category B", "Category C"], series: [{ name: "Measure A", values: [52, 68, 74] }, { name: "Measure B", values: [44, 61, 63] }], highlights: [{ category: "Category C", style: "region-tint" }], annotations: [], referenceLines: [] } },
-      "two-mark-contrast": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], highlights: [], annotations: [], referenceLines: [] } },
+      // Two values as strong decks draw them: labelled bars, no value axis, the later one in the accent, and the change
+      // between them bracketed with its label.
+      "two-mark-contrast": { props: { categories: ["Current", "Future"], series: [{ name: "Measure", values: [80, 150] }], dataLabels: true, highlights: [], annotations: [], changeAnnotations: [{ start: "Current", end: "Future", style: "bracket", text: "+87.5%" }], referenceLines: [] } },
       "focal-series": { props: { categories: ["Area 1", "Area 2"], series: [{ name: "Baseline", values: [40, 55] }, { name: "Actual", values: [60, 70] }], focusSeries: "Actual", legend: true, dataLabels: true, highlights: [], annotations: [], referenceLines: [] } }
     };
     if (id === "chart.column") {

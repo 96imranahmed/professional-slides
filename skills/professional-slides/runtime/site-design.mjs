@@ -6,6 +6,7 @@
 // hundred-page deck on an airline read its palette and its typeface off the
 // airline's site by hand, which this does in one command. Nothing is stored
 // until the user sets it.
+import dns from "node:dns/promises";
 
 const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-sans-serif", "ui-serif", "ui-monospace",
   "-apple-system", "blinkmacsystemfont", "inherit", "initial", "unset", "revert", "emoji", "math", "fangsong"]);
@@ -69,7 +70,16 @@ function faceCounts(css) {
  */
 export function siteDesign(cssTexts) {
   const css = cssTexts.join("\n");
-  const colours = colourCounts(css).filter((c) => c.sat >= 0.18 && c.light > 0.06 && c.light < 0.92).sort((a, b) => b.count - a.count);
+  // A colour a site names for its brand - a custom property called brand, primary, accent, corporate or main - says its
+  // role outright, and counts five times over; one that fills a header, a navigation bar or a button counts three. A
+  // count alone ranked airbus.com's body-text slate (#2B333F) over its navy and its blue.
+  const roles = new Map();
+  const role = (value, weight, why) => { const c = colourOf(/^#/.test(value) ? { hex: value.slice(1) } : { rgb: (/\d{1,3}/g.exec(value) && value.match(/\d{1,3}/g).slice(0, 3)) ?? [] }); if (c) roles.set(c.hex, { weight: (roles.get(c.hex)?.weight ?? 0) + weight, why: roles.get(c.hex)?.why ?? why }); };
+  for (const m of css.matchAll(/--([\w-]*(?:brand|primary|accent|corporate|main)[\w-]*)\s*:\s*(#[0-9a-f]{6}\b|#[0-9a-f]{3}\b|rgba?\([^)]*\))/gi)) role(m[2], 5, `--${m[1]}`);
+  for (const m of css.matchAll(/([^{}]*(?:header|nav|button|btn|banner|masthead)[^{}]*)\{[^}]*background(?:-color)?\s*:\s*(#[0-9a-f]{6}\b|#[0-9a-f]{3}\b|rgba?\([^)]*\))/gi)) role(m[2], 3, m[1].trim().split(/\s*,\s*/)[0].slice(0, 40));
+  // A brand colour has a hue: slate and charcoal (saturation under 0.3) are the page's text and rules.
+  const colours = colourCounts(css).map((c) => ({ ...c, count: c.count + (roles.get(c.hex)?.weight ?? 0) * Math.max(1, c.count), role: roles.get(c.hex)?.why ?? null }))
+    .filter((c) => c.sat >= 0.3 && c.light > 0.06 && c.light < 0.92).sort((a, b) => Boolean(b.role) - Boolean(a.role) || b.count - a.count);
   const primary = colours.find((c) => c.light <= 0.35) ?? colours[0] ?? null;
   const distinct = (c) => !primary || Math.abs(c.hue - primary.hue) > 15 || Math.abs(c.light - primary.light) > 0.15;
   const accent = colours.find((c) => c !== primary && c.light > 0.3 && c.light < 0.7 && distinct(c)) ?? colours.find((c) => c !== primary && distinct(c)) ?? null;
@@ -78,7 +88,7 @@ export function siteDesign(cssTexts) {
   const body = faces.running[0]?.name ?? faces.all[0]?.name ?? null, display = faces.heading[0]?.name ?? body;
   return { brand: primary ? { primary: primary.hex, ...(accent ? { accent: accent.hex } : {}) } : null,
     typography: body ? { body, display } : null,
-    evidence: { colours: colours.slice(0, 6).map((c) => `${c.hex} x${c.count}`), faces: faces.all.slice(0, 5).map((f) => `${f.name} x${f.count}`) } };
+    evidence: { colours: colours.slice(0, 6).map((c) => `${c.hex} x${c.count}${c.role ? ` (${c.role})` : ""}`), faces: faces.all.slice(0, 5).map((f) => `${f.name} x${f.count}`) } };
 }
 
 /** The stylesheets a page's HTML links and inlines: inline `<style>` blocks and `style` attributes, and the URLs of linked sheets. */
@@ -91,13 +101,47 @@ export function stylesOf(html, base) {
 }
 
 const UA = "professional-slides/1.0 (design intake from a brand's site)";
+const TIMEOUT_MS = 15000, MAX_BYTES = 2_000_000, MAX_REDIRECTS = 5;
+
+/** Whether an address is the machine's own, its network's or a cloud's metadata service: never fetched for a page's sake. */
+export function privateAddress(address) {
+  const v4 = /^(?:::ffff:)?(\d+)\.(\d+)\.(\d+)\.(\d+)$/i.exec(address);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  }
+  const v6 = address.toLowerCase();
+  return v6 === "::" || v6 === "::1" || /^f[cd]/.test(v6) || /^fe[89ab]/.test(v6);
+}
+
+/**
+ * `fetch` for addresses a page names: http and https to public hosts only, each redirect checked the same way, a
+ * timeout, and a body read to a size. The site and the stylesheets it links are the user's choice of brand, but the
+ * stylesheet URLs are the page's, and a page can point anywhere.
+ */
+async function publicFetch(url) {
+  let at = new URL(url);
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (!["http:", "https:"].includes(at.protocol)) throw new Error(`${at.href} is not an http or https address`);
+    const host = at.hostname.replace(/^\[|\]$/g, "");
+    const addresses = host === "localhost" ? [{ address: "127.0.0.1" }] : await dns.lookup(host, { all: true });
+    if (addresses.some(({ address }) => privateAddress(address))) throw new Error(`${at.host} is a private or local address; only public sites are read`);
+    const response = await fetch(at, { headers: { "User-Agent": UA }, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (response.status >= 300 && response.status < 400 && response.headers.get("location")) { at = new URL(response.headers.get("location"), at); continue; }
+    if (Number(response.headers.get("content-length")) > MAX_BYTES) throw new Error(`${at.href} is larger than ${MAX_BYTES} bytes`);
+    const text = (await response.text()).slice(0, MAX_BYTES);
+    return { ok: response.ok, status: response.status, url: at.href, text: async () => text };
+  }
+  throw new Error(`${url} redirects more than ${MAX_REDIRECTS} times`);
+}
 
 /** The site read: its page and up to eight linked stylesheets fetched, and `siteDesign` of what they hold. */
-export async function readSite(url, { fetcher = fetch } = {}) {
+export async function readSite(url, { fetcher = publicFetch } = {}) {
   const page = await fetcher(url, { headers: { "User-Agent": UA }, redirect: "follow" });
   if (!page.ok) throw new Error(`${url} answered ${page.status}`);
   const html = await page.text();
   const { inline, linked } = stylesOf(html, page.url || url);
-  const sheets = await Promise.all(linked.slice(0, 8).map((href) => fetcher(href, { headers: { "User-Agent": UA } }).then((r) => (r.ok ? r.text() : "")).catch(() => "")));
+  const sheets = await Promise.all(linked.filter((href) => /^https?:/i.test(href)).slice(0, 8)
+    .map((href) => fetcher(href, { headers: { "User-Agent": UA } }).then((r) => (r.ok ? r.text() : "")).catch(() => "")));
   return { url, sheets: linked.length, ...siteDesign([...inline, ...sheets]) };
 }

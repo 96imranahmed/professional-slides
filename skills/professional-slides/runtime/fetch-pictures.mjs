@@ -48,6 +48,7 @@ import { UA, slugOf } from "./fetch-logos.mjs";
 import { playerEntries, playerPhotographs } from "./players.mjs";
 import { isFlagRef } from "./flags.mjs";
 import { isIllustration } from "./compose-pictures.mjs";
+import { searchLibraries, searchTerms } from "./picture-providers.mjs";
 
 const STOPWORDS = new Set(readJsonSync(new URL("./gates/stopwords.json", import.meta.url)).content);
 /** The content words of `text`: lower-case runs of letters, four and up, that are not stopwords. */
@@ -137,6 +138,7 @@ export function commonsCandidates(pages, { exclude = new Set(), after = null, wi
     const { license, licenseUrl, artist } = licence;
     ok.push({
       title: page.title, landscape: info.width >= info.height * 1.15, description, ...(Number.isFinite(taken) && !drawing ? { year: taken } : {}),
+      provider: "commons", text: [page.title, description, stripHtml(meta.Categories?.value), stripHtml(meta.ObjectName?.value)].join(" "),
       ...(drawing ? { kind } : {}),
       url: info.thumburl || info.url, page: info.descriptionurl, license, licenseUrl, artist,
       credit: commonsCredit(drawing ? "Illustration" : "Photo", { artist, license, licenseUrl, page: info.descriptionurl }),
@@ -177,9 +179,12 @@ const askOf = (picture) => ({ query: picture.search ?? picture.alt,
  * a placeholder takes is passed over for the ones after it, and so is one the
  * records hold for another picture of the deck. `{ chosen }`.
  */
-export async function choosePictures(placeholders, { records = new Map(), search = searchCommons, fetch: request = null } = {}) {
+/** The libraries searched in order for files that name what was asked (picture-providers.mjs), Commons first. */
+export const searchPictures = (query, options = {}) => searchLibraries(query, { commons: searchCommons, ...options });
+
+export async function choosePictures(placeholders, { records = new Map(), search = searchPictures, fetch: request = null } = {}) {
   const taken = new Set([...records.values()].map((r) => r.title).filter(Boolean));
-  const chosen = new Map(), asked = new Map();
+  const chosen = new Map(), asked = new Map(), notes = new Map();
   for (const picture of placeholders) {
     // One photograph planned on several pages - a player's mark, by its `alt` and search words - is one choice and one file.
     const same = JSON.stringify([picture.alt, picture.search ?? null]);
@@ -187,11 +192,15 @@ export async function choosePictures(placeholders, { records = new Map(), search
     asked.set(same, picture);
     const ask = askOf(picture), own = records.get(picture.alt)?.title;
     const exclude = new Set([...taken].filter((title) => title !== own));
-    const choice = choiceOf(await search(ask.query, { ...ask.options, exclude, ...(request ? { fetch: request } : {}) }));
+    const searched = await search(ask.query, { ...ask.options, exclude, ...(request ? { fetch: request } : {}) });
+    const found = Object.assign(searched.filter((c) => !exclude.has(c.title)), { tried: searched.tried, near: searched.near });
+    // `pick` takes one file the candidate sheet showed (`pictures WORK --candidates`), by its page.
+    const choice = picture.pick ? found.find((c) => c.page === picture.pick || c.title === picture.pick) ?? null : choiceOf(found);
     chosen.set(picture, choice);
+    notes.set(picture, { tried: found.tried ?? [], near: found.near ?? [], ...(picture.pick && !choice ? { pick: picture.pick } : {}) });
     if (choice?.title) taken.add(choice.title);
   }
-  return { chosen };
+  return { chosen, notes };
 }
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
@@ -202,6 +211,8 @@ async function download(choice, file, request = globalThis.fetch) {
   // A drawing comes back as Commons' rendering of it: anything but a PNG is an error page or the SVG itself, which a deck cannot embed.
   if (choice.kind === "illustration" && bytes.subarray(0, 8).toString("hex") !== PNG_SIGNATURE) throw new Error(`the rendering of ${choice.title} is not a PNG`);
   await fs.writeFile(file, bytes);
+  // Unsplash's API terms ask that a download be reported; a report that fails costs the deck nothing.
+  if (choice.ping) await request(choice.ping, { headers: { "User-Agent": UA, ...(choice.pingHeaders ?? {}) } }).catch(() => null);
 }
 
 const recordsPath = (directory) => path.join(directory, "sources.json");
@@ -233,8 +244,8 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
   }
   // Chosen together, in order, so no two pictures of the deck take one file (choosePictures).
   const wanted = fetchMissing ? placeholders.filter((picture) => state.get(picture).fetch) : [];
-  let chosen = new Map();
-  try { ({ chosen } = await choosePictures(wanted, { records, fetch: request })); } catch (error) { for (const picture of wanted) failed.push(`${picture.alt}: ${error.message}`); }
+  let chosen = new Map(), notes = new Map();
+  try { ({ chosen, notes = new Map() } = await choosePictures(wanted, { records, fetch: request })); } catch (error) { for (const picture of wanted) failed.push(`${picture.alt}: ${error.message}`); }
   // A photograph several pages plan (a player's mark) is chosen once (choosePictures) and downloaded once.
   const downloaded = new Map();
   for (const picture of placeholders) {
@@ -244,11 +255,16 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
         if (!fetchMissing || !chosen.has(picture)) continue;
         const choice = chosen.get(picture);
         const noun = isIllustration(picture) ? "illustration" : "photograph";
-        if (!choice) { failed.push(`${picture.alt}: no freely licensed ${noun} among the search's results; set \`search\` to ${isIllustration(picture) ? "the words a drawing of it would be filed under" : "the place's own name"}, or supply the file`); continue; }
+        if (!choice) {
+          const note = notes.get(picture) ?? {}, terms = searchTerms(picture.search ?? picture.alt);
+          const asked = terms.identity.length ? `names ${terms.identity.map((t) => `"${t}"`).join(" and ")}` : `matches "${picture.search ?? picture.alt}"`;
+          failed.push(`PICTURE_UNMATCHED: ${picture.alt}: no freely licensed ${noun} that ${asked}${note.tried?.length ? ` in ${note.tried.join(", ")}` : ""}${note.near?.length ? `; nearest: ${note.near.join("; ")}` : ""}${note.pick ? `; the picked file ${note.pick} was not among them` : ""} - set \`search\` to ${isIllustration(picture) ? "the words a drawing of it would be filed under" : "the words its file would be titled with"}, supply the file as \`path\` with its \`credit\`, or set a stock library's key (\`keys --set pexels\`)`);
+          continue;
+        }
         await fs.mkdir(directory, { recursive: true });
         if (downloaded.get(file) !== choice) await download(choice, file, request);
         downloaded.set(file, choice);
-        const { url, landscape, ...record } = choice;
+        const { url, landscape, text: _text, ping: _ping, pingHeaders: _headers, ...record } = choice;
         records.set(picture.alt, { alt: picture.alt, search: picture.search ?? null, ...record, source: url, saved: path.relative(baseDir, file) });
       } else if (!exists) continue;
       picture.path = path.relative(baseDir, file);
@@ -265,7 +281,7 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
     const strip = (value) => {
       if (Array.isArray(value)) { value.forEach(strip); return; }
       if (!value || typeof value !== "object") return;
-      if (typeof value.alt === "string") { delete value.search; delete value.fetch; delete value.after; delete value.without; }
+      if (typeof value.alt === "string") { delete value.search; delete value.fetch; delete value.after; delete value.without; delete value.pick; }
       for (const child of Object.values(value)) strip(child);
     };
     strip(spec);

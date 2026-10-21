@@ -99,3 +99,11 @@ console.log(JSON.stringify({ called: totals(props), bare: totals(bare), categori
         self.assertEqual(result["called"], 0)
         self.assertEqual(result["bare"], result["categories"])
 
+
+    def test_a_stack_of_one_part_prints_no_total_over_it(self):
+        result = run_node(r'''
+import { withStackTotals } from './skills/professional-slides/runtime/compose-exhibits.mjs';
+const ex = withStackTotals({ type: 'chart.stacked-column', categories: ['A', 'B', 'C'], series: [{ name: 'Confirmed', values: [4, 21, 0] }, { name: 'Possible', values: [0, 3, 15] }] });
+console.log(JSON.stringify(ex.stackTotals));
+''')
+        self.assertEqual(result, [{"category": "B", "value": 24}])

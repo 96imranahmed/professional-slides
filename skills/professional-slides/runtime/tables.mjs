@@ -1815,9 +1815,9 @@ function drawRowBands(table) {
   return { zebra, striped, quietVerdict };
 }
 
-/** Where cells sit: one pill per bubble column, and the rows whose cells centre on a picture or a filled label block. */
+/** Where cells sit: one pill per bubble column. Every cell centres in its row (drawTextCell). */
 function cellPlacements(table) {
-  const { props, m } = table;
+  const { m } = table;
 
   // A bubble column is one pill repeated, not a pill per figure: sized to its
   // own text each pill would make "6.7%" a visibly different object from
@@ -1842,18 +1842,7 @@ function cellPlacements(table) {
     const pillHeight = Math.min(text.height + 2 * BUBBLE_PAD_Y, height - m.gap);
     return { x: area.x + (area.width - m.gap - width) / 2, y: area.y + (height - pillHeight) / 2, width, height: pillHeight };
   };
-  // A row led by a picture takes its height from the picture, and its text set
-  // at the top of that height while the figures centred puts one row on two
-  // baselines: the film's name level with the poster's top edge, its gross
-  // half a poster lower. Every cell in such a row centres on the picture.
-  const pictureRows = new Set(m.cells.flatMap((row, r) => row.some(cell => cell && (cell.type === "photo" || cell.type === "logo")) ? [r] : []));
-  // A row led by a filled label block centres its cells on the block: the
-  // block's label sits in its middle, and a one-line value hanging from the
-  // row's top edge beside it puts the row on two baselines.
-  // A label set on its side down a run of rows is not one row's block, and centring the first row of its run on it would
-  // set that row on another line than the rest.
-  const filledRows = new Set(m.cells.flatMap((row, r) => row.some((cell) => cell && !cell.vertical && cell.type === "category" && categorySurface(cell, props) === "primary") ? [r] : []));
-  return { bubblePill, pictureRows, filledRows };
+  return { bubblePill };
 }
 
 /**
@@ -2293,21 +2282,16 @@ function drawBars(table, cell, at) {
  * its mark (a binary tick or cross, a Harvey ball, a number disc) where it has one.
  */
 function drawTextCell(table, cell, at) {
-  const { m, pictureRows, filledRows } = table;
-  const { r, l, inner } = at;
-  let y = inner.y;
-  if (
-    m.stretched || pictureRows.has(r) || filledRows.has(r) ||
-    ["category", "number", "binary", "harvey", "heatmap"].includes(
-      cell.type,
-    )
-  )
-    y = inner.y + (inner.height - l.height) / 2;
-  if (l.inlineSectionMarker) y += (l.height - l.blockHeight) / 2;
+  const { l, inner } = at;
+  // Every cell's content is centred in its row: a cell of one line beside a cell of three, an icon or a bar sat at the
+  // top of the row while the marks beside it sat in its middle (the A350F deck's switchers table, 2026-10-19). A cell
+  // that fills its row is where centring puts it anyway.
+  const y = inner.y + (inner.height - l.height) / 2;
+  const markerY = l.inlineSectionMarker ? y + (l.height - l.blockHeight) / 2 : y;
   if (cell.type === "binary") drawBinaryMark(table, cell, at);
-  if (cell.type === "harvey" && !missing(cell.value)) drawHarveyBall(table, cell, at, y);
+  if (cell.type === "harvey" && !missing(cell.value)) drawHarveyBall(table, cell, at, markerY);
   if (cell.type === "number" && l.numberDisplay !== "plain") drawNumberDisc(table, cell, at);
-  else drawCellText(table, cell, at, y);
+  else drawCellText(table, cell, at, markerY);
 }
 
 /** A binary cell's tick, cross or dash. */

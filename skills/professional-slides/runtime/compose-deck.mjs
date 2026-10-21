@@ -13,7 +13,7 @@ import { composedPlaces } from "./revision.mjs";
 import { styleTable, heavyTable, barScales, validateCategoryLabels, columnWeight } from "./compose-tables.mjs";
 import { DIAGRAM_TYPES } from "./compose-exhibits.mjs";
 import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withDesignLayout } from "./compose-body.mjs";
-import { pointsPerRow, resolveFill } from "./compose-points.mjs";
+import { pointsPerRow, resolveFill, pointBullets, bulletText } from "./compose-points.mjs";
 import { imageProps, playerMarks, pictureCredits, sourcedPicture } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
@@ -95,10 +95,12 @@ function pointsBelowHeight(slide) {
   // In rows as exhibitOverCommentary sets them (pointColumns).
   const perRow = pointsPerRow(points.length);
   const perLine = Math.max(20, Math.floor((BODY_WIDTH - COLUMN_GAP * (perRow - 1)) / perRow / 6.4));
-  const text = (point) => typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`;
+  // A point's bullets each start a line of their own under its lead and sentence.
+  const lines = (point) => typeof point === "string" ? Math.ceil(point.length / perLine)
+    : Math.ceil(`${point?.lead ?? ""} ${point?.text ?? ""}`.length / perLine) + (pointBullets(point) ?? []).reduce((n, sub) => n + Math.ceil(bulletText(sub).length / perLine), 0);
   let height = 22;
   for (let at = 0; at < points.length; at += perRow) {
-    height += (Math.max(...points.slice(at, at + perRow).map((point) => Math.ceil(text(point).length / perLine))) + 1) * 18;
+    height += (Math.max(...points.slice(at, at + perRow).map(lines)) + 1) * 18;
   }
   return height;
 }

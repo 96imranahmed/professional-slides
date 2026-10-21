@@ -94,5 +94,15 @@ console.log(JSON.stringify({ spaced: step(spaced.xs), even: step(even.xs), area:
         self.assertEqual(result["native"], [False, True, False])
 
 
+
+class PeriodLabelTests(unittest.TestCase):
+    def test_edges_open_ends_year_to_date_and_today_are_periods_and_a_size_band_is_not(self):
+        result = run_node('''
+import { isPeriodLabel } from './skills/professional-slides/runtime/time-axis.mjs';
+console.log(JSON.stringify(['End 2021', '30 Sep 2026', 'Before 1995', '2015 or later', '2026 YTD Mar', 'Today', 'Large items (80 kg+)'].map(isPeriodLabel)));
+''')
+        self.assertEqual(result, [True, True, True, True, True, True, False])
+
+
 if __name__ == "__main__":
     unittest.main()

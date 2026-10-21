@@ -21,7 +21,7 @@ import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, LINK_GUTTER, BODY_H
 import { heavyTable, styleTable } from "./compose-tables.mjs";
 import { sharedBound, SIDEWAYS_CATEGORIES } from "./compose-charts.mjs";
 import { exhibitItem, headedPanel } from "./compose-exhibits.mjs";
-import { paragraph, pointColumns, pointsItem, sideTreatment, listDepth, pointsPerRow, proseOf, bridgeVariant } from "./compose-points.mjs";
+import { paragraph, pointColumns, pointsItem, sideTreatment, listDepth, pointsPerRow, proseOf, bridgeVariant, pointBullets, pointRun } from "./compose-points.mjs";
 import { photoStrip } from "./compose-pictures.mjs";
 import { metricsColumn } from "./compose-metrics.mjs";
 import { hasCommentary } from "./compose-layouts.mjs";
@@ -281,7 +281,7 @@ export function pointsUnderPanels(points, { id, slide, layout, panels, fill, poi
   const column = (list, at, size) => ({ id: `${id}-points-${at}`, layout: "flow.column", size, items: [pointsItem(list, `${id}-points-${at}-list`, tone, fill, false, pointsStyle)] });
   // One point is a paragraph, at the capped measure paragraphs keep, its lead
   // running into the sentence in bold and its phrase in the accent.
-  if (points.length === 1) {
+  if (points.length === 1 && !pointBullets(points[0])) {
     const entry = typeof points[0] === "string" ? { text: points[0] } : points[0] ?? {};
     return paragraph(`${id}-points`, [entry.lead, entry.text].filter(Boolean).join(" "), entry.highlight, entry.lead ? { lead: entry.lead } : {});
   }
@@ -337,6 +337,8 @@ function commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }
 
 // `halves`: the exhibit is a table set in halves (`split: "halves"`), and its points run in columns under the two panels
 // as they do under one: set as one list across the page, they ran past the measure a line is read at.
+// A point's bullets under it, dashed as they are beside an exhibit; a `{ lead, text }` bullet runs its bold lead in after a colon.
+const dashed = (list) => ({ ...list, props: { ...list.props, marker: "dash", inlineLead: true, leadStop: ":", leadAccent: false } });
 export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves = false }) {
   const stair = slide.pageType && !halves ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
   if (stair) { items.push(stair); return; }
@@ -349,7 +351,7 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   if (slide.pageType && facts?.type === "fact-grid" && facts.columns === undefined && (facts.items || []).length <= 4 && slide.points.length <= 3) {
     const row = factGridLayout({ x: 0, y: 0, width: BODY_WIDTH, height: BODY_HEIGHT }, facts);
     const across = pointsPerRow(slide.points.length);
-    const below = Math.max(...slide.points.map((point) => measureProse(typeof point === "string" ? point : [point?.lead, point?.text].filter(Boolean).join(" "), (BODY_WIDTH - COLUMN_GAP * (across - 1)) / across)));
+    const below = Math.max(...slide.points.map((point) => measureProse(pointRun(point), (BODY_WIDTH - COLUMN_GAP * (across - 1)) / across)));
     if (row.rows === 1 && (row.height * 1.35 + COLUMN_GAP + 44 + below) / BODY_HEIGHT < SIDE_COLUMN_SHORT) {
       items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
         exhibitItem({ ...facts, columns: 1 }, `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" }),
@@ -384,14 +386,18 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   // neighbour's lead stood as a heading, and one band would read as two
   // devices.
   const entries = slide.points.map((point) => (typeof point === "string" ? { text: point } : point));
-  const hoistAll = entries.every((entry) => entry.lead && standsAlone(entry.text));
+  // A lead over bullets always stands as its column's heading: the bullets are its parts, not a sentence it runs into.
+  // `pointsStyle: "inline"` keeps each lead in its sentence, bold and before a colon, as the style says.
+  const inline = pointsStyle === "inline";
+  const hoistAll = !inline && entries.every((entry) => entry.lead && (pointBullets(entry) || standsAlone(entry.text)));
   const columns = entries.map((entry, at) => {
     const hoist = hoistAll;
-    const text = hoist ? entry.text : [entry.lead, entry.text].filter(Boolean).join(" ");
+    const runIn = inline && entry.lead ? (/[.:;!?\u2013\u2014-]$/.test(entry.lead) ? entry.lead : `${entry.lead}:`) : entry.lead;
+    const text = hoist ? entry.text : [runIn, entry.text].filter(Boolean).join(" ");
     // A lead that stays in the sentence still leads it: it runs in bold, the
     // way a well-made page sets the phrase that carries the finding.
     // The page's highlight is set in the accent too.
-    const lead = !hoist && entry.lead ? { lead: entry.lead } : {};
+    const lead = !hoist && entry.lead ? { lead: runIn } : {};
     // `rule: false`: the block above already carries one under "What it
     // means". A hairline under each of three sub-headings as well turns one
     // divided idea into four ruled boxes, and the reader reads the rules
@@ -405,7 +411,9 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
     // width of the page.
     return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
-      items: [paragraph(`${id}-col-${at}-text`, text, entry.highlight, { ...lead, ...(loneBand ? { maxMeasure: false } : {}) })] };
+      items: [...(text ? [paragraph(`${id}-col-${at}-text`, text, entry.highlight, { ...lead, ...(loneBand ? { maxMeasure: false } : {}) })] : []),
+        // Dashed, as a point's bullets are beside an exhibit: the same device on every page, whatever the house's list marker.
+        ...(pointBullets(entry) ? [dashed(pointsItem(pointBullets(entry), `${id}-col-${at}-list`, "open", fill, false, "bulleted"))] : [])] };
   });
   // The columns share one heading, the way the side column does: without it
   // the page drops straight from the plot into three paragraphs with nothing
@@ -521,14 +529,16 @@ export const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].inclu
 export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle }) {
   // Side ratios: chart + points 2:1, table + points 3:2 — a starting point,
   // not a constant. The column is then measured against what it holds (below).
-  const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : 2;
+  // A pair of values takes half the row, as strong decks set it (chart-sense.mjs comparesTooLittle).
+  const pairOf = (ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.categories) && ex.categories.length <= 2 && Array.isArray(ex.series) && ex.series.length === 1;
+  const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : pairOf(exhibits[0]) ? 1 : 2;
   const baseSideFr = heroFr === 3 ? 2 : 1;
   // A chart beside a text column keeps a one-line heading with the unit
   // inline; the two-line heading is for peers in a row, where the bands align.
   const heroItem = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" });
   if (String(exhibits[0].type).startsWith("chart.") && heroItem.props?.unit && !heroItem.props.unitPlacement) heroItem.props.unitPlacement = "inline";
   const { tone, list, kpiTile, insightBoxes, prose, sideItems, heading, hero } = sideColumnContents({ id, slide, exhibits, fill, pointsStyle, heroItem });
-  const { sideExtras, trackHeight, sideFr } = sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading });
+  const { sideExtras, trackHeight, sideFr } = sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading, pair: pairOf(exhibits[0]) });
   // A column of points alone that stays short at its narrowest is set under
   // the exhibit instead, in columns across it, and the exhibit takes the row:
   // two or three points beside a scatter run 45-55% down the page and leave
@@ -546,7 +556,9 @@ export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, ba
   // rows and a table down its lines; set under points they lose the height
   // they are read by.
   // A radar is round: under its points it would sit no larger in a band the page's width, so it keeps its column beside them.
-  const widens = (String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow";
+  // Two values in one series do not use the width either: strong decks set a pair at about half the page, beside its
+  // column (chart-sense.mjs comparesTooLittle).
+  const widens = ((String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow") && !pairOf(exhibits[0]);
   if (pointsOnly && widens && fill !== "airy" && slide.pointsAlign !== "middle" && slide.points.length <= 4
       && (sideExtras + listDepth(list, drawnTrack(sideFr), slide.density)) / trackHeight < SIDE_COLUMN_SHORT) {
     exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
@@ -613,7 +625,7 @@ function sideColumnContents({ id, slide, exhibits, fill, pointsStyle, heroItem }
 }
 
 /** The side column's width, negotiated with what it holds against the row's height. */
-function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading }) {
+function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading, pair = false }) {
   // The column's width is negotiated with its content, not fixed by the
   // layout: forty words in a 361px track leave two fifths of the column
   // empty, and the exhibit beside it wants that width anyway. A short column
@@ -642,7 +654,8 @@ function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insig
     // its frame; a table set wider wraps less and ends higher, trading the
     // column's band for one under the table, so beside a table the column
     // gives up a fifth at most.
-    const floor = heroFr === 3 ? baseSideFr * 0.8 : 0;
+    // A pair of values cannot use more width, so its column keeps its half.
+    const floor = heroFr === 3 ? baseSideFr * 0.8 : pair ? baseSideFr : 0;
     let fr = baseSideFr;
     while (depth(fr) < SIDE_COLUMN_DEPTH && fr * 0.95 >= floor - 1e-9 && sideTrack(fr * 0.95) >= SIDE_COLUMN_MIN_WIDTH) fr *= 0.95;
     return fr;

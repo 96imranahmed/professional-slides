@@ -1176,11 +1176,21 @@ function drawCategoryLabel(chart, category, categoryIndex, categoryStart) {
     role: "category-label",
     frame: horizontal
       ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : wrapped ? categoryStart + groupSpan / 2 - wrapped.height / 2 : Math.min(categoryStart, categoryStart + groupSpan / 2 - rowLine / 2), width: horizontalCategoryLabelWidth - iconSlot, height: blockLayout ? blockLayout.height : Math.max(groupSpan, rowLine) }
-      : { x: categoryMap.get(category).labelCenter-labelSpan/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot, width: labelSpan, height: categoryLayouts[categoryIndex].height },
+      : { ...columnLabelBox(categoryMap.get(category).labelCenter, labelSpan, plot), y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot, height: categoryLayouts[categoryIndex].height },
     text: horizontal ? (blockLayout ? blockLayout.text : category) : categoryLayouts[categoryIndex].text,
     style: { ...textStyle(horizontal && !barLabelLayout ? rowSize : AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : blockLayout ? {valign:"top",lineHeight:blockLayout.lineHeight,wrap:false} : {}) },
     data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : blockLayout ? {textLayout:blockLayout} : {})}
   }));
+}
+
+/**
+ * A column's label box, centred on its column and kept within the plot: columns spaced by the dates they stand for put
+ * the first at the plot's edge, and a label as wide as an even run's slot centred there began left of the slide (the
+ * A350F deck's forecasts dated Dec 2025, Jan 2026 and Jun 2026). The box narrows evenly about its centre instead.
+ */
+function columnLabelBox(center, span, plot) {
+  const half = Math.max(0, Math.min(span / 2, center - plot.x + 4, plot.x + plot.width + 4 - center));
+  return { x: center - half, width: 2 * half };
 }
 
 /** The category's icon or logo. */
