@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execute, COMMANDS } from '../../skills/professional-slides/runtime/command.mjs';
 import { newWorkspace, editWorkspace, openWorkspace, fingerprint, digest, contentSignature, renderedSlide, rankedAdvisories } from '../../skills/professional-slides/runtime/public/workspace.mjs';
-import { approvalMessage, shortPages, storylineProblems, uniformWords } from '../../skills/professional-slides/runtime/public/storyline.mjs';
+import { approvalMessage, shortPages, storylineProblems, uniformWords, fewPictures } from '../../skills/professional-slides/runtime/public/storyline.mjs';
 import { ownerOf } from '../../skills/professional-slides/runtime/public/setup.mjs';
 import { privateAddress, readSite } from '../../skills/professional-slides/runtime/site-design.mjs';
 import { applyCandidate } from '../../skills/professional-slides/runtime/public/candidates.mjs';
@@ -340,6 +340,63 @@ test('a storyline that plans one point style or one count on most of its pages i
   assert.match(same[1].repair,/7 of 7 pages plan 3 groups of words/);
   const varied=[{shape:'lead-text',count:2},{shape:'lead-inline',count:4},{shape:'highlighted',count:3},{shape:'lead-bullets',count:2},{shape:'lead-text',count:5},{shape:'lead-inline',count:3},{shape:'rows',count:6}];
   assert.deepEqual(uniformWords(plan(varied)),[]);
+});
+
+test('a long storyline that plans almost no pictures is advised there, and one that plans them is not',()=>{
+  const plan=(types)=>({sections:[{claim:'c',pages:types.map((type,i)=>({id:`p${i}`,title:`Page ${i}`,type}))}]});
+  const bare=fewPictures(plan(Array.from({length:30},()=>'ranking/bar')));
+  assert.deepEqual(bare.map(a=>a.code),['STORYLINE_PICTURES_FEW']);
+  assert.match(bare[0].repair,/0 of 30 pages plan a picture: where the subject can be seen, plan about 2/);
+  assert.deepEqual(fewPictures(plan([...Array.from({length:28},()=>'ranking/bar'),'picture/picture-hero','picture/picture-strip'])),[]);
+  assert.deepEqual(fewPictures(plan(Array.from({length:8},()=>'ranking/bar'))),[]);
+});
+
+const variedDeck=(pages)=>{
+  const {spec}=compileDeck({deck:{schema:'professional-slides.deck/v3',id:'d',contents:false,variation:'f0097b1a',assets:{fetch:'none',reason:'test'}},pages},{partial:true});
+  return composeAll(spec).deck.slides;
+};
+
+test('led findings with no points style vary page by page, and an author\'s style stands',()=>{
+  const page=(id,extra={})=>({id,type:'ranking',form:'bar',title:'Alpha leads the field on the measures that matter',commentary:'below',source:'Source: test',...extra,
+    exhibit:{heading:'Share of routes',unit:'%',categories:['Alpha','Bravo','Charlie','Delta','Echo'],series:[{name:'Share',values:[23.4,21.5,7.4,4.1,1.9]}]},
+    points:[{lead:'Cost',text:'Alpha has the lowest fare on four routes in five and has hedged its fuel to the end of the decade.'},
+      {lead:'Hubs',text:'Bravo holds slots at three hubs in four and a loyalty base twice the size of Alpha\'s.'}]});
+  const look=(slide)=>{
+    const texts=slide.nodes.filter(n=>typeof n.text==='string').map(n=>n.text.replace(/\n/g,' '));
+    return texts.some(t=>t.startsWith('Cost: Alpha'))?'inline':slide.nodes.some(n=>n.role==='section-surface')?'boxed':'prose';
+  };
+  const looks=variedDeck(['a','b','c','d'].map(id=>page(id))).map(look);
+  assert.equal(new Set(looks.slice(0,3)).size,3,`three pages take three styles: ${looks}`);
+  looks.slice(1).forEach((one,at)=>assert.notEqual(one,looks[at],`no two pages in a row share a style: ${looks}`));
+  assert.deepEqual(variedDeck(['a','b','c'].map(id=>page(id,{pointsStyle:'inline'}))).map(look),['inline','inline','inline']);
+});
+
+test('untreated tables vary their header, label column and rows page by page; a written treatment stands',()=>{
+  const rows=[['Alpha','Lowest fare on four routes in five','Holds its share'],['Bravo','Slots at three hubs in four','Defends the hubs'],['Charlie','A new fleet from 2027','Grows on cost'],['Delta','Exits two routes','Shrinks']];
+  const page=(id,extra={})=>({id,type:'lookup',form:'table',title:'Each carrier plays to a different strength',commentary:'none',source:'Source: test',exhibit:{columns:['Carrier','Position','Outlook'],rows,...extra}});
+  const chrome=(slide)=>{
+    const roles=new Set(slide.nodes.map(n=>n.role));
+    return `${roles.has('table-label-column')?'labels':'-'}/${slide.nodes.some(n=>n.role==='table-zebra-band')?'zebra':'rules'}/${slide.nodes.some(n=>/table-header/.test(String(n.role))&&n.type==='rect')?'band':'rule'}`;
+  };
+  const varied=variedDeck(['a','b','c'].map(id=>page(id))).map(chrome);
+  assert.equal(new Set(varied).size,3,`three tables take three looks: ${varied}`);
+  const written=variedDeck(['a','b','c'].map(id=>page(id,{treatment:'open'}))).map(chrome);
+  assert.equal(new Set(written).size,1,`a written treatment keeps the house's chrome: ${written}`);
+});
+
+test('a dated timeline over its commentary is staggered across the page, its points at the foot',()=>{
+  const items=['Jan 2023','Nov 2025','May 2026','Sep 2026','Jan 2028','2029'].map((date,i)=>({date,label:`Milestone ${i+1}`,text:`What happens at milestone ${i+1}, in one sentence.`}));
+  const [slide]=variedDeck([{id:'t',type:'schedule',form:'timeline',commentary:'below',title:'Six dates bound the opening',source:'Source: test',exhibit:{items},
+    points:[{lead:'A window',text:'The entry is guided for the second half of 2027.'},{lead:'A bridge',text:'Existing aircraft keep flying through the gap.'}]}]);
+  const markers=slide.nodes.filter(n=>n.role==='timeline-marker');
+  assert.equal(markers.length,6);
+  assert.equal(new Set(markers.map(n=>Math.round(n.frame.y))).size,1,'the markers sit on one rail across the page');
+  const rail=markers[0].frame.y;
+  const labels=slide.nodes.filter(n=>n.role==='timeline-label');
+  assert.ok(labels.filter((n,i)=>i%2===0).every(n=>n.frame.y<rail)&&labels.filter((n,i)=>i%2===1).every(n=>n.frame.y>rail),'stages alternate above and below the rail');
+  assert.equal(slide.nodes.filter(n=>n.role==='timeline-stem').length,6);
+  const lead=slide.nodes.find(n=>typeof n.text==='string'&&n.text.includes('A window'));
+  assert.ok(lead.frame.y>Math.max(...labels.map(n=>n.frame.y)),'the points sit under the schedule');
 });
 
 test('a point can carry short bullets under its lead, beside a chart or under it',()=>{

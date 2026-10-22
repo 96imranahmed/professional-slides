@@ -74,7 +74,7 @@ export const SLIDE_KEYS = Object.freeze({
   // the commentary
   points: "the commentary column: a lead and a sentence per point",
   pointsHeading: "the heading over that column, or false for none",
-  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, lettered, numbered, bulleted, inline (a bullet, its bold lead before a colon) or checklist",
+  pointsStyle: "how the column is marked: icon-lead, icon-framed, prose, ruled, boxed (under an exhibit, a tinted panel a point), lettered, numbered, bulleted, inline (a bullet, its bold lead before a colon) or checklist; unset, led findings vary page by page",
   pointsTone: "open, dark, muted, tint or primary",
   pointsAlign: "middle to centre the points on the exhibit",
   paragraphs: "body prose, on a text page",
@@ -272,9 +272,11 @@ function pagePlan(slide, id, recent, recentStyles) {
   const layout = chosen === "exhibit-left" && !slide.layout && LAYOUT.commentary === "left" ? "exhibit-right" : chosen;
   if (Array.isArray(recent)) recent.unshift(chosen);
   const columnPoints = slide.points;
-  const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
+  const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints, { recentStyles, layout }) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
   const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))];
+  const look = tableLook(exhibits, recentStyles);
+  if (look) exhibits.forEach((ex, at) => { if (ex?.type === "table") exhibits[at] = { ...ex, _look: look }; });
   // A lone table whose density the composer chose (a findings matrix defaults
   // to compact, pagination picks the lightest step its estimate fits) may be
   // set a type step up when its frame holds it (`fillDensity` in tables.mjs).
@@ -283,6 +285,26 @@ function pagePlan(slide, id, recent, recentStyles) {
   if (exhibits.length === 1 && ["table", "rows", "compare", "phase-table"].includes(exhibits[0]?.type) && ["exhibit-full", "metrics-over-exhibit", "exhibit-top", "exhibit-left", "exhibit-right"].includes(layout)
       && (exhibits[0]?.density === undefined || exhibits[0]?._densityChosen === true)) exhibits[0] = { ...exhibits[0], _typeStep: true };
   return { pictures, layout, pointsStyle, exhibits };
+}
+
+/**
+ * The chrome a table of the author's takes when it names none, varied page by page (compose-exhibits.mjs TABLE_LOOKS):
+ * under the reference surfaces every table drew the same filled header, tinted label column and banded rows, and a deck
+ * of twenty word tables read as one table twenty times. Of the looks, the one the last pages used least, never the last
+ * table's; recorded in `recentStyles` as `table:<look>`. Tables on one page share one look; a page composed alone, or a
+ * table whose treatment, variant, row style or bands are written, keeps the house's.
+ */
+const TABLE_LOOK_ORDER = ["banded", "lined", "open"];
+const TABLE_AUTHORED = ["treatment", "variant", "rowStyle", "headerBand", "labelColumn", "zebra", "headerShape", "split"];
+function tableLook(exhibits, recentStyles) {
+  const tables = exhibits.filter((ex) => ex?.type === "table");
+  if (!tables.length || !Array.isArray(recentStyles) || tables.some((ex) => TABLE_AUTHORED.some((key) => ex[key] !== undefined))) return null;
+  const used = recentStyles.filter((style) => String(style).startsWith("table:")).map((style) => style.slice(6));
+  const uses = (look) => used.filter((one) => one === look).length;
+  const candidates = TABLE_LOOK_ORDER.filter((look) => look !== used[0]);
+  const look = candidates.reduce((best, one) => (uses(one) < uses(best) ? one : best), candidates[0]);
+  recentStyles.unshift(`table:${look}`);
+  return look;
 }
 
 /** The measures over the page, with the bridge across under them; returns where the measures go instead when they do not. */

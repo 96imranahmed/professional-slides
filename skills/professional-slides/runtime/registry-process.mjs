@@ -591,7 +591,7 @@ export function registerProcessFamily(registry) {
       // frame, so that height is its ceiling - any frame beyond it would be a
       // gap before the commentary; the process variant keeps its proportional
       // ceiling.
-      definition.measureCeiling = input => staged(input) ? stagesLayout(input.frame, input.props).ceiling
+      definition.measureCeiling = input => staged(input) ? ((L) => (input.props.centre && L.stagger ? null : L.ceiling))(stagesLayout(input.frame, input.props))
         : definition.resolveVariant(input.props) === "process"
         ? processCeiling(input.frame, input.props, false, 250)
         : schedule({ ...input, id: "ceiling", frame: { ...input.frame, height: Number.MAX_SAFE_INTEGER } }).height;

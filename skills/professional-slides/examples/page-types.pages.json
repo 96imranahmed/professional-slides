@@ -641,7 +641,8 @@
     }
    ],
    "pointsHeading": false,
-   "source": "Source: illustrative data for a fictional operator; ticket sales by origin station"
+   "source": "Source: illustrative data for a fictional operator; ticket sales by origin station",
+   "pointsStyle": "boxed"
   },
   {
    "id": "p07c",
