@@ -81,6 +81,33 @@ function across(frame, stages, roadmap) {
   return { orientation: "across", cells, span, inset, width, chevron, marker, whenHeight, labelHeight, headHeight, growth, place, natural: place(0).height };
 }
 
+// The columns staggered about the rail: the first stage above it, the next below, and so on, each stage's date, label
+// and detail in a block two columns wide that a stem joins to its marker. A schedule over its commentary has the
+// body's width and the height the points leave, and a single row of columns took a strip of it: the detail wrapped at a
+// sixth of the page and the band above and below the rail was empty. Staggered, each block has twice the measure and the
+// two rows of blocks take the height (`stagger`, set by the composer; compose-arrangements.mjs acrossOverCommentary).
+const STEM_MIN = 12, STEM_MAX = 56;
+function staggered(frame, stages) {
+  const n = stages.length, span = frame.width / n, inset = v("space.2"), marker = v("icon.medium");
+  if (n < 3) throw new Error("a staggered schedule needs three stages or more");
+  const right = frame.x + frame.width;
+  const cells = stages.map((stage, index) => {
+    const x = frame.x + index * span + inset;
+    const width = Math.min(2 * span - 2 * inset - v("space.4"), right - x);
+    if (width < 120) throw new Error("the stages are too many for the width");
+    const when = stage.when ? measure(stage.when, width, COMPACT, true) : null;
+    const elapsed = stage.elapsed ? measure(stage.elapsed, width, COMPACT) : null;
+    const label = measure(stage.label, width, HEADING, true);
+    const text = stage.text ? measure(stage.text, width, BODY) : null;
+    const height = (when?.height ?? 0) + (elapsed?.height ?? 0) + (when || elapsed ? v("space.1") : 0) + label.height + (text ? v("space.1") + text.height : 0);
+    return { x, width, when, elapsed, label, text, height, above: index % 2 === 0 };
+  });
+  const aboveHeight = Math.max(0, ...cells.filter((cell) => cell.above).map((cell) => cell.height));
+  const belowHeight = Math.max(0, ...cells.filter((cell) => !cell.above).map((cell) => cell.height));
+  const natural = aboveHeight + belowHeight + marker + 2 * STEM_MIN;
+  return { orientation: "across", stagger: true, cells, span, inset, marker, aboveHeight, belowHeight, growth: 2 * (STEM_MAX - STEM_MIN), natural };
+}
+
 // The rows: the dates in a column at the left, then the rail and its markers
 // (a timeline) or each stage's label in a filled block (a roadmap), then the
 // detail - under the label on a timeline, beside the block on a roadmap. A
@@ -134,10 +161,13 @@ export function stagesLayout(frameIn, props, { roadmap = false, id = "schedule" 
   const shrink = (height) => ({ ...frameIn, height: Number.isFinite(frameIn.height) ? frameIn.height - height : frameIn.height });
   const frame = frameIn;
   // Each arrangement is laid out in the frame its eras leave, and carries what it reserved.
-  const attempt = (build, stacked) => { const name = build === across ? "across" : "down", held = reserve(name);
+  const attempt = (build, stacked) => { const name = build === down ? "down" : "across", held = reserve(name);
     try { const option = build(shrink(held), stages, roadmap, stacked); return { ...option, held, natural: option.natural + held }; } catch (error) { return { error }; } };
   const stackable = roadmap && stages.some((stage) => stage.when);
-  const options = (props.orientation ? [props.orientation] : ["across", "down"]).flatMap((name) => (name === "across" ? [attempt(across)] : [attempt(down, false), ...(stackable ? [attempt(down, true)] : [])]));
+  const stagger = props.stagger && !roadmap && !eras.length && props.orientation !== "down" ? attempt(staggered) : null;
+  // Staggered where it fits the frame it is given; a frame too short for two rows of blocks takes the columns or the rows.
+  const options = stagger && !stagger.error && !(Number.isFinite(frame.height) && stagger.natural > frame.height + 0.01) ? [stagger]
+    : (props.orientation ? [props.orientation] : ["across", "down"]).flatMap((name) => (name === "across" ? [attempt(across)] : [attempt(down, false), ...(stackable ? [attempt(down, true)] : [])]));
   const drawn = options.filter((option) => !option.error);
   if (!drawn.length) throw new Error(`${id}: ${options[0].error.message}; use fewer stages, shorter labels or a wider frame`);
   const bounded = Number.isFinite(frame.height);
@@ -182,7 +212,13 @@ function erasOf(eras, stages, id) {
 
 /** The nodes of a dated timeline (`roadmap: false`) or roadmap in `frame`. */
 export function stagesNodes({ id, frame, props, roadmap = false }) {
-  const L = stagesLayout(frame, props, { roadmap, id });
+  let L = stagesLayout(frame, props, { roadmap, id });
+  // `centre`: staggered stages in a frame taller than they take sit in its middle (a timeline over its commentary).
+  if (props.centre && L.stagger && Number.isFinite(frame.height) && frame.height > L.height + 1) {
+    const offset = (frame.height - L.height) / 2;
+    frame = { ...frame, y: frame.y + offset, height: frame.height - offset };
+    L = stagesLayout(frame, props, { roadmap, id });
+  }
   if (L.natural > frame.height + 0.01) throw new Error(`${id}: the stages need ${Math.ceil(L.natural)}px and have ${Math.floor(frame.height)}px; cut the detail, use fewer stages, or give the schedule the page's height`);
   const prefix = roadmap ? "roadmap" : "timeline";
   const nodes = [];
@@ -204,6 +240,28 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
     style: { ...textStyle(size, color, bold, align, valign), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, stage: index } }));
   const blockFill = token("color.surfaceTint");
   const active = (index) => props.active === index;
+  if (L.stagger) {
+    const stem = STEM_MIN + L.spare / 2;
+    const railY = frame.y + L.aboveHeight + stem + L.marker / 2;
+    nodes.push(openLine(stableId(id, "rail"), frame.x, railY, frame.x + frame.width, railY, `${prefix}-rail`, RULE, STANDARD, { endArrow: true }));
+    L.cells.forEach((cell, index) => {
+      const { x, width } = cell;
+      const centre = x + L.marker / 2;
+      nodes.push(openLine(stableId(id, "stem", index), centre, cell.above ? railY - L.marker / 2 - stem : railY + L.marker / 2,
+        centre, cell.above ? railY - L.marker / 2 : railY + L.marker / 2 + stem, `${prefix}-stem`, RULE, HAIRLINE));
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "timeline-marker", frame: { x, y: railY - L.marker / 2, width: L.marker, height: L.marker },
+        style: boxStyle(props.active === undefined || active(index) ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")), data: { stage: index } }));
+      // An upper block ends at its stem, a lower one starts at it: the date is always first, the detail last.
+      let y = cell.above ? railY - L.marker / 2 - stem - cell.height : railY + L.marker / 2 + stem;
+      if (cell.when) { say("when", index, cell.when, { x, y, width, height: cell.when.height }, COMPACT, SECONDARY, true); y += cell.when.height; }
+      if (cell.elapsed) { say("elapsed", index, cell.elapsed, { x, y, width, height: cell.elapsed.height }, COMPACT, SECONDARY, false); y += cell.elapsed.height; }
+      if (cell.when || cell.elapsed) y += v("space.1");
+      say("label", index, cell.label, { x, y, width, height: cell.label.height }, HEADING, INK, true);
+      y += cell.label.height;
+      if (cell.text) say("text", index, cell.text, { x, y: y + v("space.1"), width, height: cell.text.height }, BODY, INK, false);
+    });
+    return nodes;
+  }
   if (L.orientation === "across") {
     const at = L.place(L.spare);
     const railY = frame.y + at.headTop + L.headHeight / 2;

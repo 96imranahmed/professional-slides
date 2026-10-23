@@ -323,6 +323,8 @@ const POINT_STYLES = {
   // A bullet whose bold lead runs into its sentence after a colon - "Engines: the XWB-97 is shared ..." - the
   // fourth way a strong deck sets a point, beside a lead above its sentence, a highlighted sentence and a lead over bullets.
   inline: { marker: "dot", inlineLead: true, leadStop: ":", leadAccent: false },
+  // Each point in a tinted panel under its exhibit, its lead the panel's heading; in a column, a hairline between items.
+  boxed: { marker: "rule" },
   // A box per item: questions to answer, criteria to meet. An item may set
   // `state: "yes"` or `"no"` once it is judged; unset, the box stays open.
   checklist: { marker: "check" },
@@ -333,7 +335,11 @@ export const POINT_STYLE_NAMES = Object.freeze(Object.keys(POINT_STYLES));
 /**
  * Honour the author, then choose markers from the content semantics.
  */
-export function resolvePointsStyle(slide, points) {
+// The ways a page's led findings are set when the author does not say, varied page by page: under an exhibit a lead
+// over its sentence, a lead run in before a colon, or a tinted panel a point; in a column, the first two or a hairline
+// between points. A deck that set every page's findings the one way read as one template from cover to close.
+const LEAD_ROTATION = { below: ["prose", "inline", "boxed"], column: ["prose", "inline", "ruled"] };
+export function resolvePointsStyle(slide, points, { recentStyles = null, layout = null } = {}) {
   if (slide.pointsStyle) {
     if (!POINT_STYLES[slide.pointsStyle]) throw new Error(`Unknown pointsStyle: ${slide.pointsStyle}; use one of ${POINT_STYLE_NAMES.join(", ")}`);
     return slide.pointsStyle;
@@ -346,7 +352,23 @@ export function resolvePointsStyle(slide, points) {
   if (!entries.some((e) => e.lead)) return "bulleted";
   // Led points are parallel findings unless the page says otherwise: no implied order or invented icon, marked the deck's
   // one unordered way on every page.
-  return LAYOUT.variation?.leadPoints ?? "prose";
+  return varyLeadPoints(slide, layout, recentStyles);
+}
+
+/**
+ * The style led findings take on this page: of the rotation for where they sit, the one the last pages used least,
+ * never the last page's own, ties broken in the deck's drawn order (its `variation` leads with its `leadPoints`). With
+ * no memory of earlier pages (a page composed alone), the deck's drawn style.
+ */
+function varyLeadPoints(slide, layout, recentStyles) {
+  const drawn = LAYOUT.variation?.leadPoints ?? "prose";
+  if (!Array.isArray(recentStyles)) return drawn;
+  const rotation = LEAD_ROTATION[layout === "exhibit-top" || layout === "table-halves" ? "below" : "column"];
+  const order = [drawn, ...rotation.filter((style) => style !== drawn)].filter((style) => rotation.includes(style));
+  const led = recentStyles.filter((style) => Object.values(LEAD_ROTATION).flat().includes(style));
+  const uses = (style) => led.filter((used) => used === style).length;
+  const candidates = order.filter((style) => style !== led[0]);
+  return candidates.reduce((best, style) => (uses(style) < uses(best) ? style : best), candidates[0] ?? drawn);
 }
 
 export function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = false) {

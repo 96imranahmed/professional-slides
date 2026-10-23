@@ -14,6 +14,7 @@ import { plotHeadroom, topBand, horizontalChart, oneMagnitude } from "./chart-ax
 import { FLAT_SHARE } from "./chart-sense.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { stepsLayout } from "./extras.mjs";
+import { detailedStages, stagesLayout } from "./schedule-stages.mjs";
 import { factGridLayout } from "./figures.mjs";
 import { renderTable, withoutInferredBars } from "./tables.mjs";
 import { metricHeight } from "./panels.mjs";
@@ -339,6 +340,25 @@ function commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }
 // as they do under one: set as one list across the page, they ran past the measure a line is read at.
 // A point's bullets under it, dashed as they are beside an exhibit; a `{ lead, text }` bullet runs its bold lead in after a colon.
 const dashed = (list) => ({ ...list, props: { ...list.props, marker: "dash", inlineLead: true, leadStop: ":", leadAccent: false } });
+/**
+ * A dated timeline over commentary runs across the page.
+ *
+ * Left to its frame, a timeline whose columns would not fill most of the body's height takes rows down the page: under a
+ * band of points that set its dates and sentences in the left half and left the right half empty, with the points pressed
+ * under its last row (the A350F deck's window and orderbook pages). Over commentary the page is a band of stages and a band
+ * of points, so the stages take the columns wherever each keeps a readable measure; an author's `orientation` stands, and a
+ * schedule too long for the columns keeps its rows. The columns take the height the points leave and sit in its middle
+ * (`centre`), so the points close the page at its foot rather than under a strip of air.
+ */
+const ACROSS_COLUMN_MIN = 150;
+export function acrossOverCommentary(ex) {
+  if (ex?.type !== "timeline" || ex.orientation !== undefined || (ex.variant && ex.variant !== "process")) return ex;
+  if (!detailedStages(ex.items) || BODY_WIDTH / ex.items.length < ACROSS_COLUMN_MIN) return ex;
+  try { stagesLayout({ x: 0, y: 0, width: BODY_WIDTH, height: undefined }, { ...ex, orientation: "across" }); }
+  catch { return ex; }
+  const stagger = !ex.eras && ex.items.length >= 3;
+  return { ...ex, orientation: "across", ...(stagger ? { stagger: true, centre: true } : {}) };
+}
 export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves = false }) {
   const stair = slide.pageType && !halves ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
   if (stair) { items.push(stair); return; }
@@ -366,7 +386,7 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   // A wide exhibit - ten categories, a twelve-row table - has no width to
   // give a side column, and three findings read better as three columns than
   // as three stacked paragraphs in a 360px gutter.
-  const item = halves ? null : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
+  const item = halves ? null : exhibitItem(acrossOverCommentary(exhibits[0]), `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
   if (String(exhibits[0].type).startsWith("chart.") && item?.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
   // A point's lead becomes the column's heading only when its sentence can
   // stand without it. Points are often written to run on from the lead ("Core
@@ -388,7 +408,7 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   const entries = slide.points.map((point) => (typeof point === "string" ? { text: point } : point));
   // A lead over bullets always stands as its column's heading: the bullets are its parts, not a sentence it runs into.
   // `pointsStyle: "inline"` keeps each lead in its sentence, bold and before a colon, as the style says.
-  const inline = pointsStyle === "inline";
+  const inline = pointsStyle === "inline", boxed = pointsStyle === "boxed";
   const hoistAll = !inline && entries.every((entry) => entry.lead && (pointBullets(entry) || standsAlone(entry.text)));
   const columns = entries.map((entry, at) => {
     const hoist = hoistAll;
@@ -409,7 +429,10 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
     // under the last, which is how a well-made page closes an exhibit: the
     // finding runs as a band the width of the chart it is read off, or the
     // width of the page.
-    return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
+    // `boxed`: each point in a tinted panel, its lead the panel's heading - the third way the band under an exhibit is
+    // set, beside a lead over its sentence and a lead run in before a colon (compose-points.mjs resolvePointsStyle).
+    return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: boxed ? HUG : "fill" },
+      ...(boxed ? { treatment: "tint" } : {}),
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
       items: [...(text ? [paragraph(`${id}-col-${at}-text`, text, entry.highlight, { ...lead, ...(loneBand ? { maxMeasure: false } : {}) })] : []),
         // Dashed, as a point's bullets are beside an exhibit: the same device on every page, whatever the house's list marker.
@@ -561,7 +584,8 @@ export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, ba
   const widens = ((String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow") && !pairOf(exhibits[0]);
   if (pointsOnly && widens && fill !== "airy" && slide.pointsAlign !== "middle" && slide.points.length <= 4
       && (sideExtras + listDepth(list, drawnTrack(sideFr), slide.density)) / trackHeight < SIDE_COLUMN_SHORT) {
-    exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
+    // A hairline between points is a column's device; set under the exhibit, the varied style takes its panels instead.
+    exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle: pointsStyle === "ruled" && !slide.pointsStyle ? "boxed" : pointsStyle });
     return;
   }
   besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr });

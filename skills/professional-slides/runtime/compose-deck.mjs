@@ -13,7 +13,7 @@ import { composedPlaces } from "./revision.mjs";
 import { styleTable, heavyTable, barScales, validateCategoryLabels, columnWeight } from "./compose-tables.mjs";
 import { DIAGRAM_TYPES } from "./compose-exhibits.mjs";
 import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withDesignLayout } from "./compose-body.mjs";
-import { pointsPerRow, resolveFill, pointBullets, bulletText } from "./compose-points.mjs";
+import { pointsPerRow, resolveFill, pointBullets, bulletText, resolvePointsStyle } from "./compose-points.mjs";
 import { imageProps, playerMarks, pictureCredits, sourcedPicture } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
@@ -407,8 +407,16 @@ function composeDeckWith(spec, baseDir) {
   const remember = (raw) => {
     const between = run?.between?.[sourceOf(raw)];
     if (!between || (raw.sourceSlideId && raw.id !== expanded.find((other) => sourceOf(other) === sourceOf(raw))?.id)) return;
-    for (const standIn of between) { try { recent.unshift(chooseLayout(standIn, recent)); } catch { /* a stand-in no layout takes adds nothing to the memory */ } }
+    for (const standIn of between) {
+      try {
+        const layout = chooseLayout(standIn, recent);
+        recent.unshift(layout);
+        // Its points' style too, so the next page varies its findings from it as it does in the deck composed whole.
+        if (standIn.points?.length) recentStyles.unshift(resolvePointsStyle(standIn, standIn.points, { recentStyles, layout }));
+      } catch { /* a stand-in no layout takes adds nothing to the memory */ }
+    }
     recent.splice(4);
+    recentStyles.splice(9);
   };
   const resolveReferences = value => {
     if (typeof value === "string") return value.replace(/\{\{page:([A-Za-z0-9_-]+)\}\}/g, (_, id) => {

@@ -127,6 +127,13 @@ function tableAlias(ex) {
 /** Components whose render is the table renderer, reached by their own id. */
 const TABLE_RENDERERS = ["trend-rows", "comparison-table", "heatmap"];
 
+/**
+ * A table's chrome when the composer varies it (compose-page.mjs tableLook): `banded` is the house's own - the filled
+ * header, the tinted label column, its rows banded or ruled; `lined` keeps the header band and rules the rows, the
+ * labels on the page; `open` sets the header in bold over a rule, keeps the label column and rules the rows.
+ */
+export const TABLE_LOOKS = Object.freeze({ banded: {}, lined: { labelColumn: false, zebra: false }, open: { headerBand: false, zebra: false } });
+
 export function exhibitItem(exIn, id, baseDir, size = SIZE) {
   exIn = resolveMediaRefs(exIn, baseDir);
   // A `compare` whose sides name an `image` sets the two pictures above the two
@@ -201,8 +208,9 @@ export function exhibitItem(exIn, id, baseDir, size = SIZE) {
   }
   if (type === "swot") return { id, component: "quadrants", props: { quadrants: ["Strengths", "Weaknesses", "Opportunities", "Threats"].map((title, i) => ({ title, points: [rest.strengths, rest.weaknesses, rest.opportunities, rest.threats][i] || [] })) }, size };
   if (type === "table") {
-    const styled = styleTable(rest);
-    return { id, component: "table", props: { ...styled, density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.chartData ? { chartData: true } : {}), ...(typeStep ? { typeStep: true } : {}), ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
+    const { _look: look, ...table } = rest;
+    const styled = styleTable(table);
+    return { id, component: "table", props: { ...styled, ...(TABLE_LOOKS[look] ?? {}), density: rest.density || "body", fillHeight: size.height === "fill", ...(rest.chartData ? { chartData: true } : {}), ...(typeStep ? { typeStep: true } : {}), ...(rest.rowSpacing ? { rowSpacing: rest.rowSpacing } : {}), ...(rest.headerShape ? { headerShape: rest.headerShape } : {}) }, size };
   }
   // The other table renderers reach the page by their component id rather than
   // through the `table` alias, and keep the one thing the alias does for

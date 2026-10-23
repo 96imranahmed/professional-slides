@@ -220,6 +220,22 @@ export function shortPages(storyline) {
 }
 
 /**
+ * A storyline that plans almost no pictures for the length it runs: a picture page for every fifteen or so, at least
+ * one. Said at the storyline as an advisory: a recognisable subject - an aircraft, a site, a product, the companies
+ * compared - is shown as well as measured, and the A350F deck planned one photograph in a hundred pages.
+ */
+export const PAGES_PER_PICTURE = 15;
+export function fewPictures(storyline) {
+  const pages = storylinePages(storyline);
+  if (pages.length < 12) return [];
+  const pictured = pages.filter((page) => formOf(page.type).name === "picture" || page.picture || page.photo || page.pictures).length;
+  const wanted = Math.max(1, Math.floor(pages.length / PAGES_PER_PICTURE));
+  if (pictured >= wanted) return [];
+  return [{ code: "STORYLINE_PICTURES_FEW", severity: "advisory",
+    repair: `${pictured} of ${pages.length} pages plan a picture: where the subject can be seen, plan about ${wanted} - a \`picture\` page (picture-hero, picture-pair, picture-strip, photo-backdrop), a photograph beside a page's commentary (\`photo\`), a cover photograph (\`deck.cover.image\`), the players' logos in a table - each a \`{ search, alt }\` the build fetches` }];
+}
+
+/**
  * A storyline whose points are planned in one style, or at one count, on more than half the pages that carry them: said
  * at the storyline, where each page's style is chosen, as an advisory. The A350F rebuild set a lead over its sentence,
  * three to a page, on 27 of 28 commentary pages; strong decks use no one style on more than a sixth of their text pages.
@@ -298,7 +314,7 @@ export async function showStoryline(work, results) {
   const detail = path.join(path.dirname(work.file), "storyline.md");
   await fs.writeFile(detail, approvalDetail(work.doc.storyline));
   const message = `${approvalMessage(work.doc.storyline, work.doc.deck, writtenPages(work.doc))}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
-  const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline)];
+  const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline), ...fewPictures(work.doc.storyline)];
   const approved = work.doc.storyline.approval?.hash === storylineHash(work.doc.storyline);
   return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: message, artifacts: [detail], ...(advisories.length ? { advisories } : {}) })
     : results.needed([{ kind: "storyline-approval", message,
