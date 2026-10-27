@@ -118,7 +118,8 @@ const lists=item=>[...(item.component==='bullet-list'?[item]:[]),...(item.items|
 for(const history of [[],['prose'],['numbered','ruled','icon-lead']]) {
  const page=composeSlide(slide,0,undefined,'balanced',1,[],history);
  const points=page.items.flatMap(lists);
- assert.ok(points.length);assert.ok(points.every(p=>p.props.marker==='none'));
+ // Varied page by page (prose, inline, ruled), but never a mark that implies an order or invents an icon.
+ assert.ok(points.length);assert.ok(points.every(p=>['none','dot','rule'].includes(p.props.marker)),JSON.stringify(points.map(p=>p.props.marker)));
 }
 console.log('{}');
 """)

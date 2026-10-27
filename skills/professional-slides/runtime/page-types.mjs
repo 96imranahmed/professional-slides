@@ -755,7 +755,7 @@ function defaultCommentary(page) {
   const data = kinds.some((kind) => kind.startsWith("chart.") || kind === "table");
   if (data && allowed.includes("beside") && ((page.points || []).length || (page.paragraphs || []).length)) {
     const table = kinds.every((kind) => kind === "table");
-    throw Object.assign(new Error(`${page.id ?? "page"}: the page writes \`points\` over a ${table ? "table" : "chart"} without saying where they go. Most strong pages carry the point on the exhibit itself: ${table ? "set it in the table (an implication column, `commentary: \"in-exhibit\"`)" : "set the one the title rests on as a callout (`annotations: [{ category, text }]`, a change mark or a labelled reference line) with `commentary: \"on-exhibit\"`"} and drop the points; or ask for the column - \`commentary: "beside"\` - or the band under the exhibit - \`commentary: "below"\``), { code: "COMMENTARY_UNCHOSEN" });
+    throw Object.assign(new Error(`${page.id ?? "page"}: the page writes \`points\` over a ${table ? "table" : "chart"} without saying where they go. Most strong pages carry the point on the exhibit itself: ${table ? "set it in the table - an implication column, a highlighted row or column (\`highlightRow\`, \`highlightColumn\`), coded cells (harvey, rag, check, trend) - with \`commentary: \"in-exhibit\"\`" : "set the one the title rests on as a callout (`annotations: [{ category, text }]`, a change mark or a labelled reference line) with `commentary: \"on-exhibit\"`"} and drop the points; or ask for the column - \`commentary: "beside"\` - or the band under the exhibit - \`commentary: "below"\``), { code: "COMMENTARY_UNCHOSEN" });
   }
   const asked = [
     ...((page.points || []).length || (page.paragraphs || []).length ? ["beside", "below"] : []),

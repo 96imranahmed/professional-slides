@@ -134,7 +134,8 @@ export function paginateTable(slide, bodyScale = 1) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     const { highlightRow, ...rest } = ex;
-    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows,
+    // `_continued`: a part after the first takes the first part's look (compose-page.mjs tableLook).
+    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows, ...(i ? { _continued: true } : {}),
       ...(Object.keys(shared).length ? { scales: { ...shared, ...(rest.scales || {}) } } : {}),
       ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
     if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
