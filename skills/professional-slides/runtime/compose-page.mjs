@@ -291,8 +291,9 @@ function pagePlan(slide, id, recent, recentStyles) {
  * The chrome a table of the author's takes when it names none, varied page by page (compose-exhibits.mjs TABLE_LOOKS):
  * under the reference surfaces every table drew the same filled header, tinted label column and banded rows, and a deck
  * of twenty word tables read as one table twenty times. Of the looks, the one the last pages used least, never the last
- * table's; recorded in `recentStyles` as `table:<look>`. Tables on one page share one look; a page composed alone, or a
- * table whose treatment, variant, row style or bands are written, keeps the house's.
+ * table's; recorded in `recentStyles` as `table:<look>`. Tables on one page share one look, and the parts of a table cut
+ * across pages (compose-deck.mjs paginateTable, `_continued` on each after the first) the first part's: they are one
+ * table. A page composed alone, or a table whose treatment, variant, row style or bands are written, keeps the house's.
  */
 const TABLE_LOOK_ORDER = ["banded", "lined", "open"];
 const TABLE_AUTHORED = ["treatment", "variant", "rowStyle", "headerBand", "labelColumn", "zebra", "headerShape", "split"];
@@ -302,7 +303,9 @@ function tableLook(exhibits, recentStyles) {
   const used = recentStyles.filter((style) => String(style).startsWith("table:")).map((style) => style.slice(6));
   const uses = (look) => used.filter((one) => one === look).length;
   const candidates = TABLE_LOOK_ORDER.filter((look) => look !== used[0]);
-  const look = candidates.reduce((best, one) => (uses(one) < uses(best) ? one : best), candidates[0]);
+  // A part carries no points (paginateTable drops them), so the last look recorded is the part before it's.
+  const look = tables.every((ex) => ex._continued) && used[0] ? used[0]
+    : candidates.reduce((best, one) => (uses(one) < uses(best) ? one : best), candidates[0]);
   recentStyles.unshift(`table:${look}`);
   return look;
 }

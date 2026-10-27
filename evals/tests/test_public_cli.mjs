@@ -349,6 +349,11 @@ test('a long storyline that plans almost no pictures is advised there, and one t
   assert.match(bare[0].repair,/0 of 30 pages plan a picture: where the subject can be seen, plan about 2/);
   assert.deepEqual(fewPictures(plan([...Array.from({length:28},()=>'ranking/bar'),'picture/picture-hero','picture/picture-strip'])),[]);
   assert.deepEqual(fewPictures(plan(Array.from({length:8},()=>'ranking/bar'))),[]);
+  // A cover photograph is one of the deck's pictures, and is not asked for once the deck has one.
+  assert.deepEqual(fewPictures(plan([...Array.from({length:23},()=>'ranking/bar'),'picture/picture-hero']),{cover:{image:{search:'A350F',alt:'An A350F'}}}),[]);
+  const covered=fewPictures(plan(Array.from({length:30},()=>'ranking/bar')),{cover:{image:{search:'A350F',alt:'An A350F'}}});
+  assert.match(covered[0].repair,/0 of 30 pages plan a picture, and the cover a photograph/);
+  assert.doesNotMatch(covered[0].repair,/deck\.cover\.image/);
 });
 
 const variedDeck=(pages)=>{
@@ -382,6 +387,13 @@ test('untreated tables vary their header, label column and rows page by page; a 
   assert.equal(new Set(varied).size,3,`three tables take three looks: ${varied}`);
   const written=variedDeck(['a','b','c'].map(id=>page(id,{treatment:'open'}))).map(chrome);
   assert.equal(new Set(written).size,1,`a written treatment keeps the house's chrome: ${written}`);
+  // A table cut across pages is one table: every part takes the first part's look.
+  const long=Array.from({length:48},(_,i)=>[`Carrier ${i+1}`,`A position held on ${i+2} routes, with slots at ${i%4+1} hubs and a fleet renewed from ${2027+i%5}`,'Holds its share']);
+  const cut=variedDeck([page('a'),page('b',{rows:long})]);
+  assert.ok(cut.length>=3,`the long table is cut across pages: ${cut.length} slides`);
+  const parts=cut.slice(1).map(chrome);
+  assert.equal(new Set(parts).size,1,`the parts share one look: ${parts}`);
+  assert.notEqual(parts[0],chrome(cut[0]),'the cut table still varies from the table before it');
 });
 
 test('a dated timeline over its commentary is staggered across the page, its points at the foot',()=>{

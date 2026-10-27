@@ -13,7 +13,7 @@ import { composedPlaces } from "./revision.mjs";
 import { styleTable, heavyTable, barScales, validateCategoryLabels, columnWeight } from "./compose-tables.mjs";
 import { DIAGRAM_TYPES } from "./compose-exhibits.mjs";
 import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withDesignLayout } from "./compose-body.mjs";
-import { pointsPerRow, resolveFill, pointBullets, bulletText, resolvePointsStyle } from "./compose-points.mjs";
+import { pointsPerRow, resolveFill, pointBullets, bulletText } from "./compose-points.mjs";
 import { imageProps, playerMarks, pictureCredits, sourcedPicture } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
@@ -134,7 +134,8 @@ export function paginateTable(slide, bodyScale = 1) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     const { highlightRow, ...rest } = ex;
-    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows,
+    // `_continued`: a part after the first takes the first part's look (compose-page.mjs tableLook).
+    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows, ...(i ? { _continued: true } : {}),
       ...(Object.keys(shared).length ? { scales: { ...shared, ...(rest.scales || {}) } } : {}),
       ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
     if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
@@ -407,16 +408,8 @@ function composeDeckWith(spec, baseDir) {
   const remember = (raw) => {
     const between = run?.between?.[sourceOf(raw)];
     if (!between || (raw.sourceSlideId && raw.id !== expanded.find((other) => sourceOf(other) === sourceOf(raw))?.id)) return;
-    for (const standIn of between) {
-      try {
-        const layout = chooseLayout(standIn, recent);
-        recent.unshift(layout);
-        // Its points' style too, so the next page varies its findings from it as it does in the deck composed whole.
-        if (standIn.points?.length) recentStyles.unshift(resolvePointsStyle(standIn, standIn.points, { recentStyles, layout }));
-      } catch { /* a stand-in no layout takes adds nothing to the memory */ }
-    }
+    for (const standIn of between) { try { recent.unshift(chooseLayout(standIn, recent)); } catch { /* a stand-in no layout takes adds nothing to the memory */ } }
     recent.splice(4);
-    recentStyles.splice(9);
   };
   const resolveReferences = value => {
     if (typeof value === "string") return value.replace(/\{\{page:([A-Za-z0-9_-]+)\}\}/g, (_, id) => {

@@ -172,7 +172,7 @@ export function exhibitItem(exIn, id, baseDir, size = SIZE) {
   }
   const typeStep = exIn?._typeStep === true && size.height === "fill";
   const ex = withStackTotals(tableAlias(exIn));
-  const { type, layout: _l, _typeStep: _t, _densityChosen: _d, ...rest } = ex;
+  const { type, layout: _l, _typeStep: _t, _densityChosen: _d, _continued: _c, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
   if (type === "cards" || type === "quadrants") {
     const { centre, ...sz } = size;

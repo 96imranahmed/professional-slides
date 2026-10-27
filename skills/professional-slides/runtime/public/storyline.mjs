@@ -225,14 +225,16 @@ export function shortPages(storyline) {
  * compared - is shown as well as measured, and the A350F deck planned one photograph in a hundred pages.
  */
 export const PAGES_PER_PICTURE = 15;
-export function fewPictures(storyline) {
+export function fewPictures(storyline, deck = {}) {
   const pages = storylinePages(storyline);
   if (pages.length < 12) return [];
   const pictured = pages.filter((page) => formOf(page.type).name === "picture" || page.picture || page.photo || page.pictures).length;
+  // The cover's photograph is one of the deck's pictures, set in the pages file's `deck` rather than a storyline page.
+  const cover = Boolean(deck?.cover?.image);
   const wanted = Math.max(1, Math.floor(pages.length / PAGES_PER_PICTURE));
-  if (pictured >= wanted) return [];
+  if (pictured + (cover ? 1 : 0) >= wanted) return [];
   return [{ code: "STORYLINE_PICTURES_FEW", severity: "advisory",
-    repair: `${pictured} of ${pages.length} pages plan a picture: where the subject can be seen, plan about ${wanted} - a \`picture\` page (picture-hero, picture-pair, picture-strip, photo-backdrop), a photograph beside a page's commentary (\`photo\`), a cover photograph (\`deck.cover.image\`), the players' logos in a table - each a \`{ search, alt }\` the build fetches` }];
+    repair: `${pictured} of ${pages.length} pages plan a picture${cover ? ", and the cover a photograph" : ""}: where the subject can be seen, plan about ${wanted} - a \`picture\` page (picture-hero, picture-pair, picture-strip, photo-backdrop), a photograph beside a page's commentary (\`photo\`)${cover ? "" : ", a cover photograph (`deck.cover.image`)"} - each a \`{ search, alt }\` the build fetches` }];
 }
 
 /**
@@ -314,7 +316,7 @@ export async function showStoryline(work, results) {
   const detail = path.join(path.dirname(work.file), "storyline.md");
   await fs.writeFile(detail, approvalDetail(work.doc.storyline));
   const message = `${approvalMessage(work.doc.storyline, work.doc.deck, writtenPages(work.doc))}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
-  const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline), ...fewPictures(work.doc.storyline)];
+  const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline), ...fewPictures(work.doc.storyline, work.doc.deck)];
   const approved = work.doc.storyline.approval?.hash === storylineHash(work.doc.storyline);
   return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: message, artifacts: [detail], ...(advisories.length ? { advisories } : {}) })
     : results.needed([{ kind: "storyline-approval", message,
