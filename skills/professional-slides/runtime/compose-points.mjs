@@ -330,22 +330,33 @@ function varyPoints(kind, drawn, recentStyles) {
  * points (`takes`, on its definition), and the engine chooses among those offered by how each reads in the room it
  * has (tasteful-layout), unless a judge chose for it (`choices`). It is a list of ways and not a rule per case: a new
  * way is a line here and a component that says what it takes.
+ *
+ * A way is offered only for points it draws whole. Each says what of a point it carries (`carries`, of `POINT_CONTENT`;
+ * the list ways draw all of it): a statement or a centred row that set a point's lead and text was offered a point with
+ * sub-points too, and won, and the sub-points were in neither output.
  */
+// What a point can say, by the field that says it (registry-text.mjs normalizeListItems): its lead and text, the
+// sub-points that develop it, an icon, a state (a box ticked or crossed) and a number its author gave it. Emphasis
+// (`highlight`) is how the words are set, not more words.
+const POINT_CONTENT = Object.freeze(["lead", "text", "points", "icon", "state", "number"]);
+const says = (point) => (typeof point === "string" ? ["text"]
+  : POINT_CONTENT.filter((key) => { const value = point?.[key]; return value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && !value.length); }));
 const POINT_WAYS = [
   { label: "list", component: "bullet-list", item: (points, { id, tone, fill, style }) => pointsItem(points, id, tone, fill, style) },
   { label: "blocks", component: "bullet-list", each: [2, 8], item: (points, { id, tone, fill, style }) => ({ id, layout: "flow.best", size: HUG, items: points.map((point, at) =>
     pointsItem([style === "numbered" && point?.number === undefined ? { ...(typeof point === "string" ? { text: point } : point), number: at + 1 } : point], `${id}-${at}`, tone, fill, style === "ruled" ? "prose" : style)) }) },
-  { label: "centred", component: "paragraph", each: [2, 4], item: (points, { id, highlight }) => {
+  { label: "centred", component: "paragraph", each: [2, 4], carries: ["lead", "text"], item: (points, { id, highlight }) => {
     // Centred text reads to about three lines: a block's floor is the width that sets it in three (a character averages half its size across), and the group's is its widest block's.
     const items = points.map((point, at) => { const { lead, text } = proseParts(point);
       return { ...paragraph(`${id}-${at}`, text, highlight, { align: "center", ...(lead ? { heading: lead } : {}) }), hints: { minWidth: Math.max(240, Math.ceil(text.length * LIST_BODY_PX * 0.5 / 3)) } }; });
     return { id, layout: "flow.best", size: HUG, items, hints: { minWidth: Math.max(...items.map((item) => item.hints.minWidth)) } }; } },
-  { label: "statement", component: "insight", item: ([point], { id, highlight }) => { const { lead, text } = proseParts(point);
+  { label: "statement", component: "insight", carries: ["lead", "text"], item: ([point], { id, highlight }) => { const { lead, text } = proseParts(point);
     return { id, component: "insight", props: { variant: "tonal", align: "center", text, ...(lead ? { heading: lead } : {}), ...(highlight === undefined ? {} : { highlight }) }, size: HUG }; } },
 ];
 export function pointWays(points, context, registry) {
   const within = ([least, most], count) => count >= least && count <= most;
-  return POINT_WAYS.filter((way) => within(way.each ?? registry.get(way.component).takes.points, points.length)).map((way) => ({ label: way.label, ...way.item(points, context) }));
+  const whole = (way) => points.every((point) => says(point).every((key) => (way.carries ?? POINT_CONTENT).includes(key)));
+  return POINT_WAYS.filter((way) => within(way.each ?? registry.get(way.component).takes.points, points.length) && whole(way)).map((way) => ({ label: way.label, ...way.item(points, context) }));
 }
 
 /** The points as a list, as tall as its content: the column it sits in places it, with whatever else it holds, as one group in the middle of it. */

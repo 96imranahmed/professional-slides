@@ -311,8 +311,10 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
     ...(result.html?.renderSkipped ? { message: result.html.renderSkipped } : {}),
     checks: { mechanical: (result.blockers || []).length ? "failed" : "passed", rendering: result.html?.render ? "ran" : "missing", visual: "pending" }, result: path.join(path.resolve(out), "build-result.json") });
   if (!result.pptxPath) return complete({ status: "blocked", findings: result.blockers || [], advisories, result: path.join(path.resolve(out), "build-result.json") });
-  // What this build wrote, not every file the folder holds: the deck, its PDF and the page images.
-  const files = [result.pptxPath, result.htmlPath, result.render?.pdf, ...(result.render?.renders ?? [])].filter(Boolean);
+  // What this build wrote, not every file the folder holds: the deck, its PDF and the page images - the HTML output's
+  // photographs too where both were built, as an HTML build returns them: they are what its gates read, and a caller
+  // given only the PowerPoint's images could not look at the HTML it is handed.
+  const files = [result.pptxPath, result.htmlPath, result.render?.pdf, ...(result.render?.renders ?? []), ...(result.html?.render?.renders ?? [])].filter(Boolean);
   const scene=await readJson(path.join(path.resolve(out),"scene.json"));
   const readback=await readJson(path.join(path.resolve(out),"readback.json"),{optional:true});
   const editability={schema:"professional-slides.editability/v1",scope:"composed pages",basis:"scene with saved-PPTX readback",
@@ -335,8 +337,11 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
     files.push(image);
   }
   const uncertainties = work.doc.pages.flatMap(p => (p.uncertainties || []).map(message => ({ page: p.id, message })));
+  // The findings are the build's blockers, the HTML output's gates among them where it was built (build-deck.mjs
+  // buildOutcome); a browser that could not photograph the HTML is said, as an HTML build says it.
+  const message = [status === "blocked" ? `The files were written for review, not for delivery: the build is blocked on ${(result.blockers || []).length} finding${(result.blockers || []).length === 1 ? "" : "s"}; fix them and build again.` : null, result.html?.renderSkipped].filter(Boolean).join(" ");
   return complete({ status, sourceHash: await fingerprint(work), artifacts: files, findings: result.blockers || [], advisories,
-    ...(status === "blocked" ? { message: `The files were written for review, not for delivery: the build is blocked on ${(result.blockers || []).length} finding${(result.blockers || []).length === 1 ? "" : "s"}; fix them and build again.` } : {}),
+    ...(message ? { message } : {}),
     checks: { mechanical: status === "complete" ? "passed" : "failed", rendering: result.status === "built-unrendered" ? "missing" : "ran", visual: "pending" },
     editability, uncertainties, result: path.join(path.resolve(out), "build-result.json") });
 }

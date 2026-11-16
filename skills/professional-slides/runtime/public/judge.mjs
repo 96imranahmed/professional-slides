@@ -14,6 +14,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { readJson, writeJsonWhole, pythonBin } from "../cli.mjs";
+import { partsOf, readPagesFile } from "../pages-file.mjs";
 import { runProcess } from "../process.mjs";
 import { deckHtml } from "../emit/emit_html.mjs";
 import { renderHtml } from "../emit/render_html.mjs";
@@ -35,37 +36,55 @@ const pageOf = (slide) => String(slide.sourceSlideId ?? slide.id);
 /** A page's first decision still open: one the engine made between two or more drawable candidates that no judge has settled. */
 const openDecision = (slide) => (slide.decisions || []).find((decision) => !decision.held && decision.candidates.length > 1);
 const drawn = (slide) => JSON.stringify(slide.nodes.map((node) => [node.type, node.role, node.frame, node.text, node.style?.align]));
+// The pages as the deck is built from them - every part a `{ include }` names spliced in, the appendix after the body -
+// and not the pages file as written: a page in a part, or in the appendix, is compiled and asked about like any other,
+// and a lookup in the raw file's `pages` alone found nothing for it and stopped the judge.
+const pagesOf = (doc) => [...(doc.pages ?? []), ...(doc.appendix ?? [])];
+const pageIn = (doc, id) => pagesOf(doc).find((page) => page && page.include === undefined && String(page.id) === String(id));
 
 /** `judge WORK --choices FILE`: record a judge's choices - `{ <page id>: { <decision id>: <candidate label> } }` - on their pages. */
 export async function recordChoices(work, file) {
   const chosen = await readJson(path.resolve(file));
-  const unknown = Object.keys(chosen).filter((id) => !work.doc.pages.some((page) => String(page.id) === id));
-  if (unknown.length) throw new Error(`No page ${unknown.join(", ")} in ${work.file}`);
-  const next = structuredClone(work.doc);
-  for (const page of next.pages) if (chosen[String(page.id)]) page.choices = { ...page.choices, ...chosen[String(page.id)] };
-  await writeJsonWhole(work.file, next);
+  const source = await readPagesFile(work.file);
+  const unknown = Object.keys(chosen).filter((id) => !pageIn(source, id));
+  if (unknown.length) throw new Error(`No page ${unknown.join(", ")} in ${work.file} or the parts it includes`);
+  // A choice is written on its page in the file that holds it: the pages file, or the part the page was included from.
+  // The includes stay as they are written, so the parts a worker owns stay theirs and the pages file is not flattened.
+  const parts = partsOf(source), owners = new Map();
+  for (const id of Object.keys(chosen)) {
+    const owner = parts.has(id) ? path.join(path.dirname(work.file), parts.get(id)) : work.file;
+    owners.set(owner, [...(owners.get(owner) ?? []), id]);
+  }
+  for (const [owner, ids] of owners) {
+    // A part is { pages } or the bare list; the pages file holds the body's pages and the appendix.
+    const written = await readJson(owner);
+    const doc = Array.isArray(written) ? { pages: written } : written;
+    for (const id of ids) { const page = pageIn(doc, id); page.choices = { ...page.choices, ...chosen[id] }; }
+    await writeJsonWhole(owner, Array.isArray(written) ? doc.pages : doc);
+  }
   // Each choice is a verdict: the candidate preferred, and the measures of every candidate it was preferred over. They are
   // what the engine's weights are checked and fitted against (evals/taste).
   const round = await readJson(path.join(work.root, "judgement", "round.json"), { optional: true }) ?? [];
   const verdicts = round.filter((asked) => chosen[asked.page]?.[asked.decision]).map((asked) => JSON.stringify({ ...asked, chosen: chosen[asked.page][asked.decision] }));
   if (verdicts.length) await fs.appendFile(path.join(work.root, "judgement", "verdicts.jsonl"), `${verdicts.join("\n")}\n`);
-  return complete({ artifacts: [work.file], message: `Recorded on ${Object.keys(chosen).join(", ")}. Run judge again: a choice can open another inside it. When none is open, build.` });
+  return complete({ artifacts: [...owners.keys()], message: `Recorded on ${Object.keys(chosen).join(", ")}. Run judge again: a choice can open another inside it. When none is open, build.` });
 }
 
 /** `judge WORK --out OUT`: draw each page's open decision as its candidates and ask which stands. */
 export async function judgeWorkspace(work, out) {
   const compiled = await compileWorkspace(work);
   if (compiled.held) return compiled.held;
+  const { source } = compiled;
   // A recorded choice the page no longer honours - the flow it names is gone, or its candidate cannot be drawn any more -
   // is said, not kept silently: the page is drawn the engine's way meanwhile, and the choice is the author's to remove.
-  const stale = work.doc.pages.flatMap((page) => Object.entries(page.choices ?? {}).filter(([id, label]) =>
+  const stale = pagesOf(source).flatMap((page) => Object.entries(page.choices ?? {}).filter(([id, label]) =>
     !compiled.authored.deck.slides.some((slide) => pageOf(slide) === String(page.id) && (slide.decisions || []).some((decision) => decision.id === id && decision.held && decision.chosen === label)))
     .map(([decision, label]) => ({ page: String(page.id), decision, label })));
   const staleNote = stale.length ? { stale, staleMessage: `${stale.length} recorded choice${stale.length === 1 ? " is" : "s are"} no longer honoured (${stale.map((entry) => `${entry.page}: ${entry.decision}`).join("; ")}): the page changed under ${stale.length === 1 ? "it" : "them"}. Remove ${stale.length === 1 ? "it" : "them"} from the page's \`choices\` and judge again.` } : {};
   const asked = [];
   for (const slide of compiled.authored.deck.slides) {
     const decision = openDecision(slide);
-    const settled = Object.keys(work.doc.pages.find((page) => String(page.id) === pageOf(slide))?.choices ?? {}).length;
+    const settled = Object.keys(pageIn(source, pageOf(slide))?.choices ?? {}).length;
     if (decision && settled < ROUNDS && !asked.some((entry) => entry.page === pageOf(slide))) asked.push({ page: pageOf(slide), decision, candidates: [{ ...decision.candidates[0], slide }] });
   }
   if (!asked.length) return complete({ stage: "judge", ...staleNote, message: "No layout decision is left open: every arrangement the engine chose between has a judge's recorded choice, or the page has had its rounds. Build." });
@@ -73,8 +92,8 @@ export async function judgeWorkspace(work, out) {
   for (let nth = 1; nth < SHOWN; nth += 1) {
     const holding = asked.filter((entry) => entry.decision.candidates[nth]);
     if (!holding.length) break;
-    const doc = structuredClone(work.doc);
-    for (const entry of holding) { const page = doc.pages.find((p) => String(p.id) === entry.page); page.choices = { ...page.choices, [entry.decision.id]: entry.decision.candidates[nth].label }; }
+    const doc = structuredClone(source);
+    for (const entry of holding) { const page = pageIn(doc, entry.page); page.choices = { ...page.choices, [entry.decision.id]: entry.decision.candidates[nth].label }; }
     const variant = await compileWorkspace(work, { doc });
     for (const entry of holding) {
       const slide = variant.authored?.deck.slides.find((s) => pageOf(s) === entry.page && (s.decisions || []).some((d) => d.id === entry.decision.id && d.held));
@@ -96,7 +115,7 @@ export async function judgeWorkspace(work, out) {
     if (render.renders) {
       sheet = path.join(directory, `${entry.page}.png`);
       const layout = path.join(directory, `${entry.page}.sheet.json`);
-      await writeJsonWhole(layout, { out: sheet, title: String(work.doc.pages.find((page) => String(page.id) === entry.page)?.title ?? entry.page), subtitle: `${entry.decision.id}: the same content, set ${candidates.length} ways`, header: false,
+      await writeJsonWhole(layout, { out: sheet, title: String(pageIn(source, entry.page)?.title ?? entry.page), subtitle: `${entry.decision.id}: the same content, set ${candidates.length} ways`, header: false,
         tiles: candidates.map((candidate, nth) => ({ label: `${nth + 1}. ${candidate.label}`, note: nth ? `score ${candidate.score}` : `score ${candidate.score} (the engine's choice)`, images: [{ path: candidate.image }] })) });
       await runProcess(pythonBin(), [path.join(runtime, "emit/contact_sheet.py"), layout]);
     }
@@ -105,7 +124,7 @@ export async function judgeWorkspace(work, out) {
   }
   // What was asked, kept beside the workspace: a recorded choice is filed with the measures it was chosen over (verdicts.jsonl).
   await fs.mkdir(path.join(work.root, "judgement"), { recursive: true });
-  await writeJsonWhole(path.join(work.root, "judgement", "round.json"), requiredInputs.map(({ page, decision, candidates }) => ({ page, decision, density: work.doc.pages.find((p) => String(p.id) === page)?.density ?? work.doc.deck?.density ?? "executive", candidates: candidates.map(({ label, score, measures }) => ({ label, score, measures })) })));
+  await writeJsonWhole(path.join(work.root, "judgement", "round.json"), requiredInputs.map(({ page, decision, candidates }) => ({ page, decision, density: pageIn(source, page)?.density ?? source.deck?.density ?? "executive", candidates: candidates.map(({ label, score, measures }) => ({ label, score, measures })) })));
   return needed(requiredInputs, { stage: "judge", ...staleNote, rubric: RUBRIC, artifacts: requiredInputs.map((input) => input.sheet).filter(Boolean),
     ...(render.skipped ? { message: `${render.skipped} The candidates are listed with their measures only.` } : {}),
     record: `Write { "<page id>": { "<decision id>": "<candidate label>" } } for every page judged to a file, then: judge WORK --choices FILE. Then run judge again until it reports nothing open.` });

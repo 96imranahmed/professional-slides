@@ -125,6 +125,12 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const pptx = formats.includes("pptx"), html = formats.includes("html");
   const started = Date.now();
   const spec = source ? structuredClone(source.spec) : await readJson(specPath);
+  // Carried slides are the source deck's own PowerPoint parts, set into the assembled PowerPoint as they are; the HTML
+  // output draws only the composed pages. Beside carried slides it would be part of the deck standing for all of it -
+  // with `both` it was written, without a word, short of every carried slide - so any request that includes HTML is
+  // refused here, before anything is fetched or written.
+  const carried = carriedCount(spec);
+  if (carried && html) throw new UsageError(`This revision carries ${carried} slide${carried === 1 ? "" : "s"} from the PowerPoint the user supplied, which HTML cannot draw: an HTML output would leave ${carried === 1 ? "it" : "them"} out and still read as the deck. Build it with --format pptx`);
   const stem = deckStem(spec);
   const baseDir = source?.baseDir ?? path.dirname(path.resolve(specPath));
   // A deck.json stands for its pages as they were when it was compiled. One whose pages file or parts changed since is
@@ -173,7 +179,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // A revision that carries slides composes only the pages it gave a type: those are emitted and gated as a deck of their
   // own, and the deck the user receives is assembled from the source deck around them. A revision that composes no page
   // at all - text edits on carried slides, a slide dropped - has nothing to emit or gate, and is assembled alone.
-  const carries = carriedCount(spec) > 0, composes = deck.slides.length > 0;
+  const carries = carried > 0, composes = deck.slides.length > 0;
   if (composes) {
     const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, stem, directory, py, result, deck, scenePath, composedOnly: carries, pptx });
     if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
@@ -182,8 +188,7 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       pptx ? readBackAndRender({ render, spec, directory, py, result, deck, scenePath, gates, pptxPath, emitted, design }) : null,
       html ? emitAndRenderHtml({ render, spec, stem, directory, py, timed, result, deck, scenePath, gates, design }) : null);
   } else if (preflight) { result.preflight = { passed: true, findings: [] }; result.status = "preflight-passed"; return finish(result, directory, started); }
-  // Carried slides are the source deck's own PowerPoint parts: a revision that carries any is assembled as PowerPoint.
-  if (carries && !pptx) throw new UsageError("This deck carries slides from a PowerPoint the user supplied, which only a PowerPoint build can hold: build it with the pptx format");
+  // A revision that carries slides is assembled as PowerPoint (an HTML output was refused above).
   if (carries && !only) await assembleRevision({ spec, stem, baseDir, directory, py, result, deck, render });
   Object.assign(result, buildOutcome(result, { render, pptx }));
   return finish(result, directory, started);

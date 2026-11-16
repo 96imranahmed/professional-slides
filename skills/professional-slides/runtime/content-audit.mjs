@@ -68,6 +68,9 @@ export function auditContent(spec, scene) {
       if (typeof value === "string") prose.push(value);
       else if (value && typeof value === "object") {
         for (const key of ["lead", "heading", "label", "text"]) if (value[key]) prose.push(value[key]);
+        // A point's sub-points are authored words too: a way of setting the point that drew its lead and text and
+        // dropped them passed this audit, so they are looked for as the point's own words are.
+        if (Array.isArray(value.points)) value.points.forEach(collect);
       }
     };
     for (const value of [...(slide.points || []), ...(slide.paragraphs || []), ...(slide.insights || []), ...(slide.pictures || [])]) collect(value);
