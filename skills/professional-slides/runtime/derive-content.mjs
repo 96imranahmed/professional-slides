@@ -76,8 +76,17 @@ export function planRole(role) {
 export function deriveContent(spec, deck) {
   const records = [];
   const pages = [...(spec.cover ? [{ ...spec.cover, id: "cover", kind: "cover" }] : []), ...(spec.slides || []), ...(spec.appendix || [])];
-  pages.forEach((page, index) => {
-    const scene = deck.slides.filter((s) => s.id === page.id || s.sourceSlideId === page.id);
+  // A page written without an id is the slide that carries its title: matched by an absent id, every slide with no
+  // source page of its own answered to it, and each page's plan was the whole deck's text.
+  const title = (text) => String(text ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().replace(/\s*\(\d+\/\d+\)$/, "");
+  const titled = (slide, page) => (slide.nodes || []).some((node) => /-title$/.test(node.role) && title(node.data?.textLayout?.source ?? node.text) === title(page.title));
+  pages.forEach((pageIn, index) => {
+    const matched = deck.slides.filter((s) => (pageIn.id === undefined ? titled(s, pageIn) : s.id === pageIn.id || s.sourceSlideId === pageIn.id));
+    // A page with no id that the composer set on several slides is a record a slide: each slide answers for its own text.
+    for (const scene of pageIn.id === undefined && matched.length > 1 ? matched.map((slide) => [slide]) : [matched]) record(pageIn, index, scene);
+  });
+  function record(pageIn, index, scene) {
+    const page = pageIn.id === undefined && scene.length ? { ...pageIn, id: scene[0].sourceSlideId ?? scene[0].id } : pageIn;
     const blocks = [];
     for (const slide of scene) {
       for (const node of slide.nodes || []) {
@@ -89,6 +98,6 @@ export function deriveContent(spec, deck) {
       }
     }
     records.push({ id: page.id, n: index + 1, ...(page.kind ? { kind: page.kind } : {}), textPlan: blocks });
-  });
+  }
   return { schema: "professional-slides.content/v1", id: spec.id, textContract: "complete", derivedFrom: "pages", pages: records };
 }

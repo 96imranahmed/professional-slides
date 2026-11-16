@@ -84,7 +84,7 @@ function matrixNodes({ id, frame, props }) {
 
 function defineMatrix() {
   return component({
-    id: "matrix",
+    id: "matrix", sizing: "fill",
     category: "relationship",
     role: "matrix",
     tokens: [
@@ -105,7 +105,7 @@ function defineMatrix() {
 
 function defineMap() {
   return component({
-    id: "map",
+    id: "map", sizing: "fill",
     category: "relationship",
     role: "map",
     tokens: MAP_TOKENS,
@@ -124,7 +124,7 @@ function defineMap() {
 
 function defineFunnel() {
   return component({
-    id: "funnel",
+    id: "funnel", sizing: "fill",
     category: "relationship",
     role: "funnel",
     tokens: [

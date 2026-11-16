@@ -1,10 +1,10 @@
-// Seventeen figure families that well-made decks use and the skill could not
-// otherwise draw.
+// The figure families that well-made decks use and the skill could not
+// otherwise draw (RENDER, at the foot, lists them).
 //
 // These are diagram and statistic styles no other component draws: a column of large statistics, a
 // flowchart, spectrum sliders, a layer stack, items placed into category
 // columns, a rank table across periods, a two-sided flow, an icon array, rows
-// carried by arrows and a row of capsule pillars. Each is drawn from the
+// carried by arrows, rows led by an icon tile and a row of capsule pillars. Each is drawn from the
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
@@ -27,8 +27,8 @@ const v = (id) => tokenValue(token(id));
 
 export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
   "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary", "color.chartSeries1",
-  "color.rule", "color.surfaceMuted", "color.surfaceTint", "color.band", "font.body", "font.display", "type.metric", "type.heading", "type.body",
-  "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6",
+  "color.rule", "color.surface", "color.surfaceMuted", "color.surfaceTint", "color.band", "font.body", "font.display", "type.metric", "type.heading", "type.body",
+  "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6", "space.8", "space.loose", "icon.medium",
   "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const style = (size, color = INK, bold = false, align = "left", font = FONT, valign = "top") =>
@@ -42,6 +42,17 @@ const between = (items, lo, hi, what) => {
 };
 const line = (id, role, x1, y1, x2, y2, stroke = RULE, width = "line.hairline", data = {}) =>
   linePrimitive({ id, role, x1, y1, x2, y2, style: { stroke, lineWidth: token(width) }, data });
+
+// A list of rows uses spare height to open its gaps evenly, as far as the page's loosest gap (`space.loose`), and is drawn
+// from the top of its frame. It does not centre itself in a frame taller than that: centred there, the rows floated in
+// the middle of their panel while the panel's heading stayed at the top, a band of air between the two. The list says
+// how much height it uses instead (`listCeiling`, its `measureCeiling`), and the engine sizes the frame to it and sets
+// the list in the free height as one group with whatever heads it (core.mjs `ceilingOf`).
+const openedGap = (gap, room, rows) => (rows > 1 ? gap + Math.max(0, Math.min(room / (rows - 1), v("space.loose") - gap)) : 0);
+const listCeiling = (layout, rowsOf = (L) => L.rows.length) => (frame, props) => {
+  const L = layout(frame, props);
+  return L.height + Math.max(0, rowsOf(L) - 1) * Math.max(0, v("space.loose") - L.gap);
+};
 
 /* --------------------------------------------------------------- stat-list */
 
@@ -87,14 +98,11 @@ export function statListNodes({ id, frame, props }) {
   const nodes = [];
   if (dark) nodes.push(fillRect(stableId(id, "panel"), "stat-panel", frame, PRIMARY));
   const pad = v("space.3");
-  // Spare height widens the gaps up to half as much again, then the list centres.
   for (let c = 0; c < L.columns; c++) {
     const rows = L.rows.slice(c * L.perColumn, (c + 1) * L.perColumn);
     const natural = rows.reduce((sum, r) => sum + r.height, 0);
-    const room = frame.height - 2 * pad - natural;
-    const gap = rows.length > 1 ? Math.min(Math.max(L.gap, room / (rows.length - 1)), L.gap * 2.2) : 0;
-    const used = natural + gap * (rows.length - 1);
-    let y = frame.y + pad + Math.max(0, (frame.height - 2 * pad - used) / 2);
+    const gap = openedGap(L.gap, frame.height - 2 * pad - natural - L.gap * (rows.length - 1), rows.length);
+    let y = frame.y + pad;
     const x = frame.x + L.inset + c * (L.colWidth + L.colGap);
     rows.forEach((r, i) => {
       const rid = stableId(id, "stat", c * L.perColumn + i);
@@ -180,7 +188,7 @@ export function flowLayout(frame, props) {
   columns.forEach((col, c) => {
     const measured = col.map(({ node }) => {
       const title = measure(node.label, inner, "type.body", true);
-      const body = node.text ? measure(node.text, inner, "type.compact") : null;
+      const body = node.text ? measure(node.text, inner, "type.body") : null;
       if (title.lines.length > 3) throw new Error(`Flow step "${node.label}" is too long to label; shorten it`);
       return { node, title, body, height: title.height + (body ? v("space.1") + body.height : 0) + 2 * v("space.3") };
     });
@@ -270,7 +278,7 @@ export function flowNodes({ id, frame, props }) {
       // The copy centres in a step that grew.
       const top = y + v("space.3") + (h - m.height) / 2;
       out.push(label(stableId(id, "label", m.node.id), "flow-step-label", { x: x + v("space.3"), y: top, width: L.inner }, m.title, style("type.body", ink, true, "center")));
-      if (m.body) out.push(label(stableId(id, "text", m.node.id), "flow-step-text", { x: x + v("space.3"), y: top + m.title.height + v("space.1"), width: L.inner }, m.body, style("type.compact", ink, false, "center")));
+      if (m.body) out.push(label(stableId(id, "text", m.node.id), "flow-step-text", { x: x + v("space.3"), y: top + m.title.height + v("space.1"), width: L.inner }, m.body, style("type.body", ink, false, "center")));
       y += h + L.gap;
     }
   });
@@ -368,7 +376,7 @@ export function spectrumLayout(frame, props) {
   const quoteWidth = (frame.width - v("space.5")) / 2;
   const rows = items.map((item, i) => {
     const left = measure(item.left, poleWidth, "type.body", true), right = item.right ? measure(item.right, poleWidth, "type.body", true) : null;
-    const text = item.text ? measure(item.text, trackWidth, "type.compact") : null;
+    const text = item.text ? measure(item.text, trackWidth, "type.body") : null;
     const quotes = item.quotes && Object.fromEntries(["left", "right"].map((side) => [side, item.quotes[side] ? measure(item.quotes[side], quoteWidth, "type.compact") : null]));
     for (const side of ["left", "right"]) if (quotes?.[side] && quotes[side].lines.length > QUOTE_LINES)
       throw new Error(`Spectrum row ${i + 1}'s ${side} quote runs to ${quotes[side].lines.length} lines in its half of the row; a pole's voice is ${QUOTE_LINES} lines at most - cut it to the words that make the pole`);
@@ -388,10 +396,8 @@ export function spectrumNodes({ id, frame, props }) {
   const L = spectrumLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The spectrum needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a row or its note`);
   const out = [];
-  const room = frame.height - L.height;
-  const gap = L.rows.length > 1 ? L.gap + Math.min(room / (L.rows.length - 1), L.gap * 2) : 0;
-  const used = L.header + L.rows.reduce((s, r) => s + r.height, 0) + gap * (L.rows.length - 1);
-  let y = frame.y + Math.max(0, (frame.height - used) / 2);
+  const gap = openedGap(L.gap, frame.height - L.height, L.rows.length);
+  let y = frame.y;
   const trackX = frame.x + L.poleWidth + v("space.4");
   const segX = (k) => trackX + k * (L.segWidth + L.segGap);
   if (L.scale) L.scale.forEach((m, k) => out.push(label(stableId(id, "scale", k), "spectrum-scale", { x: segX(k), y: y + L.header - v("space.2") - m.height, width: L.segWidth }, m, style("type.label", SECONDARY, false, "center"))));
@@ -420,7 +426,7 @@ export function spectrumNodes({ id, frame, props }) {
     }
     if (L.segments) {
       for (let k = 0; k < L.segments; k++) out.push(fillRect(stableId(rid, "segment", k), k === r.item.level - 1 ? "spectrum-level" : "spectrum-segment", { x: segX(k), y: mid - 7, width: L.segWidth, height: 14 }, k === r.item.level - 1 ? ACCENT : MUTED, { data: { level: k + 1, selected: k === r.item.level - 1 } }));
-      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "left")));
+      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.body", SECONDARY, false, "left")));
       y += r.height + gap;
       return;
     }
@@ -431,14 +437,14 @@ export function spectrumNodes({ id, frame, props }) {
         const value = r.item.values[k];
         out.push(ellipsePrimitive({ id: stableId(rid, "marker", props.markers[k].id), role: "spectrum-marker", frame: { x: trackX + L.trackWidth * value - dot / 2, y: mid - dot / 2, width: dot, height: dot }, style: { fill: MARKER_FILLS[k], stroke: WHITE, lineWidth: token("line.standard") }, data: { value, marker: props.markers[k].id } }));
       });
-      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "center")));
+      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.body", SECONDARY, false, "center")));
       y += r.height + gap;
       return;
     }
     out.push(fillRect(stableId(rid, "track"), "spectrum-track", { x: trackX, y: mid - 3, width: L.trackWidth, height: 6 }, MUTED, { radius: "radius.round" }));
     out.push(fillRect(stableId(rid, "fill"), "spectrum-fill", { x: trackX, y: mid - 3, width: L.trackWidth * r.item.value, height: 6 }, TINT, { radius: "radius.round" }));
     out.push(ellipsePrimitive({ id: stableId(rid, "marker"), role: "spectrum-marker", frame: { x: trackX + L.trackWidth * r.item.value - dot / 2, y: mid - dot / 2, width: dot, height: dot }, style: { fill: ACCENT, stroke: WHITE, lineWidth: token("line.standard") }, data: { value: r.item.value } }));
-    if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "center")));
+    if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.body", SECONDARY, false, "center")));
     y += r.height + gap;
   });
   return out;
@@ -456,36 +462,50 @@ function normalizeLayers(props) {
   });
 }
 
+// Each band is inset a little more than the one below it, so the stack reads as resting on its base rather than as a
+// table of rows.
+const LAYER_STEP = 10;
+
 export function layersLayout(frame, props) {
   const layers = normalizeLayers(props);
   const labelWidth = Math.min(260, frame.width * 0.28), pad = v("space.4");
-  const textWidth = frame.width - labelWidth - 3 * pad;
-  const rows = layers.map((layer) => {
+  // A layer's text is wrapped to the width its OWN band leaves beside the label. It was wrapped once, to the base
+  // band's width, and drawn in every band: in the narrower bands above the base the ends of the lines ran past the
+  // band's edge, white type on the white page, and read as cut off ("...the sky stays stub").
+  const rows = layers.map((layer, i) => {
+    const inset = (layers.length - 1 - i) * LAYER_STEP;
+    const textWidth = frame.width - 2 * inset - labelWidth - 3 * pad;
     const title = measure(layer.label, labelWidth, "type.body", true);
-    const text = layer.text ? measure(layer.text, textWidth, "type.body") : null;
-    return { layer, title, text, height: Math.max(title.height, text ? text.height : 0) + 2 * v("space.3") };
+    let text = null;
+    if (layer.text) {
+      try { text = measure(layer.text, textWidth, "type.body"); } catch (error) {
+        throw new Error(`The layer "${layer.label}" leaves ${Math.max(0, Math.floor(textWidth))}px for its text beside a ${Math.floor(labelWidth)}px label, and the text does not set in it: ${error.message}. Give the stack more width (commentary below it, not beside), or shorten that layer's text`);
+      }
+    }
+    return { layer, title, text, inset, textWidth, height: Math.max(title.height, text ? text.height : 0) + 2 * v("space.3") };
   });
   const gap = v("space.1");
-  return { rows, labelWidth, textWidth, pad, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+  return { rows, labelWidth, pad, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
 }
 
 export function layersNodes({ id, frame, props }) {
   const L = layersLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The layer stack needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; shorten the descriptions`);
+  if (L.height > frame.height + 0.01) {
+    // Name the layer to cut: the one whose text runs to the most lines in the width its band leaves.
+    const longest = L.rows.reduce((a, r) => ((r.text?.lines.length ?? 0) > (a.text?.lines.length ?? 0) ? r : a));
+    throw new Error(`The layer stack needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px, ${Math.ceil(L.height - frame.height)}px too many${longest.text ? `: "${longest.layer.label}" runs to ${longest.text.lines.length} lines in the ${Math.floor(longest.textWidth)}px its layer leaves for text` : ""}; shorten the descriptions, or give the stack more width`);
+  }
   const stretch = Math.min(1.5, frame.height / L.height);
   const out = [];
   let y = frame.y + (frame.height - L.height * stretch) / 2;
   const tones = [ACCENT, PRIMARY];
   L.rows.forEach((r, i) => {
     const h = r.height * stretch, rid = stableId(id, "layer", i);
-    // Each band is inset a little more than the one below it, so the stack
-    // reads as resting on its base rather than as a table of rows.
-    const inset = (L.rows.length - 1 - i) * 10;
-    const band = { x: frame.x + inset, y, width: frame.width - 2 * inset, height: h };
+    const band = { x: frame.x + r.inset, y, width: frame.width - 2 * r.inset, height: h };
     const fill = i === 0 ? tones[0] : tones[1];
     out.push(fillRect(stableId(rid, "band"), "layer-band", band, fill, { radius: "radius.small" }));
     out.push(label(stableId(rid, "label"), "layer-label", { x: band.x + L.pad, y: y + (h - r.title.height) / 2, width: L.labelWidth }, r.title, style("type.body", WHITE, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "layer-text", { x: band.x + L.pad * 2 + L.labelWidth, y: y + (h - r.text.height) / 2, width: Math.min(L.textWidth, band.width - L.labelWidth - 3 * L.pad) }, r.text, style("type.body", WHITE)));
+    if (r.text) out.push(label(stableId(rid, "text"), "layer-text", { x: band.x + L.pad * 2 + L.labelWidth, y: y + (h - r.text.height) / 2, width: r.textWidth }, r.text, style("type.body", WHITE)));
     y += h + L.gap;
   });
   return out;
@@ -514,7 +534,7 @@ export function placementLayout(frame, props) {
   const { columns, items } = normalizePlacement(props);
   const gap = v("space.4"), width = (frame.width - gap * (columns.length - 1)) / columns.length;
   const inner = width - 2 * v("space.3");
-  const heads = columns.map((c) => ({ title: measure(c.label, inner - (c.icon ? 32 : 0), "type.body", true), text: c.text ? measure(c.text, inner, "type.compact") : null }));
+  const heads = columns.map((c) => ({ title: measure(c.label, inner - (c.icon ? 32 : 0), "type.body", true), text: c.text ? measure(c.text, inner, "type.body") : null }));
   const headHeight = Math.max(...heads.map((h) => h.title.height + (h.text ? v("space.1") + h.text.height : 0))) + 2 * v("space.3");
   const pills = items.map((item) => ({ item, m: measure(item.label, inner, "type.compact", item.highlight) }));
   const pillGap = v("space.2");
@@ -544,7 +564,7 @@ export function placementNodes({ id, frame, props }) {
     let hx = x + v("space.3");
     if (col.icon) { out.push(...iconMarker({ id: stableId(cid, "icon"), role: "placement-icon", x: hx, y: frame.y + v("space.3"), size: 24, icon: col.icon, tone: "inverse" })); hx += 32; }
     out.push(label(stableId(cid, "label"), "placement-label", { x: hx, y: frame.y + v("space.3"), width: L.inner - (col.icon ? 32 : 0) }, head.title, style("type.body", WHITE, true)));
-    if (head.text) out.push(label(stableId(cid, "text"), "placement-text", { x: x + v("space.3"), y: frame.y + v("space.3") + head.title.height + v("space.1"), width: L.inner }, head.text, style("type.compact", WHITE)));
+    if (head.text) out.push(label(stableId(cid, "text"), "placement-text", { x: x + v("space.3"), y: frame.y + v("space.3") + head.title.height + v("space.1"), width: L.inner }, head.text, style("type.body", WHITE)));
     out.push(fillRect(stableId(cid, "well"), "placement-well", { x, y: frame.y + L.headHeight, width: L.width, height: frame.height - L.headHeight }, MUTED));
     let y = frame.y + L.headHeight + v("space.3");
     L.stacks[c].forEach((p, i) => {
@@ -583,7 +603,7 @@ export function nestedLayout(frame, props) {
   if (diameter < 160) throw new Error("Nested circles need more room; widen the frame");
   const largest = items[0].value;
   const circles = items.map((item) => ({ item, d: diameter * Math.sqrt(item.value / largest),
-    figure: measure(item.display, labelWidth, "type.heading", true), name: measure(item.label, labelWidth, "type.body", true), text: item.text ? measure(item.text, labelWidth, "type.compact") : null }));
+    figure: measure(item.display, labelWidth, "type.heading", true), name: measure(item.label, labelWidth, "type.body", true), text: item.text ? measure(item.text, labelWidth, "type.body") : null }));
   return { items, circles, diameter, labelWidth, gap, height: diameter };
 }
 
@@ -603,7 +623,7 @@ export function nestedNodes({ id, frame, props }) {
     out.push(line(stableId(id, "leader", i), "nested-leader", cx, top, lx - v("space.2"), y + c.figure.height / 2, SECONDARY));
     out.push(label(stableId(id, "figure", i), "nested-figure", { x: lx, y, width: L.labelWidth }, c.figure, style("type.heading", i === L.circles.length - 1 ? ACCENT : INK, true)));
     out.push(label(stableId(id, "name", i), "nested-label", { x: lx, y: y + c.figure.height, width: L.labelWidth }, c.name, style("type.body", INK, true)));
-    if (c.text) out.push(label(stableId(id, "text", i), "nested-text", { x: lx, y: y + c.figure.height + c.name.height + v("space.1"), width: L.labelWidth }, c.text, style("type.compact", SECONDARY)));
+    if (c.text) out.push(label(stableId(id, "text", i), "nested-text", { x: lx, y: y + c.figure.height + c.name.height + v("space.1"), width: L.labelWidth }, c.text, style("type.body", SECONDARY)));
     floor = y + block + v("space.3");
   });
   if (floor > frame.y + frame.height + 0.01) throw new Error(`The circles' labels need ${Math.ceil(floor - frame.y)}px and have ${Math.floor(frame.height)}px; shorten their lines`);
@@ -660,10 +680,10 @@ export function vennNodes({ id, frame, props }) {
   L.sets.forEach((set, i) => {
     const [x, y] = centres[i], dx = x - middle[0], dy = y - middle[1], len = Math.hypot(dx, dy) || 1;
     const px = x + (dx / len) * r * 0.45, py = y + (dy / len) * r * 0.45;
-    const name = measure(set.label, width, "type.heading", true), text = set.text ? measure(set.text, width, "type.compact") : null;
+    const name = measure(set.label, width, "type.heading", true), text = set.text ? measure(set.text, width, "type.body") : null;
     const block = name.height + (text ? v("space.1") + text.height : 0);
     out.push(label(stableId(id, "set-label", set.id), "venn-label", { x: px - width / 2, y: py - block / 2, width }, name, style("type.heading", INK, true, "center")));
-    if (text) out.push(label(stableId(id, "set-text", set.id), "venn-text", { x: px - width / 2, y: py - block / 2 + name.height + v("space.1"), width }, text, style("type.compact", SECONDARY, false, "center")));
+    if (text) out.push(label(stableId(id, "set-text", set.id), "venn-text", { x: px - width / 2, y: py - block / 2 + name.height + v("space.1"), width }, text, style("type.body", SECONDARY, false, "center")));
   });
   // Each overlap's name at the middle of the sets it joins - a pair's of three
   // pushed out of the third circle, into the part only the pair shares.
@@ -841,21 +861,22 @@ export function pictogramLayout(frame, props) {
   const size = Math.min(48, (iconArea - (P.of - 1) * 6) / P.of);
   if (size < 12) throw new Error("A pictogram is too narrow for its figures; widen it");
   const rows = P.rows.map((row) => {
-    const title = measure(row.label, labelWidth, "type.body", true), text = row.text ? measure(row.text, labelWidth, "type.compact") : null;
+    const title = measure(row.label, labelWidth, "type.body", true), text = row.text ? measure(row.text, labelWidth, "type.body") : null;
     return { row, title, text, height: Math.max(size, title.height + (text ? v("space.1") + text.height : 0)) };
   });
-  return { ...P, rows, size, labelWidth, iconArea, height: rows.reduce((s, r) => s + r.height, 0) + v("space.5") * (rows.length - 1) };
+  const gap = v("space.5");
+  return { ...P, rows, size, labelWidth, iconArea, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
 }
 
 export function pictogramNodes({ id, frame, props }) {
   const L = pictogramLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The pictogram needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop a row or give it more height`);
-  const out = [], gap = v("space.5") + Math.min(v("space.5"), (frame.height - L.height) / Math.max(1, L.rows.length - 1));
-  let y = frame.y + Math.max(0, (frame.height - L.height - (gap - v("space.5")) * (L.rows.length - 1)) / 2);
+  const out = [], gap = openedGap(L.gap, frame.height - L.height, L.rows.length);
+  let y = frame.y;
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i);
     out.push(label(stableId(rid, "label"), "pictogram-label", { x: frame.x, y, width: L.labelWidth }, r.title, style("type.body", INK, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "pictogram-text", { x: frame.x, y: y + r.title.height + v("space.1"), width: L.labelWidth }, r.text, style("type.compact", SECONDARY)));
+    if (r.text) out.push(label(stableId(rid, "text"), "pictogram-text", { x: frame.x, y: y + r.title.height + v("space.1"), width: L.labelWidth }, r.text, style("type.body", SECONDARY)));
     const x0 = frame.x + L.labelWidth + v("space.5"), iy = y + (r.height - L.size) / 2;
     for (let k = 0; k < L.of; k++) {
       const filled = k < Math.round(r.row.value);
@@ -893,17 +914,147 @@ export function arrowRowsLayout(frame, props) {
 export function arrowRowsNodes({ id, frame, props }) {
   const L = arrowRowsLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The arrow rows need ${Math.ceil(L.height)}px and have ${Math.floor(frame.height)}px; drop a row or shorten the labels`);
-  const out = [], room = frame.height - L.height, gap = L.gap + Math.min(room / Math.max(1, L.rows.length - 1), L.gap * 2);
-  const used = L.rows.reduce((s, r) => s + r.height, 0) + gap * (L.rows.length - 1);
-  let y = frame.y + Math.max(0, (frame.height - used) / 2);
+  const out = [], gap = openedGap(L.gap, frame.height - L.height, L.rows.length);
+  let y = frame.y;
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i), last = i === L.rows.length - 1;
-    out.push(shapePrimitive({ id: stableId(rid, "arrow"), role: "arrow-row-shape", geometry: "notchedRightArrow", frame: { x: frame.x, y, width: L.arrowWidth, height: r.height }, style: { fill: last ? ACCENT : PRIMARY, stroke: "none" } }));
+    // The block is drawn as its own outline (a bar the row's full height, pointed at what follows from it), not as an
+    // office preset: a preset arrow's shaft is half its height in PowerPoint, and the label spilled out of it there.
+    const point = 20 / L.arrowWidth;
+    out.push(shapePrimitive({ id: stableId(rid, "arrow"), role: "arrow-row-shape", geometry: "customPolygon", data: { paths: [[[0, 0], [1 - point, 0], [1, 0.5], [1 - point, 1], [0, 1]]] },
+      frame: { x: frame.x, y, width: L.arrowWidth, height: r.height }, style: { fill: last ? ACCENT : PRIMARY, stroke: "none" } }));
     let tx = frame.x + v("space.4");
     if (r.item.icon) { out.push(...iconMarker({ id: stableId(rid, "icon"), role: "arrow-row-icon", x: tx, y: y + (r.height - 24) / 2, size: 24, icon: r.item.icon, tone: "inverse" })); tx += 32; }
     out.push(label(stableId(rid, "label"), "arrow-row-label", { x: tx, y: y + (r.height - r.title.height) / 2, width: L.inner - (r.item.icon ? 32 : 0) }, r.title, style("type.body", WHITE, true)));
     if (r.text) out.push(label(stableId(rid, "text"), "arrow-row-text", { x: frame.x + L.arrowWidth + v("space.5"), y: y + (r.height - r.text.height) / 2, width: L.textWidth }, r.text, style("type.body", INK)));
     y += r.height + gap;
+  });
+  return out;
+}
+
+/* --------------------------------------------------------------- icon-rows */
+
+// Parallel reasons, features or benefits down a column: a tinted square tile with the item's icon in the accent, the
+// lead in bold heading type beside it and the description under the lead at body size in the secondary colour. Nothing
+// points anywhere, because nothing follows from a row: where each row leads to a consequence, that is arrow rows. A row
+// is as tall as its copy (or its tile); the tile stands at the row's top, level with the lead, so the tiles and the
+// leads each keep one left edge down the list. An item without an icon carries its number in the tile.
+const ICON_ROWS_LIMITS = Object.freeze({ min: 2, max: 6 });
+
+function normalizeIconRows(props) {
+  const { min, max } = ICON_ROWS_LIMITS, given = Array.isArray(props.items) ? props.items.length : 0;
+  if (given < min || given > max) throw new Error(`Icon rows take ${min} to ${max} items, a row each; this list has ${given}${given > max ? " - group the items, or set them as cards" : ""}`);
+  return props.items.map((item, i) => {
+    if (!clean(item?.label)) throw new Error(`Icon row ${i + 1} needs a \`label\`: the few bold words the row leads with`);
+    return { label: clean(item.label), text: clean(item.text), icon: item.icon ?? null, number: String(i + 1) };
+  });
+}
+
+export function iconRowsLayout(frame, props) {
+  const items = normalizeIconRows(props);
+  const tile = v("space.8"), textX = tile + v("space.4"), textWidth = frame.width - textX, between = v("space.1");
+  if (textWidth < 160) throw new Error("Icon rows are too narrow for their text; give the list more width");
+  const rows = items.map((item) => {
+    const title = measure(item.label, textWidth, "type.heading", true), text = item.text ? measure(item.text, textWidth, "type.body") : null;
+    const copy = title.height + (text ? between + text.height : 0);
+    return { item, title, text, copy, height: Math.max(tile, copy) };
+  });
+  const gap = v("space.5");
+  return { rows, tile, textX, textWidth, between, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+}
+
+export function iconRowsNodes({ id, frame, props }) {
+  const L = iconRowsLayout(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error(`The icon rows need ${Math.ceil(L.height)}px and have ${Math.floor(frame.height)}px; drop a row or shorten the descriptions`);
+  const out = [], gap = openedGap(L.gap, frame.height - L.height, L.rows.length), glyph = v("icon.medium");
+  let y = frame.y;
+  L.rows.forEach((r, i) => {
+    const rid = stableId(id, "row", i);
+    out.push(fillRect(stableId(rid, "tile"), "icon-row-tile", { x: frame.x, y, width: L.tile, height: L.tile }, TINT, { radius: "radius.small", data: { index: i } }));
+    if (r.item.icon) out.push(...iconMarker({ id: stableId(rid, "icon"), role: "icon-row-icon", x: frame.x + (L.tile - glyph) / 2, y: y + (L.tile - glyph) / 2, size: glyph, icon: r.item.icon, tone: "accent" }));
+    else {
+      const numeral = measure(r.item.number, L.tile, "type.heading", true);
+      out.push(label(stableId(rid, "number"), "icon-row-number", { x: frame.x, y: y + (L.tile - numeral.height) / 2, width: L.tile }, numeral, style("type.heading", readableOn(ACCENT, TINT, 3), true, "center")));
+    }
+    // Copy shorter than the tile (a lead alone) is centred on it; taller copy starts at the tile's top.
+    const ty = y + Math.max(0, (L.tile - r.copy) / 2);
+    out.push(label(stableId(rid, "label"), "icon-row-label", { x: frame.x + L.textX, y: ty, width: L.textWidth }, r.title, style("type.heading", INK, true)));
+    if (r.text) out.push(label(stableId(rid, "text"), "icon-row-text", { x: frame.x + L.textX, y: ty + r.title.height + L.between, width: L.textWidth }, r.text, style("type.body", SECONDARY)));
+    y += r.height + gap;
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------- agenda-rows */
+
+// The agenda a meeting follows: one row a topic, the rows of one height down
+// the frame and a hairline under each, so the page reads as a list the room
+// works through. Each row opens on a numbered tile, sets the topic in bold
+// heading type and, at a fixed column, what the topic covers in the secondary
+// colour. The contents page (panels.mjs `agenda`) lists a deck's sections and
+// is the runtime's own furniture; this is an author's page, for an agenda that
+// is the meeting's and not the deck's.
+//
+// A row is as tall as the frame gives it, between what its copy needs and
+// AGENDA_ROW_MAX: past that a two-item agenda is two bands of air, so the
+// component says how far it grows (`agendaRowsCeiling`) and the page's flow
+// places the group. The tile is a share of the row, capped so the numerals do
+// not outweigh the topics they number.
+const AGENDA_ROWS_LIMITS = Object.freeze({ min: 2, max: 8 });
+const AGENDA_ROW_MIN = 48, AGENDA_ROW_MAX = 120, AGENDA_TILE_SHARE = 0.7, AGENDA_TILE_MAX = 72, AGENDA_TEXT_AT = 0.55;
+
+function normalizeAgendaRows(props) {
+  const { min, max } = AGENDA_ROWS_LIMITS, given = Array.isArray(props.items) ? props.items.length : 0;
+  if (given < min || given > max) throw new Error(`An agenda takes ${min} to ${max} items, a row each; this one has ${given}${given > max ? " - group the topics, or split the agenda over two pages" : ""}`);
+  const items = props.items.map((item, i) => {
+    if (!clean(item?.topic)) throw new Error(`Agenda item ${i + 1} needs a \`topic\``);
+    const number = item.number === undefined || item.number === null ? String(i + 1) : String(item.number).trim();
+    if (!number || number.length > 2) throw new Error(`Agenda item ${i + 1}: \`number\` is what its tile prints, one or two characters (got ${JSON.stringify(item.number)})`);
+    return { topic: clean(item.topic), text: clean(item.text), number };
+  });
+  const active = props.active ?? null;
+  if (active !== null && !(Number.isInteger(active) && active >= 0 && active < items.length)) throw new Error(`An agenda's \`active\` is the place of the item the meeting has reached, 0 to ${items.length - 1} (got ${JSON.stringify(props.active)})`);
+  return { items, active };
+}
+
+export function agendaRowsLayout(frame, props) {
+  const { items, active } = normalizeAgendaRows(props);
+  const pad = v("space.3"), gap = v("space.5"), described = items.some((item) => item.text);
+  // The tile is sized from the row and the row from the copy, so the topic is measured in the width the largest tile
+  // leaves it; drawn beside a smaller one it starts one gap from the tile and keeps that measure.
+  const textX = described ? Math.round(frame.width * AGENDA_TEXT_AT) : frame.width;
+  const topicWidth = textX - AGENDA_TILE_MAX - gap - (described ? gap : 0), textWidth = frame.width - textX;
+  if (topicWidth < 160) throw new Error("An agenda is too narrow for its topics; give it the page's width");
+  const rows = items.map((item, i) => ({ item, active: i === active, topic: measure(item.topic, topicWidth, "type.heading", true), text: item.text ? measure(item.text, textWidth, "type.body") : null }));
+  const wrapped = rows.findIndex((r) => r.topic.lines.length > 2 || (r.text?.lines.length ?? 0) > 2);
+  if (wrapped >= 0) throw new Error(`Agenda item ${wrapped + 1} runs past two lines; a topic is a few words and its description one line`);
+  const rowHeight = Math.max(AGENDA_ROW_MIN, ...rows.map((r) => Math.max(r.topic.height, r.text?.height ?? 0) + 2 * pad));
+  return { rows, gap, topicWidth, textX, textWidth, rowHeight, height: rowHeight * rows.length };
+}
+
+/** The most height the rows use: each at AGENDA_ROW_MAX, or at what its copy needs where that is more. */
+export function agendaRowsCeiling(frame, props) {
+  const L = agendaRowsLayout(frame, props);
+  return Math.max(L.rowHeight, AGENDA_ROW_MAX) * L.rows.length;
+}
+
+export function agendaRowsNodes({ id, frame, props }) {
+  const L = agendaRowsLayout(frame, props), n = L.rows.length;
+  if (L.height > frame.height + 0.01) throw new Error(`The agenda needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop an item or shorten the descriptions`);
+  const rowHeight = Math.min(frame.height / n, Math.max(L.rowHeight, AGENDA_ROW_MAX));
+  const tile = Math.min(AGENDA_TILE_MAX, Math.round(rowHeight * AGENDA_TILE_SHARE));
+  // The numeral is the largest figure size whose line the tile holds, with a margin at its sides: the rows of a long
+  // agenda in a short frame are too low for the metric size, and every tile takes one size so the column reads as one.
+  const numeralSize = ["type.metric", "type.heading", "type.body"].find((size) => L.rows.every((r) => { const m = measure(r.item.number, tile, size); return m.height <= tile && m.width <= tile - 2 * v("space.2"); })) ?? "type.body";
+  const out = [];
+  L.rows.forEach((r, i) => {
+    const rid = stableId(id, "row", i), y = frame.y + i * rowHeight, cy = y + rowHeight / 2;
+    const fill = r.active ? ACCENT : PRIMARY, numeral = measure(r.item.number, tile, numeralSize);
+    out.push(fillRect(stableId(rid, "tile"), "agenda-row-tile", { x: frame.x, y: cy - tile / 2, width: tile, height: tile }, fill, { radius: "radius.small", data: { index: i, active: r.active } }));
+    out.push(label(stableId(rid, "number"), "agenda-row-number", { x: frame.x, y: cy - numeral.height / 2, width: tile }, numeral, style(numeralSize, onFill(fill), false, "center")));
+    out.push(label(stableId(rid, "topic"), "agenda-row-topic", { x: frame.x + tile + L.gap, y: cy - r.topic.height / 2, width: L.topicWidth }, r.topic, style("type.heading", r.active ? readableOn(ACCENT, token("color.surface"), 3) : INK, true)));
+    if (r.text) out.push(label(stableId(rid, "text"), "agenda-row-text", { x: frame.x + L.textX, y: cy - r.text.height / 2, width: L.textWidth }, r.text, style("type.body", SECONDARY)));
+    out.push(line(stableId(rid, "rule"), "agenda-row-rule", frame.x, y + rowHeight, frame.x + frame.width, y + rowHeight));
   });
   return out;
 }
@@ -927,7 +1078,7 @@ export function capsulesLayout(frame, props) {
   // pretending every width sets them the same.
   const gap = v("space.6"), width = Math.min(frame.width * 0.2, (frame.width - gap * (items.length - 1)) / items.length);
   const inner = width - 2 * v("space.4");
-  const measured = items.map((item) => ({ item, title: measure(item.title, inner, "type.body", true), text: item.text ? measure(item.text, inner, "type.compact") : null }));
+  const measured = items.map((item) => ({ item, title: measure(item.title, inner, "type.body", true), text: item.text ? measure(item.text, inner, "type.body") : null }));
   const content = Math.max(...measured.map((m) => m.title.height + (m.text ? v("space.2") + m.text.height : 0)));
   const disc = 56, icon = 32;
   return { measured, gap, width, inner, disc, icon, content, height: v("space.5") + disc + v("space.4") + content + v("space.4") + icon + v("space.5") };
@@ -953,7 +1104,7 @@ export function capsulesNodes({ id, frame, props }) {
     let y = top + Math.max(0, (room - L.content) / 2);
     out.push(label(stableId(cid, "title"), "capsule-title", { x: x + v("space.4"), y, width: L.inner }, m.title, style("type.body", type, true, "center")));
     y += m.title.height + v("space.2");
-    if (m.text) out.push(label(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, style("type.compact", type, false, "center")));
+    if (m.text) out.push(label(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, style("type.body", type, false, "center")));
     if (m.item.icon) out.push(...iconMarker({ id: stableId(cid, "icon"), role: "capsule-icon", x: x + (L.width - L.icon) / 2, y: y0 + h - v("space.5") - L.icon, size: L.icon, icon: m.item.icon, tone: "inverse" }));
   });
   return out;
@@ -985,7 +1136,6 @@ const FACT_TILE_SPAN = 4;
 const FACT_COLUMN_MAX = 600;
 
 /** The most height a fact grid uses: a single row stops at FACT_ROW_GROWTH; two rows or more take the frame. */
-
 export function factGridCeiling(frame, props) {
   const L = factGridLayout(frame, props);
   return L.columns === 1 && frame.width > FACT_COLUMN_MAX ? L.height : L.rows > 1 ? null : L.height * FACT_ROW_GROWTH;
@@ -1016,7 +1166,7 @@ export function factGridLayout(frame, props) {
     const tiles = items.map((item) => {
       const value = measure(item.value, inner, "type.metric", true, FIGURES);
       const label = measure(item.label, inner, "type.body", true);
-      const text = item.text ? measure(item.text, inner, "type.compact") : null;
+      const text = item.text ? measure(item.text, inner, "type.body") : null;
       const top = item.icon ? 28 + v("space.2") : 0;
       return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
     });
@@ -1063,8 +1213,8 @@ export function factGridNodes({ id, frame, props }) {
   // are the exhibit, and four tiles two by two beside the commentary, grown by
   // a third and centred, leave a band of air above and below the grid.
   // A single row still grows by a third at most - a row of tiles as tall as
-  // the page is a row of empty boxes - and sits at the top of its frame, the
-  // rest going to what follows (measureCeiling). Copy in a tile that grew is
+  // the page is a row of empty boxes - and stops there (measureCeiling): the
+  // column it sits in places it with whatever height is left. Copy in a tile that grew is
   // centred in it - a tile holds one fact, where a card's copy starts at its
   // top to line up with its neighbours' - and a gauge stays on the tile's foot.
   // A single column across the page never stretches: its rows are bands, and
@@ -1086,7 +1236,7 @@ export function factGridNodes({ id, frame, props }) {
       ty += t.value.height + v("space.1");
       out.push(label(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, style("type.body", dark ? WHITE : INK, true)));
       ty += t.label.height;
-      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.compact", textColor))); ty += v("space.1") + t.text.height; }
+      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.body", textColor))); ty += v("space.1") + t.text.height; }
       if (t.item.gauge !== null) {
         const gy = y + h - L.pad - 6;
         out.push(fillRect(stableId(tid, "gauge-track"), "fact-gauge-track", { x: x + L.pad, y: gy, width: L.inner, height: 6 }, dark ? SECONDARY : RULE, { radius: "radius.round" }));
@@ -1243,7 +1393,7 @@ export function worksheetLayout(frame, props) {
   if (row.length) rows.push(row);
   const measured = rows.map((r) => r.map((f) => {
     const w = unit * f.span + gap * (f.span - 1) - 2 * v("space.3");
-    return { ...f, width: w, title: measure(f.label, w, "type.body", true), text: measure(f.prompt, w, "type.compact") };
+    return { ...f, width: w, title: measure(f.label, w, "type.body", true), text: measure(f.prompt, w, "type.body") };
   }));
   const min = measured.map((r) => Math.max(...r.map((f) => f.title.height + v("space.1") + f.text.height)) + 2 * v("space.3") + 40);
   return { rows: measured, columns, gap, unit, min, height: min.reduce((a, b) => a + b, 0) + gap * (rows.length - 1) };
@@ -1260,7 +1410,7 @@ export function worksheetNodes({ id, frame, props }) {
       const w = L.unit * f.span + L.gap * (f.span - 1), fid = stableId(id, "field", r, c);
       out.push(fillRect(stableId(fid, "box"), "worksheet-box", { x, y, width: w, height: h }, "none", { stroke: RULE, radius: "radius.small" }));
       out.push(label(stableId(fid, "label"), "worksheet-label", { x: x + v("space.3"), y: y + v("space.3"), width: f.width }, f.title, style("type.body", INK, true)));
-      out.push(label(stableId(fid, "prompt"), "worksheet-prompt", { x: x + v("space.3"), y: y + v("space.3") + f.title.height + v("space.1"), width: f.width }, f.text, style("type.compact", SECONDARY)));
+      out.push(label(stableId(fid, "prompt"), "worksheet-prompt", { x: x + v("space.3"), y: y + v("space.3") + f.title.height + v("space.1"), width: f.width }, f.text, style("type.body", SECONDARY)));
       x += w + L.gap;
     });
     y += h + L.gap;
@@ -1459,7 +1609,9 @@ const SAMPLES = {
   sankey: { left: [{ id: "a", label: "(Insert source 1)" }, { id: "b", label: "(Insert source 2)" }], right: [{ id: "x", label: "(Insert use 1)" }, { id: "y", label: "(Insert use 2)" }],
     flows: [{ from: "a", to: "x", value: 3 }, { from: "a", to: "y", value: 1 }, { from: "b", to: "y", value: 2 }] },
   pictogram: { rows: [{ label: "(Insert population)", value: 6 }, { label: "(Insert comparison)", value: 3 }] },
+  "icon-rows": { items: [{ label: "(Insert reason 1)", text: "(Insert what it means)", icon: "target" }, { label: "(Insert reason 2)", text: "(Insert what it means)", icon: "bolt" }, { label: "(Insert reason 3)", text: "(Insert what it means)", icon: "star" }] },
   "arrow-rows": { items: [{ label: "(Insert scenario 1)", text: "(Insert what follows)" }, { label: "(Insert scenario 2)", text: "(Insert what follows)" }] },
+  "agenda-rows": { items: [{ topic: "(Insert topic 1)", text: "(Insert what it covers)" }, { topic: "(Insert topic 2)", text: "(Insert what it covers)" }, { topic: "(Insert topic 3)", text: "(Insert what it covers)" }] },
   capsules: { items: [{ title: "(Insert priority 1)", text: "(Insert what it means)" }, { title: "(Insert priority 2)", text: "(Insert what it means)" }, { title: "(Insert priority 3)", text: "(Insert what it means)" }] },
   "fact-grid": { items: [{ value: "63m", label: "(Insert what it counts)" }, { value: "1,200+", label: "(Insert what it counts)" }, { value: "47%", label: "(Insert what share it measures)", gauge: 0.47 }], columns: 3 },
   "zone-matrix": { xAxis: { label: "(Insert axis)" }, yAxis: { label: "(Insert axis)" }, points: [{ label: "(Insert item)", x: 0.3, y: 0.7 }, { label: "(Insert item)", x: 0.8, y: 0.8 }] },
@@ -1481,7 +1633,9 @@ const GUIDANCE = {
   "rank-flow": { useWhen: "the rank of three to fifteen entities across two to six periods, where movement is the finding", why: "lines joining an entity's positions show rises and falls that a table of ranks hides", actionTitle: "state who moved and by how far" },
   sankey: { useWhen: "quantities moving from one set of categories to another, such as roles today to roles tomorrow", why: "band widths add up on both sides, so the reader sees where each source goes and what each use is made of", actionTitle: "state the flow that decides the answer" },
   pictogram: { useWhen: "one to five population shares best read as 'six in ten'", why: "filled figures make a share countable, which a bar at 60% does not", actionTitle: "state the share and who it describes" },
-  "arrow-rows": { useWhen: "two to six scenarios or levers, each leading to a consequence", why: "the arrow says the row leads somewhere; the consequence sits where the arrow points", actionTitle: "state the scenario that matters and what follows from it" },
+  "icon-rows": { useWhen: "two to six parallel reasons, features or benefits, each a few bold words with a sentence under them; the form to reach for first when a list answers 'why' or 'what you get'", why: "an icon in a tinted tile marks where each item starts and the bold lead is read down the column; nothing points anywhere, because no row leads to another thing", actionTitle: "state what the reasons together establish" },
+  "arrow-rows": { useWhen: "only where each of two to six rows leads to the consequence written beside it - a scenario and what follows, a lever and its effect; parallel reasons, features or benefits are icon rows", why: "the arrow says the row leads somewhere; the consequence sits where the arrow points", actionTitle: "state the scenario that matters and what follows from it" },
+  "agenda-rows": { useWhen: "the two to eight topics a meeting works through, in order, each with a line on what it covers", why: "rows of one height under numbered tiles read as a running order; the description column says what each topic is for without a second page", actionTitle: "'Agenda'; the topics carry the content" },
   capsules: { useWhen: "two to five priorities or principles set as equal columns", why: "tall pillars side by side read as parallel commitments, each taken on its own", actionTitle: "state the priority the rest depend on" },
   "fact-grid": { useWhen: "three to nine separate facts, each a figure with its label, on a 'by the numbers' page", why: "a grid of equal tiles lets each figure read on its own and the set read as a profile", actionTitle: "state what the facts together say" },
   "zone-matrix": { useWhen: "items plotted on two judged axes whose combination grades them, such as likelihood against impact", why: "graded zones show where attention belongs without asserting a verdict colour", actionTitle: "state which items sit in the highest zone" },
@@ -1501,7 +1655,9 @@ const RENDER = {
   "rank-flow": [rankFlowNodes, rankFlowLayout, { width: 1160, height: 460 }],
   sankey: [sankeyNodes, sankeyLayout, { width: 1160, height: 440 }],
   pictogram: [pictogramNodes, pictogramLayout, { width: 1160, height: 320 }],
+  "icon-rows": [iconRowsNodes, iconRowsLayout, { width: 760, height: 360 }],
   "arrow-rows": [arrowRowsNodes, arrowRowsLayout, { width: 1160, height: 400 }],
+  "agenda-rows": [agendaRowsNodes, agendaRowsLayout, { width: 1160, height: 480 }],
   capsules: [capsulesNodes, capsulesLayout, { width: 1160, height: 460 }],
   "fact-grid": [factGridNodes, factGridLayout, { width: 1160, height: 440 }],
   "zone-matrix": [zoneMatrixNodes, zoneMatrixLayout, { width: 1160, height: 460 }],
@@ -1514,11 +1670,15 @@ const RENDER = {
   venn: [vennNodes, vennLayout, { width: 760, height: 440 }],
 };
 
+// The figures that say how far they grow in a frame taller than their content (core.mjs ceilingOf).
+const CEILING = { "fact-grid": factGridCeiling, "agenda-rows": agendaRowsCeiling, "icon-rows": listCeiling(iconRowsLayout), "arrow-rows": listCeiling(arrowRowsLayout), pictogram: listCeiling(pictogramLayout),
+  spectrum: listCeiling(spectrumLayout), "stat-list": listCeiling(statListLayout, (L) => L.perColumn) };
+
 export function registerFigures(registry) {
   for (const [id, [nodes, layout, preferredSize]] of Object.entries(RENDER)) {
     registry.set(id, { id, version: "1.0.0", category: "diagram", role: id, tokens: [...FIGURE_TOKENS], preferredSize,
       sample: SAMPLES[id], render: (input) => ({ nodes: nodes(input) }), measureContent: ({ frame, props }) => layout(frame, props),
-      ...(id === "fact-grid" ? { measureCeiling: ({ frame, props }) => factGridCeiling(frame, props) } : {}),
+      ...(CEILING[id] ? { measureCeiling: ({ frame, props }) => CEILING[id](frame, props) } : {}),
       guidance: GUIDANCE[id] });
   }
   return registry;

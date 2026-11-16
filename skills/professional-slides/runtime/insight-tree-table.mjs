@@ -10,7 +10,6 @@ import { textStyle as baseTextStyle, boxStyle as baseBoxStyle, measuredTextNode 
 
 const INK = token("color.ink");
 const PRIMARY = token("color.componentPrimary");
-const PRIMARY_TINT = token("color.componentPrimaryTint");
 const SURFACE = token("color.surface");
 const MUTED_SURFACE = token("color.surfaceMuted");
 const RULE = token("color.rule");

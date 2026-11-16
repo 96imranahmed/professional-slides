@@ -45,7 +45,7 @@ A key is the user's to set, never typed into a deck or a chat: `printf %s "$KEY"
 | `design` | `design` |
 | `colours: "brand"` + `brand` | `identity: { primary, accent }` |
 | `colours:` a palette | `palette` |
-| `colours: "subject"` | nothing: set `identity` per deck when the subject has its own colours (a brand's, a flag's) |
+| `colours: "subject"` | nothing: set `identity` per deck when the subject has its own colours (a brand's, a flag's); beside `primary` and `accent` it takes `muted`, `tint` and `rule`, each derived where not given |
 | `tracker`, `surfaces`, `typography` | the key of the same name (`tracker: "none"` is `false`; `auto` leaves it to the deck's `variation`) |
 | `titleRule` | the palette's title-rule styles |
 | `footer`, `wordmark` | `footer`, `logo` |

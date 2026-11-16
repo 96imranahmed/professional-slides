@@ -4,7 +4,7 @@
 // drawn to it, the so-what close, and how full a page should read (`fill`).
 import { resolveDensityTokens, TOKENS, token, tokenValue } from "./core.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
-import { textWords, proseParts, proseText, PROSE_PARAGRAPH_MAX } from "./text-contract.mjs";
+import { textWords, proseParts, proseText } from "./text-contract.mjs";
 import { measureProse, proseMeasure, measureList } from "./registry-text.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { HUG, SIZE, BODY_HEIGHT, LAYOUT, BODY_WIDTH } from "./compose-body.mjs";
@@ -26,8 +26,6 @@ export const ledParagraph = (id, p, highlight) => {
 export const pointBullets = (point) => (point && typeof point === "object" && Array.isArray(point.points) && point.points.length ? point.points : null);
 /** A bullet's words: a string, or a `{ lead, text }` bullet as "lead: text". */
 export const bulletText = (sub) => (typeof sub === "string" ? sub : [sub?.lead, sub?.text].filter(Boolean).join(": "));
-/** A point's words as one run - lead, sentence and its bullets - for measuring it. */
-export const pointRun = (point) => (typeof point === "string" ? point : [point?.lead, point?.text, ...(pointBullets(point) ?? []).map(bulletText)].filter(Boolean).join(" "));
 /** The page's authored `paragraphs`, each carrying the page's highlight. */
 export const proseOf = (slide, id) => (slide.paragraphs || []).map((p, at) => ledParagraph(`${id}-p${at}`, p, slide.highlight));
 // Points set in columns run up to three across, four two by two and more
@@ -185,50 +183,6 @@ function proseFit(authored, room) {
 }
 
 /**
- * How many words of prose fill the layout `proseBeside` sets them in:
- * `{ words, columns, min, max }` - the words the prose runs to, the columns
- * it is set in, and the range of lengths at which prose written like this
- * page's own reaches the foot of its column without running past it. It is
- * read off the same measurement that chooses the layout (proseFit), on the
- * page's own words run shorter and longer in its own paragraphs, so the range
- * is the one the composer will fill: an author told a column stands empty is
- * told how long the prose has to be, not left to find it a run at a time.
- * `most` caps the search (the page's word ceiling, as words of prose and
- * their leads); the range is in words of prose, the leads aside.
- */
-export function proseFillRange(authored, room, density, most = 600) {
-  // The leads stay as written; the prose under them is what runs shorter or longer.
-  const paragraphs = authored.map(proseParts);
-  const words = paragraphs.flatMap((p) => p.text.trim().split(/\s+/).filter(Boolean));
-  const shares = paragraphs.map((p) => textWords(p.text) / Math.max(1, words.length));
-  // The page's own prose at `n` words: its words in order, cycled where it has
-  // to run longer, cut into its own paragraphs' proportions - or, where those
-  // would run past PROSE_PARAGRAPH_MAX, into as many equal paragraphs as keep
-  // under it, each under one of the page's leads, as an author lengthening it would write it.
-  const leads = paragraphs.map((p) => p.lead).filter(Boolean);
-  const proseOf = (n) => { const run = Array.from({ length: n }, (_, i) => words[i % words.length]); let at = 0;
-    const count = Math.ceil(n / PROSE_PARAGRAPH_MAX), split = count > paragraphs.length && n * Math.max(...shares) > PROSE_PARAGRAPH_MAX;
-    const parts = split ? Array.from({ length: count }, (_, p) => ({ share: 1 / count, lead: leads.length ? leads[p % leads.length] : "" }))
-      : shares.map((share, p) => ({ share, lead: paragraphs[p].lead }));
-    return parts.map(({ share, lead }, p) => { const take = p === parts.length - 1 ? n - at : Math.round(n * share); const text = run.slice(at, at + take).join(" "); at += take; return { lead, text }; })
-      .filter((p) => p.text).map((p) => ({ ...p, text: /[.!?]$/.test(p.text) ? p.text : `${p.text}.` })); };
-  return atDensity(density, () => {
-    const fills = (n) => { const fit = proseFit(proseOf(n), room); return fit.reach !== undefined && fit.reach >= PROSE_FULL; };
-    const fitsOne = (n) => { const fit = proseFit(proseOf(n), room); return fit.reach !== undefined && fit.columns.length === 1; };
-    const first = (lo, hi, test) => { while (lo < hi) { const mid = Math.floor((lo + hi) / 2); if (test(mid)) hi = mid; else lo = mid + 1; } return lo; };
-    // `most` is the page's ceiling on body words, and the leads are body words
-    // too: the longest prose it allows is the longest whose leads still fit.
-    const total = (n) => proseOf(n).reduce((sum, p) => sum + textWords(proseText(p)), 0);
-    const cap = Math.max(1, first(1, most + 1, (n) => total(n) > most) - 1);
-    // The shortest prose that fills one column at the measure's floor; a column deepens with every word.
-    const min = first(1, cap, (n) => fills(n) || !fitsOne(n));
-    // The longest that still fills: the cap where it fills there, otherwise the longest one column holds.
-    const max = fills(cap) ? cap : first(min, cap, (n) => !fitsOne(n)) - 1;
-    return { words: words.length, columns: proseFit(paragraphs, room).columns.length, min, max: Math.max(min, max) };
-  });
-}
-
-/**
  * The bridge between the evidence and what is read off it, in the gutter.
  *
  * A well-made deck carries this relation four or five different ways and draws
@@ -335,10 +289,12 @@ export const POINT_STYLE_NAMES = Object.freeze(Object.keys(POINT_STYLES));
 /**
  * Honour the author, then choose markers from the content semantics.
  */
-// The ways a page's led findings are set when the author does not say, varied page by page: under an exhibit a lead
-// over its sentence, a lead run in before a colon, or a tinted panel a point; in a column, the first two or a hairline
-// between points. A deck that set every page's findings the one way read as one template from cover to close.
-const LEAD_ROTATION = { below: ["prose", "inline", "boxed"], column: ["prose", "inline", "ruled"] };
+// The ways a page's points are set when the author does not say, varied page by page: a deck that set every page's
+// points the one way read as one template from cover to close. Led findings under an exhibit take a lead over its
+// sentence, a lead run in before a colon, or a tinted panel a point; in a column, a lead over its paragraph, numbered
+// discs, a lead run in after a bullet, a hairline between points, or the house bullet. Plain points take the house
+// bullet, numbered discs or hairlines.
+const ROTATION = { below: ["prose", "inline", "boxed"], column: ["prose", "numbered", "inline", "ruled", "bulleted"], plain: ["bulleted", "numbered", "ruled"] };
 export function resolvePointsStyle(slide, points, { recentStyles = null, layout = null } = {}) {
   if (slide.pointsStyle) {
     if (!POINT_STYLES[slide.pointsStyle]) throw new Error(`Unknown pointsStyle: ${slide.pointsStyle}; use one of ${POINT_STYLE_NAMES.join(", ")}`);
@@ -349,51 +305,59 @@ export function resolvePointsStyle(slide, points, { recentStyles = null, layout 
   if (entries.some((e) => e.icon)) return "icon-lead";
   if (entries.some((e) => e.state)) return "numbered";
   if (entries.every((e) => e.number !== undefined)) return "numbered";
-  if (!entries.some((e) => e.lead)) return "bulleted";
-  // Led points are parallel findings unless the page says otherwise: no implied order or invented icon, marked the deck's
-  // one unordered way on every page.
-  return varyLeadPoints(slide, layout, recentStyles);
+  if (!entries.some((e) => e.lead)) return varyPoints("plain", "bulleted", recentStyles);
+  return varyPoints(layout === "exhibit-top" || layout === "table-halves" ? "below" : "column", LAYOUT.variation?.leadPoints ?? "prose", recentStyles);
 }
 
 /**
- * The style led findings take on this page: of the rotation for where they sit, the one the last pages used least,
- * never the last page's own, ties broken in the deck's drawn order (its `variation` leads with its `leadPoints`). With
- * no memory of earlier pages (a page composed alone), the deck's drawn style.
+ * The style a page's points take: of the rotation for what they are and where they sit, the one the last pages used
+ * least, never the last page's own, ties broken from the deck's drawn style on. With no memory of earlier pages (a
+ * page composed alone), the drawn style.
  */
-function varyLeadPoints(slide, layout, recentStyles) {
-  const drawn = LAYOUT.variation?.leadPoints ?? "prose";
+function varyPoints(kind, drawn, recentStyles) {
   if (!Array.isArray(recentStyles)) return drawn;
-  const rotation = LEAD_ROTATION[layout === "exhibit-top" || layout === "table-halves" ? "below" : "column"];
+  const rotation = ROTATION[kind];
   const order = [drawn, ...rotation.filter((style) => style !== drawn)].filter((style) => rotation.includes(style));
-  const led = recentStyles.filter((style) => Object.values(LEAD_ROTATION).flat().includes(style));
-  const uses = (style) => led.filter((used) => used === style).length;
-  const candidates = order.filter((style) => style !== led[0]);
+  const recent = recentStyles.filter((style) => POINT_STYLES[style]);
+  const uses = (style) => recent.filter((used) => used === style).length;
+  const candidates = order.filter((style) => style !== recent[0]);
   return candidates.reduce((best, style) => (uses(style) < uses(best) ? style : best), candidates[0] ?? drawn);
 }
 
-export function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = false) {
-  // The side column is a track, not a shelf: its points spread down it. A list
-  // that hugs the top of a 500px column leaves two fifths of it empty, which is
-  // how a page carrying real content still reads as thin. A list under a row of
-  // exhibits hugs instead — there it is a footer, not a column.
-  //
-  // The gap opens to its cap on every deck, airy included: white space between
-  // the points is what "airy" means; all of it pooled under the last one is
-  // just an unfinished page.
-  //
-  // What the cap leaves over stays at the foot: the list starts at the top of
-  // its track. Centred, a list under a kpi or an insight floats away from the
-  // thing it reads from, the halves of a two-column split land on different
-  // tops, and a list that owns its track carries a band of air above its first
-  // point as tall as the one under its last. `centre: true` is for an author
-  // who asked for the middle (`pointsAlign`).
-  const distribute = inColumn && points.length > 1;
+/**
+ * The ways a page's points can be set, the plainest first: one list; each point a block of its own, for the engine to
+ * set down or across; the same blocks centred, as a row of parallel findings can be; one point as a statement. A way is offered where the component that draws it takes that many
+ * points (`takes`, on its definition), and the engine chooses among those offered by how each reads in the room it
+ * has (tasteful-layout), unless a judge chose for it (`choices`). It is a list of ways and not a rule per case: a new
+ * way is a line here and a component that says what it takes.
+ */
+const POINT_WAYS = [
+  { label: "list", component: "bullet-list", item: (points, { id, tone, fill, style }) => pointsItem(points, id, tone, fill, style) },
+  { label: "blocks", component: "bullet-list", each: [2, 8], item: (points, { id, tone, fill, style }) => ({ id, layout: "flow.best", size: HUG, items: points.map((point, at) =>
+    pointsItem([style === "numbered" && point?.number === undefined ? { ...(typeof point === "string" ? { text: point } : point), number: at + 1 } : point], `${id}-${at}`, tone, fill, style === "ruled" ? "prose" : style)) }) },
+  { label: "centred", component: "paragraph", each: [2, 4], item: (points, { id, highlight }) => {
+    // Centred text reads to about three lines: a block's floor is the width that sets it in three (a character averages half its size across), and the group's is its widest block's.
+    const items = points.map((point, at) => { const { lead, text } = proseParts(point);
+      return { ...paragraph(`${id}-${at}`, text, highlight, { align: "center", ...(lead ? { heading: lead } : {}) }), hints: { minWidth: Math.max(240, Math.ceil(text.length * LIST_BODY_PX * 0.5 / 3)) } }; });
+    return { id, layout: "flow.best", size: HUG, items, hints: { minWidth: Math.max(...items.map((item) => item.hints.minWidth)) } }; } },
+  { label: "statement", component: "insight", item: ([point], { id, highlight }) => { const { lead, text } = proseParts(point);
+    return { id, component: "insight", props: { variant: "tonal", align: "center", text, ...(lead ? { heading: lead } : {}), ...(highlight === undefined ? {} : { highlight }) }, size: HUG }; } },
+];
+export function pointWays(points, context, registry) {
+  const within = ([least, most], count) => count >= least && count <= most;
+  return POINT_WAYS.filter((way) => within(way.each ?? registry.get(way.component).takes.points, points.length)).map((way) => ({ label: way.label, ...way.item(points, context) }));
+}
+
+/** The points as a list, as tall as its content: the column it sits in places it, with whatever else it holds, as one group in the middle of it. */
+export function pointsItem(points, id, tone, fill, style = null) {
   const shape = style && POINT_STYLES[style] ? POINT_STYLES[style] : {};
+  // Numbered discs count the points in the order the page wrote them, where the author numbered none.
+  if (style === "numbered") points = points.map((p, at) => { const item = typeof p === "string" ? { text: p } : { ...p }; return item.number === undefined ? { ...item, number: at + 1 } : item; });
   if (style === "checklist") points = points.map((p) => {
     const item = typeof p === "string" ? { text: p } : { ...p };
     return item.state === undefined ? { ...item, state: "open" } : item;
   });
-  return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}), ...(distribute ? { distribute: true, ...(centre ? {} : { centre: false }) } : {}) }, size: distribute ? { width: { fr: 1 }, height: "fill" } : HUG };
+  return { id, component: "bullet-list", props: { variant: "body", items: points, ...shape, ...(tone === "dark" || tone === "primary" ? { tone: "inverse" } : {}) }, size: HUG };
 }
 
 /**

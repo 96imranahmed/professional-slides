@@ -337,7 +337,7 @@ export function registerTrackers(registry) {
     { id: "D", label: "Section D" }
   ];
   registry.set("tracker-page", {
-    id: "tracker-page", version: "2.2.0", category: "navigation", role: "tracker-page",
+    id: "tracker-page", sizing: "fill", version: "2.2.0", category: "navigation", role: "tracker-page",
     tokens: [...TRACKER_TOKENS], preferredSize: { ...SLIDE },
     sample: { trackerId: "example-sections", title: "Contents", parentTitle: "Section A", items: sampleItems, selectedId: "B", layout: "sequential-circles", mode: "light", density: "regular" },
     variants: TRACKER_PAGE_VARIANTS, defaultVariant: "sequential-selected-light", resolveVariant: resolveTrackerPageVariant,

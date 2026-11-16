@@ -1,11 +1,11 @@
 // The pages a photograph carries: two to five named things side by side with
-// their cards (`picturesAcross`), one subject beside its argument
-// (`pictureHero`), and an exhibit on a card over the thing it measures
-// (`photoBackdrop`).
+// their cards (`picturesAcross`), and an exhibit on a card over the thing it
+// measures (`photoBackdrop`). One subject beside its argument is a grid
+// (compose-arrangements.mjs builtInGrid, `picture-hero`).
 import { token } from "./core.mjs";
 import { SIZE, HUG, BODY_WIDTH } from "./compose-body.mjs";
-import { pictureFrame, pictureCards, pictureRows, photoStrip, imageProps } from "./compose-pictures.mjs";
-import { pointsItem, sideTreatment, proseOf } from "./compose-points.mjs";
+import { pictureFrame, pictureCards, pictureRows, imageProps } from "./compose-pictures.mjs";
+import { pointsItem, sideTreatment } from "./compose-points.mjs";
 import { exhibitItem } from "./compose-exhibits.mjs";
 import { pointsUnderPanels } from "./compose-arrangements.mjs";
 
@@ -38,37 +38,9 @@ export function picturesAcross(items, { id, slide, layout, pictures, baseDir, fi
       : { id: `${id}-picture-cards-row${tag}`, layout: "flow.row", gap: "space.3", size: HUG,
         items: [pictureCards(row, `${id}-picture-cards${tag}`, { width: { fr: row.length }, height: "hug" }), open("cards", { width: { fr: across - row.length }, height: "hug" })] });
   }
-  if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
+  if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, pointsStyle));
 }
 
-// One subject, the argument beside it: the copy takes the left column (a
-// toned panel when `pointsTone` says so), the picture the right, both full
-// height. `photo` is another spelling of the same page and draws the same.
-export function pictureHero(items, { id, slide, pictures, baseDir, fill, pointsStyle }) {
-  const tone = sideTreatment(slide);
-  const picture = pictures[0];
-  const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry != null);
-  const copy = [
-    ...(slide.kpi ? [{ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } }] : []),
-    ...insightSpecs.map((insight, at) => ({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insightSpecs.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG })),
-    ...proseOf(slide, id),
-    ...(slide.points?.length ? [pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle)] : []),
-  ];
-  const column = { id: `${id}-side`, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), treatment: tone, layout: "flow.column", ...(slide.pointsAlign === "middle" ? { leftover: "center" } : {}), size: { width: { fr: 1.2 }, height: "fill" }, items: copy };
-  // The picture's own line sits under it as a statement box, the way a
-  // captioned panel does: naming the subject is the picture's job, not the
-  // argument's.
-  const frame = picture
-    ? pictureFrame(picture, `${id}-picture`, baseDir, { width: { fr: 1 }, height: "fill" })
-    : photoStrip(slide, `${id}-photo`, baseDir, 1);
-  const caption = picture && (picture.label || picture.text)
-    ? { id: `${id}-picture-caption`, component: "insight", props: { text: [picture.label, picture.text].filter(Boolean).join(" — "), variant: "neutral", align: "center" }, size: HUG }
-    : null;
-  const side = caption
-    ? { id: `${id}-picture-column`, layout: "flow.column", gap: "space.3", size: { width: { fr: 1 }, height: "fill" }, items: [{ ...frame, size: { width: { fr: 1 }, height: "fill" } }, caption] }
-    : frame;
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [column, side] });
-}
 
 // The exhibit on a card over a full-bleed photograph of what it measures:
 // "numbers over the thing itself". The photo sets

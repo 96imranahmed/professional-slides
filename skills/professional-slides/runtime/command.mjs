@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Public CLI. Commands are described once for discovery, help and parsing.
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseCli, readJson, isMain } from "./cli.mjs";
 import { PAGE_TYPES, pageSchema } from "./page-types.mjs";
 import { formFields } from "./form-fields.mjs";
@@ -15,6 +14,8 @@ import { pictureCandidates } from "./public/pictures.mjs";
 import { setPictureKey, clearPictureKey, keyStatus, keysPath } from "./picture-keys.mjs";
 import { importStyle, buildStyle, HOUSE_SCHEMA } from "./public/styles.mjs";
 import { checkEnvironment, setup, setupHome } from "./public/setup.mjs";
+import { judgeWorkspace, recordChoices } from "./public/judge.mjs";
+import { formatsOf } from "./build-deck.mjs";
 
 const flag = (type="string") => ({type});
 export const COMMANDS = Object.freeze({
@@ -32,7 +33,8 @@ export const COMMANDS = Object.freeze({
   keys: {args:0,usage:"keys [--set PROVIDER | --clear PROVIDER]",about:"Show which picture libraries have a key, or set one (read from standard input) or clear it: pexels, unsplash, pixabay",flags:{set:flag(),clear:flag()}},
   pictures: {args:1,usage:"pictures WORK --candidates",about:"Find each planned picture's best three files across the picture libraries, on one sheet to look at before the build",flags:{candidates:flag("boolean")}},
   check: {args:1,usage:"check WORK",about:"Compile every page and run its layout checks, without rendering",flags:{}},
-  build: {args:1,usage:"build WORK --out OUT [--page ID[,ID...]] [--no-fetch]",about:"Build and check the saved PowerPoint using local Office; --page builds and renders those pages alone to look at; --no-fetch looks up no logo, photograph or place",flags:{out:flag(),renderer:flag(),page:flag(),"no-fetch":flag("boolean")}},
+  judge: {args:1,usage:"judge WORK [--out OUT | --choices FILE.json]",about:"Wherever the layout engine chose between ways of setting a page, draw the candidates side by side for you to choose between, once a decision; --choices records your choices on their pages, where every build holds to them",flags:{out:flag(),choices:flag()}},
+  build: {args:1,usage:"build WORK --out OUT [--format pptx|html|both] [--page ID[,ID...]] [--no-fetch]",about:"Build and check the deck from one composed scene: PowerPoint rendered by local Office (the default), HTML photographed by a headless browser with no Office needed, or both side by side; --page builds and renders those pages alone to look at; --no-fetch looks up no logo, photograph or place",flags:{out:flag(),renderer:flag(),format:flag(),page:flag(),"no-fetch":flag("boolean")}},
   "style import": {args:1,usage:"style import SOURCE --out PROFILE.json",about:"Extract a named house profile without changing user defaults",flags:{out:flag()}},
   "style build": {args:1,usage:"style build PROFILE.json --out OUT [--no-fetch]",about:"Render editable style-guide and template slides",flags:{out:flag(),renderer:flag(),"no-fetch":flag("boolean")}},
 });
@@ -86,7 +88,9 @@ export async function execute(argv) {
   }
   if(command==="import")return importSource(p[0],required(v.out,"out"));
   if(command==="style import")return importStyle(p[0],required(v.out,"out"));
-  if(["build","options","style build"].includes(command)){
+  const formats=formatsOf(v.format);
+  // An HTML build draws in the browser: only an output that is a PowerPoint needs local Office.
+  if(["options","style build"].includes(command)||(command==="build"&&formats.includes("pptx"))){
     const ready=await checkEnvironment({renderer});if(ready.status!=="complete")return ready;
   }
   const fetching=!v["no-fetch"];
@@ -102,10 +106,11 @@ export async function execute(argv) {
   if(command==="insights")return addInsights(work,required(v.add,"add"),{complete,blocked});
   if(command==="pictures"){if(!v.candidates)throw new Error(commandHelp(command));return pictureCandidates(work,{complete});}
   if(command==="check")return checkWorkspace(work);
+  if(command==="judge")return v.choices?recordChoices(work,v.choices):judgeWorkspace(work,v.out??path.join(work.root,"judgement"));
   if(command==="edit")return editWorkspace(work,await readJson(path.resolve(required(v.file,"file"))));
   if(command==="options")return makeOptions(work,required(v.slide,"slide"),{count:v.count===undefined?3:Number(v.count),design:v.design,style:v.style,fetch:fetching});
   if(command==="apply")return applyCandidate(work,required(v.candidate,"candidate"));
-  if(command==="build")return buildWorkspace(work,required(v.out,"out"),{fetch:fetching,...(v.page?{only:new Set(String(v.page).split(",").map(s=>s.trim()).filter(Boolean))}:{})});
+  if(command==="build")return buildWorkspace(work,required(v.out,"out"),{fetch:fetching,formats,...(v.page?{only:new Set(String(v.page).split(",").map(s=>s.trim()).filter(Boolean))}:{})});
   throw new Error(`Unhandled command ${command}`);
 }
 export async function main(argv=process.argv.slice(2)) {

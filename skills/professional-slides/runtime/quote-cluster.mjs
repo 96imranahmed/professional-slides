@@ -300,7 +300,7 @@ export function quoteClusterNodes({ id, frame, props }) {
 
 export function registerQuoteCluster(registry) {
   registry.set("quote-cluster", {
-    id: "quote-cluster", version: "2.3.0", category: "section", role: "quote-cluster",
+    id: "quote-cluster", sizing: "fill", version: "2.3.0", category: "section", role: "quote-cluster",
     tokens: [...QUOTE_CLUSTER_TOKENS], preferredSize: { width: 1160, height: 480 },
     sample: { quotes: speechQuotes(3), treatment: "speech-bubble", placement: "full-field", arrangement: "staggered", attributionAlign: "left" },
     variants: QUOTE_CLUSTER_VARIANTS,

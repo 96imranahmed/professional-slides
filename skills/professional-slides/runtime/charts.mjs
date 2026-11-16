@@ -282,6 +282,7 @@ export function registerCharts(registry) {
     ];
     registry.set(chart.id, {
       id: chart.id,
+      sizing: "fill",
       version: "2.6.0",
       category: "chart",
       role: "chart",

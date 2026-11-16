@@ -211,7 +211,7 @@ export function approvalDetail(storyline) {
 /**
  * Pages the storyline plans too short to fill a page: a chart of three members or fewer in one series, set across the
  * page. Said at the storyline, where planning its commentary beside it costs nothing; the A350F deck met two dozen of them
- * as empty bands (SCENE_VOID) after its pages were written.
+ * as empty bands after its pages were written.
  */
 export function shortPages(storyline) {
   return storylinePages(storyline).filter((page) => isChart(page.type) && Number.isInteger(page.members) && page.members <= 3 && (page.series ?? 1) <= 1)

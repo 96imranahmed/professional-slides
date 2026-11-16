@@ -16,21 +16,6 @@ export const PANEL_MIN_WIDTH = 300;
 export const BODY_WIDTH = 1160, BODY_HEIGHT = 508, CONNECTOR_WIDTH = 44, COLUMN_GAP = 16;
 // The gutter a breakout's fan or a spread's bracket crosses between two panels.
 export const LINK_GUTTER = 72;
-// How deep a commentary column should run down its track: the gates hold a
-// column's trailing band to a fifth of its height (column_void_max), so a
-// column that narrows to reach four fifths clears it with the list's own gaps
-// to spare. A short column narrows toward this, giving the exhibit the width,
-// and stops at SIDE_COLUMN_MIN_WIDTH: below it a line of body type holds too
-// few characters to read as prose (CPL's floor of 35).
-export const SIDE_COLUMN_DEPTH = 0.8;
-export const SIDE_COLUMN_MIN_WIDTH = 280;
-// A column of points that still runs less than this far down its track at
-// its narrowest is not a column: it ends halfway down the page beside a
-// full-height exhibit. The points go under the exhibit, which takes the width.
-// Set where the gates' column void starts: a trailing band a fifth of the
-// page's height is 144px of a 508px body.
-export const SIDE_COLUMN_SHORT = 0.72;
-
 // The design system's composition choices for the deck being composed
 // (design-systems.mjs); set by composeDeck, read by the page builders.
 const CONSULTING_LAYOUT = Object.freeze({ name: "consulting", takeaway: "band", commentary: "right", shapeBias: {} });

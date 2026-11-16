@@ -1,0 +1,42 @@
+{
+  "about": [
+    "The outline of every named scene geometry, once. A scene node names its shape (data.geometry); emit/html-shapes.mjs",
+    "and emit/emit_pptx.py both draw the name from this table, so a polygonal geometry cannot be one outline in the HTML",
+    "page and another in the PowerPoint file. It was two hand-kept lists before - polygon points for HTML, an Office",
+    "preset for PowerPoint - and the presets were not the polygons: a preset notchedRightArrow's shaft is half its height,",
+    "a preset hexagon's or trapezoid's slant is a share of the shorter side rather than of the width, so a label measured",
+    "to sit inside the HTML shape ran out of the PowerPoint one.",
+    "",
+    "outlines: one closed polygon per geometry, points in the unit square of the node's frame (x across, y down).",
+    "A coordinate is a number, or a pair [a, b] meaning a + b * (shorter side of the frame / this axis's length): the",
+    "way an outline says 'half the shorter side', which is how a chevron's point keeps its angle on a wide band.",
+    "",
+    "presets: the few geometries PowerPoint draws as its own autoshape (so the shape keeps its name and its yellow",
+    "handle when edited by hand) because the preset's outline at these adjustments IS the polygon above at every frame.",
+    "Each is proved by evals/tests/test_shape_outlines.py, which computes the preset's path from its PresentationML",
+    "definition and compares it with the outline. A geometry not listed here is written as a freeform of the outline;",
+    "list one only with that proof."
+  ],
+  "outlines": {
+    "chevron": [[0, 0], [[1, -0.5], 0], [1, 0.5], [[1, -0.5], 1], [0, 1], [[0, 0.5], 0.5]],
+    "snip1Rect": [[0, 0], [0.88, 0], [1, 0.12], [1, 1], [0, 1]],
+    "notchedRightArrow": [[0, 0], [0.78, 0], [1, 0.5], [0.78, 1], [0, 1], [0.18, 0.5]],
+    "rightArrow": [[0, 0.18], [0.72, 0.18], [0.72, 0], [1, 0.5], [0.72, 1], [0.72, 0.82], [0, 0.82]],
+    "leftArrow": [[1, 0.18], [0.28, 0.18], [0.28, 0], [0, 0.5], [0.28, 1], [0.28, 0.82], [1, 0.82]],
+    "triangle": [[0.5, 0], [1, 1], [0, 1]],
+    "rtTriangle": [[0, 0], [1, 1], [0, 1]],
+    "diamond": [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]],
+    "pentagon": [[0.5, 0], [1, 0.38], [0.82, 1], [0.18, 1], [0, 0.38]],
+    "hexagon": [[0.25, 0], [0.75, 0], [1, 0.5], [0.75, 1], [0.25, 1], [0, 0.5]],
+    "parallelogram": [[0.18, 0], [1, 0], [0.82, 1], [0, 1]],
+    "trapezoid": [[0.18, 0], [0.82, 0], [1, 1], [0, 1]],
+    "downArrow": [[0.25, 0], [0.75, 0], [0.75, 0.58], [1, 0.58], [0.5, 1], [0, 0.58], [0.25, 0.58]],
+    "upArrow": [[0.5, 0], [1, 0.42], [0.75, 0.42], [0.75, 1], [0.25, 1], [0.25, 0.42], [0, 0.42]]
+  },
+  "presets": {
+    "chevron": { "prst": "chevron", "adjustments": [0.5] },
+    "triangle": { "prst": "triangle", "adjustments": [0.5] },
+    "rtTriangle": { "prst": "rtTriangle", "adjustments": [] },
+    "diamond": { "prst": "diamond", "adjustments": [] }
+  }
+}

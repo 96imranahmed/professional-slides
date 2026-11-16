@@ -8,7 +8,7 @@ import { authorDeck, readInsights } from "../author-deck.mjs";
 import { buildWorkspace, renderedSlide, fingerprint, runtimeFingerprint, selectPage, contentSignature, digest, complete, needed, blocked, runtime } from "./workspace.mjs";
 
 // What an option's own page must not carry: a refusal, or a finding the build stops on before the render.
-const HELD = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
+const HELD = new Set(["PAGE_ADJUSTED"]);
 
 /**
  * The deck an option is drawn in. A design or a style is the deck's, so it restyles every page the deck composes;

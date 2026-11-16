@@ -11,9 +11,11 @@ import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, 
 import { metricsStrip, metricsBesideExhibit } from "./compose-metrics.mjs";
 import { SLIDE_PASSES } from "./compose-passes.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
-import { peerExhibitsRow, exhibitOverCommentary, labelledRows, centredCards, centredFigure, exhibitBesideCommentary, figureWithPoints,
-  fullWidthExhibit, tableHalves, heroNumber, splitTone, exhibitStack, exhibitGrid, exhibitDashboard } from "./compose-arrangements.mjs";
-import { picturesAcross, pictureHero, photoBackdrop } from "./compose-picture-pages.mjs";
+import { SLOTS, resolveTemplate } from "./layout-templates.mjs";
+import { templatePage, builtInGrid, peerExhibitsRow, exhibitOverCommentary, labelledRows, centredCards, centredFigure, figureWithPoints,
+  tableHalves, exhibitDashboard } from "./compose-arrangements.mjs";
+import { exhibitItem } from "./compose-exhibits.mjs";
+import { picturesAcross, photoBackdrop } from "./compose-picture-pages.mjs";
 import { sidebarPage, textPage } from "./compose-text-pages.mjs";
 
 /** Walk the composed tree and join every chart's unit to its heading. */
@@ -42,9 +44,10 @@ export const SLIDE_KEYS = Object.freeze({
   id: "the page's own id; one is derived from its position when absent",
   kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
   shape: "one of the four heavy-page shapes: findings-matrix, measure-table, model-page, half-and-half",
-  layout: "force a layout instead of letting the composer choose one",
+  layout: "force a layout instead of letting the composer choose one; \"arranged\" lets the engine set the exhibit and its commentary beside each other or one over the other, whichever reads better",
   arrange: "row, stack, grid, sequence (a row joined by arrows), breakout (an overview and the detail of one mark) or dashboard (a grid of areas), when the page carries more than one exhibit",
-  grid: "on a dashboard, its column and row tracks and each exhibit's area on them",
+  choices: "where the engine chose between ways of setting the page (`decisions` in the build's scene), the candidate a judge chose instead: { <decision id>: <candidate label> }",
+  grid: "the page's own grid, as CSS grid writes one - { columns, rows, gap, areas, place } - or the name of one of the deck's `layouts`; on a dashboard, its tracks and each exhibit's area on them",
   breakout: "on a breakout, the overview's mark ({ from: { exhibit, category, series }, to }) fanned out to the panel that splits it",
   spread: "on a row of panels, the gap between a mark in one and a mark in a later one ({ from, to, label }), bracketed and named",
   density: "this page's density profile, overriding the deck's",
@@ -224,17 +227,23 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
       ...(slide.image && sourcedPicture(slide.image) ? { image: imageProps(slide.image, baseDir) } : {}),
       ...(slide.notes ? { notes: slide.notes } : {}) };
   }
+  // A page with a grid of its own is set on it (layout-templates.mjs); a dashboard's grid is its exhibits' cells.
+  if (slide.grid && slide.arrange !== "dashboard" && !slide.grid.areas?.[0]?.content) slide = { ...slide, layout: "template", grid: resolveTemplate(slide.grid, deck.layouts, id) };
   let slideIn;
   ({ slide, slideIn } = analyticalPasses(slide, id, ctx));
   const { pictures, layout, pointsStyle, exhibits } = pagePlan(slide, id, recent, recentStyles);
   const items = [];
-  const { metricsBelow, metricsBeside } = measuresOverPage(items, { id, slide, layout, exhibits });
+  // On a grid of its own the page's areas take its content; the furniture every page sets for itself - the strip of
+  // figures over the body, the reading note, the close - is set only where no area has taken it.
+  const taken = layout === "template" ? new Set(slide.grid.areas.flatMap((area) => area.content).map((name) => SLOTS[name] ?? name)) : null;
+  const furniture = taken ? Object.fromEntries(Object.entries(slide).filter(([key]) => !taken.has(key) && !(key === "insights" && taken.has("insight")))) : slide;
+  const { metricsBelow, metricsBeside } = measuresOverPage(items, { id, slide: furniture, layout, exhibits });
   const pointsPlaced = arrangePage(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures, metricsBeside });
   // A page photograph is drawn where its layout keeps a place for it - a strip beside the copy, a picture page's hero or
   // backdrop - and was dropped unseen anywhere else.
   if (slide.photo && !placesItem(items, (itemId) => itemId === `${id}-photo` || itemId === `${id}-backdrop`))
     throw new Error(`${id}: \`photo\` is set as a strip beside the copy, and this ${layout} page keeps no place for it - choose commentary "beside" or "beside-left" so the page has a column beside the exhibit, or make the picture the page's subject (a picture page, or a \`pictures\` entry)`);
-  closePage(items, { id, slide, layout, fill, pointsStyle, metricsBelow, pointsPlaced });
+  closePage(items, { id, slide: furniture, layout, fill, pointsStyle, metricsBelow, pointsPlaced });
   return pageRecord(items, { id, slide, slideIn });
 }
 
@@ -314,7 +323,7 @@ function tableLook(exhibits, recentStyles) {
 function measuresOverPage(items, { id, slide, layout, exhibits }) {
   // Explicit layouts must preserve their author's commentary too. Side-only
   // fields cannot be silently dropped by a layout that has no side track.
-  if ((slide.insight || slide.insights?.length || slide.kpi) && !["exhibit-left", "exhibit-right", "hero-number", "stack", "picture-hero"].includes(layout)) {
+  if ((slide.insight || slide.insights?.length || slide.kpi) && !["exhibit-left", "exhibit-right", "arranged", "hero-number", "stack", "picture-hero", "template"].includes(layout)) {
     throw new Error(`${id}: ${layout} cannot place insight/insights/kpi; choose an exhibit-left or exhibit-right layout`);
   }
   const metricsBelow = slide.metricsPosition === "bottom";
@@ -351,21 +360,24 @@ function arrangePage(items, page) {
   // exhibit still takes the whole width and the height the strip leaves.
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) return figureWithPoints(items, page);
-  if (fullWidth) fullWidthExhibit(items, page);
+  const grid = layout === "template" ? slide.grid : builtInGrid(fullWidth && page.metricsBeside ? "metrics-beside" : layout, slide, exhibits, id);
+  // The page's own grid, or the grid a built-in arrangement is (compose-arrangements.mjs builtInGrid).
+  if (grid) templatePage(items, { ...page, slide: { ...slide, grid } });
+  // An exhibit across the page is one block in the body, at its own size: it needs no grid, and no heading band of its
+  // own - the action title and its own header say what it is.
+  else if (fullWidth) {
+    const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
+    if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
+    items.push(item);
+  }
   // A table in halves with points sets them in columns under the panels, as the page with one table over its points does.
   else if (layout === "table-halves" && slide.points?.length) { exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves: true }); return true; }
   else if (layout === "table-halves") tableHalves(items, page);
-  else if (layout === "exhibit-left" || layout === "exhibit-right") exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle });
   else if (layout === "exhibit-top") exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
-  else if (layout === "hero-number") heroNumber(items, page);
-  else if (layout === "split-tone") splitTone(items, page);
-  else if (layout === "stack") exhibitStack(items, page);
-  else if (layout === "grid") exhibitGrid(items, page);
   else if (layout === "dashboard") exhibitDashboard(items, page);
   else if (layout === "two-up" || layout === "two-up-contrast" || layout === "sequence" || layout === "breakout") peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures });
   else if (layout === "labelled-rows") labelledRows(items, { id, slide, baseDir, fill });
   else if (layout === "picture-pair" || layout === "picture-strip") picturesAcross(items, page);
-  else if (layout === "picture-hero") pictureHero(items, page);
   else if (layout === "sidebar") sidebarPage(items, page);
   else if (layout === "photo-backdrop") photoBackdrop(items, page);
   else textPage(items, page);
@@ -377,7 +389,7 @@ function closePage(items, { id, slide, layout, fill, pointsStyle, metricsBelow, 
   // These full-width/paired layouts keep supplied points in a measured track
   // below the evidence, just like the two-up recipe.
   if (["exhibit-full", "table-halves", "split-tone"].includes(layout) && slide.points?.length && !pointsPlaced) {
-    items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
+    items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, pointsStyle));
   }
   // Authored prose on a full-width page goes under the evidence, for the same
   // reason the points do: the page was given the words, so the page prints them.
@@ -389,10 +401,8 @@ function closePage(items, { id, slide, layout, fill, pointsStyle, metricsBelow, 
   if (Array.isArray(slide.metrics) && slide.metrics.length && metricsBelow) items.push(metricsStrip(slide.metrics, `${id}-metrics`, slide.metricsTone));
   if (slide.callout) {
     const note = { id: `${id}-callout`, component: "callout", props: typeof slide.callout === "string" ? { text: slide.callout } : slide.callout, size: HUG };
-    const row = items.find((it) => it.id === `${id}-row`);
-    const at = row?.items?.findIndex((it) => it.id === `${id}-side`) ?? -1;
-    if (at >= 0) row.items[at] = { id: `${id}-side-column`, layout: "flow.column", size: row.items[at].size, items: [note, { ...row.items[at], size: { width: { fr: 1 }, height: "fill" } }] };
-    else items.push(note); // full-width pages: the reading aid sits under the exhibit, above the takeaway
+    // Beside an exhibit the note sits over the side column, in the page's grid (builtInGrid); on any other page it sits under the exhibit, above the takeaway.
+    if (!["exhibit-left", "exhibit-right"].includes(layout)) items.push(note);
   }
   if (slide.soWhat) items.push(soWhatItem(slide.soWhat, `${id}-sowhat`, slide.highlight, !slide.callout));
   if (!items.length) throw new Error(`${id}: a slide needs an exhibit, points, paragraphs or a soWhat`);
@@ -411,5 +421,5 @@ function pageRecord(items, { id, slide, slideIn }) {
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(fixedTone(slide, id, GROUND_TONES) ? { ground: slide.tone } : {}), ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.titlePlacement ? { titlePlacement: slide.titlePlacement } : {}), ...(slide.titleNumeral ? { titleNumeral: slide.titleNumeral } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.source && Array.isArray(slide.sourceForms) && slide.sourceForms.length ? { sourceForms: slide.sourceForms } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, ...(slide.choices ? { choices: slide.choices } : {}), role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(fixedTone(slide, id, GROUND_TONES) ? { ground: slide.tone } : {}), ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.titlePlacement ? { titlePlacement: slide.titlePlacement } : {}), ...(slide.titleNumeral ? { titleNumeral: slide.titleNumeral } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.source && Array.isArray(slide.sourceForms) && slide.sourceForms.length ? { sourceForms: slide.sourceForms } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }

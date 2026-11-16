@@ -161,7 +161,7 @@ export function exhibitItem(exIn, id, baseDir, size = SIZE) {
   if (exIn && typeof exIn.caption === "string" && exIn.caption.trim()) {
     const { caption, captionHeight, captionHighlight, ...rest } = exIn;
     const panel = exhibitItem(rest, id, baseDir, { width: { fr: 1 }, height: "fill" });
-    // The caption is the panel's finding in compact type, left-aligned under
+    // The caption is the panel's finding in body type, left-aligned under
     // it at the panel's width, with no surface: set as a centred bold box it
     // is the loudest thing on the page after the title. The statement box is
     // the page's takeaway alone. Peers share one caption height, so the plots

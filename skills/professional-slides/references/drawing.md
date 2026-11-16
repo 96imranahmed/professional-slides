@@ -92,7 +92,7 @@ The frame sets hard limits - a chart's three callouts, a rail's eight lines, a p
 
 **A short chart takes a partner.** A chart of three or four members in one series, set across the page, reads thin; about three chart pages in ten in strong decks carry two to four exhibits. Pair it with a second exhibit for the same claim - another cut of the same data, the table behind it, the figures it rests on - as a `panels` `row`, the second taken from the page's candidates. A second chart that does not bear on the title is padding.
 
-A band of the page left empty is advised (`SCENE_VOID`). On cards, tiles and small multiples the first lever is the count a row, `exhibit.columns`: fewer a row stand taller and take the height, more a row take the width. Elsewhere, give the exhibit the height or move the commentary beside it.
+A page that looks half empty is yours to see on the render, not a finding. On cards, tiles and small multiples the first lever is the count a row, `exhibit.columns`: fewer a row stand taller and take the height, more a row take the width. Elsewhere, give the exhibit the height, move the commentary beside it, or leave the arrangement to the engine (`commentary: "auto"`).
 
 **Components without a page form.** Seven components are strips or bands that cannot fill a page; each reaches one as an exhibit of a `panels` page: `journey` (stages and their touchpoints) and `highlight-strip` (numbered findings) across a short row of a dashboard; `icon-trends`, `speech` and `status-list` beside the exhibit they explain; `logo-collage` naming a set's members in a dashboard cell; and `worksheet`, blank by design, beside its worked example in a `panels` row.
 

@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { readJson, writeJsonWhole, pythonBin } from "../cli.mjs";
-import { runProcess, lastJson } from "../process.mjs";
+import { runProcess } from "../process.mjs";
 import { authorDeck, compileDeck, readInsights, loggedSources, openComposeCache } from "../author-deck.mjs";
 import { readPagesFile, compiledFrom } from "../pages-file.mjs";
 import { buildDeck } from "../build-deck.mjs";
@@ -215,10 +215,9 @@ export async function editWorkspace(work, patch) {
   const advisories = [...after.adjusted].filter(([id]) => touched.has(id)).map(([id, notes]) => ({ code: "PAGE_ADJUSTED", id, severity: "advisory", repair: notes.join("; ") }));
   return { ...await inspectWorkspace(await openWorkspace(work.root)), ...(advisories.length ? { advisories } : {}) };
 }
-// Findings the compile measures on one page's layout, before any render. The build stops on them instead of rendering
-// a deck it will redo: the A350F deck's three half-empty pages were measured on the scene (SCENE_VOID), rendered anyway
-// and reported as complete; a design edit that set a page's points aside (PAGE_ADJUSTED) dropped them without a word.
-const STOP_BEFORE_RENDER = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
+// Findings the compile raises on one page before any render, which the build stops on instead of rendering a deck it
+// will redo: a design edit that set a page's points aside (PAGE_ADJUSTED) dropped them without a word.
+const STOP_BEFORE_RENDER = new Set(["PAGE_ADJUSTED"]);
 
 /**
  * The advisories in the order they matter: what the user must hear (a title changed since they approved it), what may be
@@ -255,7 +254,7 @@ function argumentHeld(work) {
  * The pages file is read as `author-deck` reads it - its parts spliced in, the research's sources registry where it has
  * none of its own, the compose cache beside it; `doc` compiles a document that is not on disk (an option).
  */
-async function compileWorkspace(work, { python: py = pythonBin(), doc = null } = {}) {
+export async function compileWorkspace(work, { python: py = pythonBin(), doc = null } = {}) {
   const source = doc ?? await readPagesFile(work.file);
   const argument = argumentHeld({ ...work, doc: source });
   if (argument.held) return argument;
@@ -294,7 +293,7 @@ export function renderedSlide(out, scene, pageId) {
  * Build the PowerPoint and render it. `doc` and `authored` build an option already compiled (candidates.mjs); `only`
  * emits and renders those pages alone; `specPath` keeps an option's compiled deck out of the workspace's own.
  */
-export async function buildWorkspace(work, out, { python: py = pythonBin(), doc = null, authored: given = null, only = null, specPath = null, fetch = true } = {}) {
+export async function buildWorkspace(work, out, { python: py = pythonBin(), doc = null, authored: given = null, only = null, specPath = null, fetch = true, formats = ["pptx"] } = {}) {
   const compiled = given ? { authored: given, advisories: given.advisories, source: doc } : await compileWorkspace(work, { python: py, doc });
   if (compiled.held) return compiled.held;
   const { authored, advisories } = compiled;
@@ -303,12 +302,17 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
   // deck.json from older pages is refused (DECK_OLDER_THAN_PAGES).
   await writeJsonWhole(spec, { ...authored.spec, ...(doc ? {} : { compiledFrom: compiledFrom(compiled.source) }) });
   // `fetch: false` (`--no-fetch`) looks nothing up: no logo, photograph, flag or place leaves the machine's own files.
-  await buildDeck(spec, path.resolve(out), { python: py, render: true, fetchLogos: fetch, source: { spec: authored.spec, baseDir: work.root }, ...(only ? { only } : {}) });
+  await buildDeck(spec, path.resolve(out), { python: py, render: true, fetchLogos: fetch, source: { spec: authored.spec, baseDir: work.root }, formats, ...(only ? { only } : {}) });
   const result = await readJson(path.join(path.resolve(out), "build-result.json"));
   const status = result.status === "built" ? "complete" : "blocked";
+  // An HTML build delivers the page and its photographs; it has no saved PowerPoint to read back.
+  if (!result.pptxPath && result.htmlPath) return complete({ status: result.status === "built-unrendered" && !(result.blockers || []).length ? "complete" : status, sourceHash: await fingerprint(work),
+    artifacts: [result.htmlPath, ...(result.html?.render?.renders ?? [])], findings: result.blockers || [], advisories,
+    ...(result.html?.renderSkipped ? { message: result.html.renderSkipped } : {}),
+    checks: { mechanical: (result.blockers || []).length ? "failed" : "passed", rendering: result.html?.render ? "ran" : "missing", visual: "pending" }, result: path.join(path.resolve(out), "build-result.json") });
   if (!result.pptxPath) return complete({ status: "blocked", findings: result.blockers || [], advisories, result: path.join(path.resolve(out), "build-result.json") });
   // What this build wrote, not every file the folder holds: the deck, its PDF and the page images.
-  const files = [result.pptxPath, result.render?.pdf, ...(result.render?.renders ?? [])].filter(Boolean);
+  const files = [result.pptxPath, result.htmlPath, result.render?.pdf, ...(result.render?.renders ?? [])].filter(Boolean);
   const scene=await readJson(path.join(path.resolve(out),"scene.json"));
   const readback=await readJson(path.join(path.resolve(out),"readback.json"),{optional:true});
   const editability={schema:"professional-slides.editability/v1",scope:"composed pages",basis:"scene with saved-PPTX readback",

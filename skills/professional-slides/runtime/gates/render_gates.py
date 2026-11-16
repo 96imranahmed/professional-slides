@@ -39,15 +39,6 @@ from ink import CANVAS_H
 from text_stats import word_count
 
 
-def column_repair(column):
-    # Only what a page key does: where a group sits in its column and how wide the column is are the composer's.
-    return ("The {} column is empty from y {} to {} while the page beside it is full. Give the height to what "
-            "can use it - the exhibit at its frame's size, a table with the rows or treated column it was given "
-            "the height for - or set the commentary under a short exhibit (`commentary: \"below\"`). Do not "
-            "stretch rows or pad text to cover the band.").format(
-                column["name"], column["from"], column["to"])
-
-
 # --- gates -----------------------------------------------------------------
 
 
@@ -84,10 +75,11 @@ def filled_rows(rows):
 
 
 def void_bands(rows, top=VOID_TOP, bottom=FOOTER_TOP, scale=CANVAS_H):
-    """DEAD_BAND and INTERNAL_VOID's one definition, read off `rows[y]`, the
-    occupied pixels on each canvas row. The render's gates pass the rows of the
-    PNG; SCENE_VOID passes the rows the scene will draw (scene_rows), so the
-    author hears at authoring the bands the build will report.
+    """The one definition of a page's empty bands, read off `rows[y]`, the
+    occupied pixels on each canvas row. The drift check (page_gates
+    gate_render_drift) passes the rows of the PNG and, through scene_void, the
+    rows the scene will draw (scene_rows), so a band the page composed is told
+    from one the export lost.
 
     `deadBand` is the trailing band from the last occupied row to the footer;
     `internalVoid` the tallest empty run between VOID_TOP and that row - a

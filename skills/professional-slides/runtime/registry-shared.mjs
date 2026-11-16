@@ -50,8 +50,19 @@ export const openLine = (id, x1, y1, x2, y2, role = "rule", stroke = RULE, lineW
   data
 });
 
-export const component = ({ id, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render, measureContent }) => ({
+// `sizing: "fill"`: the component draws to whatever frame it is given (a chart, a picture, a toned panel); without it, it
+// has a size of its own, which it measures or the engine reads off what it draws.
+// `takes`: the page content the component can set, and how many items of it ({ points: [1, 1] } - one point, no more);
+// `reads`: the widths it reads at ({ minWidth, maxWidth }, px). Both are requirements the engine weighs when it chooses
+// between ways of setting a page (tasteful-layout), so a new way to set content is a component that says what it takes.
+// `anchor: "top"`: the component is read from its head (a table from its header row), so where it leaves height it
+// keeps the top of its frame and the page's own top line from one such page to the next.
+export const component = ({ id, sizing, takes, reads, anchor, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render, measureContent }) => ({
   id,
+  ...(sizing ? { sizing } : {}),
+  ...(takes ? { takes } : {}),
+  ...(reads ? { reads } : {}),
+  ...(anchor ? { anchor } : {}),
   version: "2.0.0",
   category,
   role,
@@ -123,7 +134,7 @@ export function simpleList({ id, frame, items, numbered = false, markerColor = P
   // Each item measured, and drawn in the lines it was measured to (a chevron's details keep them in the PPTX too,
   // emit_pptx.py LABEL_ROLES): estimated from a character count and wrapped again by PowerPoint, a 30-character detail took
   // two lines' room and was drawn on one, so a column of details was spaced unevenly.
-  const layouts = items.map((item) => measureText(String(item), textWidth, { fontSize: tokenValue(COMPACT), wrapWidthRatio: ENGINE_RESERVE }));
+  const layouts = items.map((item) => measureText(String(item), textWidth, { fontSize: tokenValue(BODY), wrapWidthRatio: ENGINE_RESERVE }));
   let heights = layouts.map((layout) => Math.max(28, layout.lines.length * 20));
   let gap = defaultGap;
   if (distribute) {
@@ -147,7 +158,7 @@ export function simpleList({ id, frame, items, numbered = false, markerColor = P
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: frame.x, y: y + 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.round")) }));
       nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: `${rolePrefix}-marker-label`, frame: { x: frame.x, y: y + 2, width: markerSize, height: markerSize }, text: String(index + 1), style: textStyle(LABEL, WHITE, true, "center") }));
     } else if (marker === "circle") {
-      const firstLineHeight = tokenValue(COMPACT) * 1.2;
+      const firstLineHeight = tokenValue(BODY) * 1.2;
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: frame.x + 2, y: y + (firstLineHeight - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.round")) }));
     } else if (marker === "square") {
       nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: frame.x + 2, y: y + 9, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
@@ -155,7 +166,7 @@ export function simpleList({ id, frame, items, numbered = false, markerColor = P
       nodes.push(shapePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, geometry: "rightArrow", frame: { x: frame.x + 2, y: y + 5, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
     }
     const layout = layouts[index];
-    nodes.push(textPrimitive({ id: stableId(id, "item", index), role: `${rolePrefix}-item`, frame: { x: frame.x + textOffset, y, width: textWidth, height }, text: layout.text, style: { ...textStyle(COMPACT, INK, false, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+    nodes.push(textPrimitive({ id: stableId(id, "item", index), role: `${rolePrefix}-item`, frame: { x: frame.x + textOffset, y, width: textWidth, height }, text: layout.text, style: { ...textStyle(BODY, INK, false, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
     cursor += height + gap;
   });
   return nodes;

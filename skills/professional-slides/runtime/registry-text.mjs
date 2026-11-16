@@ -24,8 +24,8 @@ function paragraphMeasure(frameWidth, props = {}) {
  * the track is a strip of nothing down the page.
  */
 export const proseMeasure = () => ({ widest: paragraphMeasure(Infinity), narrowest: Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 45) });
-/** A panel caption's height at a width: compact, the panel's full width (paragraph variant "caption"). */
-export const measureCaption = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: false }).height;
+/** A panel caption's height at a width: body size, the panel's full width (paragraph variant "caption"). A caption is the panel's finding, the page's content, so it is not set in the caption sizes kept for furniture. */
+export const measureCaption = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false }).height;
 export const measureProse = (text, width, heading) => {
   const body = measureText(text, paragraphMeasure(width), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false }).height;
   const head = paragraphHeading({ heading }, paragraphMeasure(width));
@@ -374,35 +374,17 @@ function bodyListLayout(frame, itemsIn, props = {}) {
 
 function bodyListNodes({ id, frame, props }) {
   const layout = bodyListLayout(frame, props.items, props);
-  if (layout.height > frame.height + 0.01) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
-  // `distribute: true` (a side column on any deck that is not airy) spreads the
-  // rows down the frame instead of stacking them at the top. The gap is capped
-  // near the height of a two-line item: past that the list reads as a menu, and
-  // the answer to a column that still ends early is more content or a narrower
-  // column, not more air.
-  const spare = Math.max(0, frame.height - layout.height);
-  // The spread opens a reading gap, not a chasm: past about a line of text the
-  // points stop reading as one column and start reading as three labels adrift
-  // in it. A column that still ends high wants another point, not more air -
-  // which is what the column and page floors ask for.
-  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 24) : 0;
-  // Whatever the cap leaves over is split above and below the list rather than
-  // dropped under it. A column that opens its gaps to the cap and then hugs the
-  // top still ends two fifths up the track, with all the slack in one band at
-  // the foot - which reads as an unfinished page, not as air. Centred, the same
-  // leftover reads as the margin around a block. The gap does the reading work;
-  // the centring stops the remainder pooling in one place.
+  // A list over its height is the author's to cut, so it says by how much, in lines of body text.
+  if (layout.height > frame.height + 0.01) {
+    const over = Math.ceil(layout.height - frame.height), line = (layout.measured[0]?.text ?? layout.measured[0]?.lead)?.lineHeight ?? 20;
+    throw new Error(`${id}: the column holds ${Math.ceil(layout.height)}px of content in ${Math.floor(frame.height)}px - over by ${over}px, about ${Math.ceil(over / line)} line${Math.ceil(over / line) === 1 ? "" : "s"} of body text (${line}px a line); cut that much from its points, or move a point elsewhere`);
+  }
   // On a dark or primary panel the list reads in white: white text, white markers,
   // reversed number discs.
   const inverse = props.tone === "inverse";
   if (props.tone !== undefined && !["standard", "inverse"].includes(props.tone)) throw new Error(`Unknown bullet-list tone: ${props.tone}`);
   const INK_ = inverse ? reversedType() : INK;
-  // `centre: false` keeps the block at the top of its track. The leftover is
-  // only a margin when the list owns the track: under a kpi or an insight it
-  // reads as a gap between the two, and in a two-column split it lands the
-  // halves on different tops.
-  const centred = props.centre !== false;
-  let y = frame.y + (centred && extraGap > 0 ? Math.max(0, spare - extraGap * (layout.measured.length - 1)) / 2 : 0);
+  let y = frame.y;
   const nodes = [];
   layout.measured.forEach((m, index) => {
     const first = m.lead ?? m.text;
@@ -479,7 +461,7 @@ function bodyListNodes({ id, frame, props }) {
       nodes.push(textPrimitive({ id: stableId(id, "sub", index, k), role: "list-subitem", frame: { x: x + layout.subIndent, y: ty, width: frame.width - layout.offset - layout.subIndent, height: sub.height }, text: sub.text, ...drawnRuns(sub, inverse), style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: sub.lineHeight }, data: { textLayout: sub } }));
       ty += sub.height;
     });
-    y += m.height + layout.gap + extraGap;
+    y += m.height + layout.gap;
   });
   return nodes;
 }
@@ -488,7 +470,7 @@ function defineParagraph() {
   return component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "type.compact", "color.ink", "color.textSecondary"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
     if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
     const width = paragraphMeasure(frame.width, props);
-    // `variant: "caption"` is the line under a panel: compact, secondary, the
+    // `variant: "caption"` is the line under a panel: body size, secondary, the
     // finding this panel carries. A well-made page captions every panel in a row
     // instead of closing the page with one shared so-what. It is the panel's
     // insight, and its role says so: set at the foot of the body it is still
@@ -500,7 +482,7 @@ function defineParagraph() {
     const nodes = head ? [textPrimitive({ id: stableId(id, "lead"), role: "paragraph-lead", frame: { x: frame.x, y: frame.y, width, height: head.layout.height }, text: head.layout.text, ...(head.layout.runs ? { runs: head.layout.runs } : {}),
       style: { ...textStyle(BODY, INK, true, props.align || "left", "top"), lineHeight: head.layout.lineHeight }, data: { textLayout: head.layout } })] : [];
     const below = head ? head.layout.height + head.gap : 0;
-    nodes.push(measuredTextNode({ id: stableId(id, "text"), role: caption ? "insight-caption" : "paragraph", frame: { ...frame, y: frame.y + below, height: frame.height - below, width }, text: props.text, ...(runs ? { runs } : {}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") }));
+    nodes.push(measuredTextNode({ id: stableId(id, "text"), role: caption ? "insight-caption" : "paragraph", frame: { ...frame, y: frame.y + below, height: frame.height - below, width }, text: props.text, ...(runs ? { runs } : {}), style: textStyle(BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") }));
     return { nodes };
   } });
 }
@@ -519,9 +501,10 @@ function paragraphHeading(props, width) {
 function defineBulletList() {
   return component({
     id: "bullet-list",
+    takes: { points: [1, 8] },
     category: "text",
     tokens: [
-      "font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule",
+      "font.body", "type.body", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule",
       "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "radius.none", "radius.round"
     ],
     preferredSize: { width: 540, height: 240 },
@@ -533,6 +516,9 @@ function defineBulletList() {
 function defineInsight() {
   return component({
     id: "insight",
+    // One point, as a statement: it holds a sentence at the page's width, where a paragraph would run too long a line.
+    takes: { points: [1, 1] },
+    reads: { minWidth: 280, maxWidth: 1160 },
     category: "section",
     role: "insight",
     tokens: [
@@ -588,7 +574,7 @@ function defineEvidenceNote() {
 
 function definePanel() {
   return component({
-    id: "panel",
+    id: "panel", sizing: "fill",
     category: "section",
     role: "panel",
     tokens: [

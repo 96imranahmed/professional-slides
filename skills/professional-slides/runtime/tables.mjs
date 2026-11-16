@@ -43,6 +43,7 @@ export const CELL_TYPES = Object.freeze([
   "bars",
   "implication",
   "rag",
+  "tag",
   "lights",
   "progress",
   "dot",
@@ -114,6 +115,25 @@ export const RAG_STATES = Object.freeze({
   // to. Grey, because amber says "behind" and these are not behind anything.
   neutral: { label: "No verdict", color: "color.rule" },
 });
+// A category or a priority in a pill - High / Medium / Low, Launched / In development - which is a label, not a verdict:
+// set in a status colour it would read as red, amber or green news. A tag is drawn in the deck's own colours instead, in
+// one of three weights the author picks by `tone`: the accent, the primary, or the quiet tint with ink type.
+export const TAG_TONES = Object.freeze({ accent: "color.accent", primary: "color.componentPrimary", neutral: "color.componentPrimaryTint" });
+/** What a pill cell prints and the token it is filled in: a `rag` state's, or a `tag`'s own word in its tone. Null for any other cell. */
+function pillOf(cell) {
+  if (cell.type === "rag") {
+    const state = RAG_STATES[cell.value];
+    if (!state) throw new Error(`Table rag cells take one of ${Object.keys(RAG_STATES).join(", ")}; a category or a priority that is not a status is a \`tag\` cell`);
+    return { label: cell.text || state.label, color: state.color };
+  }
+  if (cell.type === "tag") {
+    const tone = cell.tone ?? "neutral", label = String(cell.text ?? "").trim();
+    if (!Object.hasOwn(TAG_TONES, tone)) throw new Error(`Table tag "${label.slice(0, 40)}" takes \`tone\` ${Object.keys(TAG_TONES).join(", ")} (got ${JSON.stringify(tone)}); a red, amber or green status is a \`rag\` cell`);
+    if (!label) throw new Error("A table tag cell needs the word its pill prints, as a string or `text`");
+    return { label, color: TAG_TONES[tone] };
+  }
+  return null;
+}
 export const LIGHT_STATES = Object.freeze({ green: "color.positive", amber: "color.caution", red: "color.negative" });
 export const TABLE_TOKENS = [
   "font.body",
@@ -676,9 +696,12 @@ function contentLayout(cell, width, props, used) {
       if (!everything.includes(String(phrase).toLowerCase())) throw new Error(`Table cell accent "${phrase}" does not occur in the cell`);
     }
   }
+  // Under a bubble the qualifier clears the pill, not the figure: the row is taller by the pill's own padding and the gap
+  // the qualifier is set off by (bubbleUnder), so the pill keeps its one-line height with the line beneath it.
+  const underBubble = sub && cell.type === "highlight" && cell.surface === "bubble" ? 2 * BUBBLE_PAD_Y() + bubbleUnder({ sub }) - sub.height : 0;
   const blockHeight = (blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
-    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0) + (by ? v("space.1") + by.height : 0);
+    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0) + underBubble + (by ? v("space.1") + by.height : 0);
   const numberMarker =
     cell.type === "number" && cell.numberDisplay !== "plain"
       ? Math.max(
@@ -818,15 +841,14 @@ function fixedCellLayout(cell, { props, padding, gap, marker, inner }) {
   }
 }
 
-/** A cell drawn as a mark with at most a label: a RAG pill, lights, a progress bar, a trend ring, a dot or check. Undefined for any other cell. */
+/** A cell drawn as a mark with at most a label: a status or tag pill, lights, a progress bar, a trend ring, a dot or check. Undefined for any other cell. */
 function markCellLayout(cell, { padding, gap, marker, inner, bold, size }) {
-  if (cell.type === "rag") {
-    const state = RAG_STATES[cell.value];
-    if (!state) throw new Error(`Table rag cells take one of ${Object.keys(RAG_STATES).join(", ")}`);
-    const label = measure(cell.text || state.label, inner, true, "type.label");
+  const pillState = pillOf(cell);
+  if (pillState) {
+    const label = measure(pillState.label, inner, true, "type.label");
     const pillWidth = label.width + 2 * v("space.3"), pillHeight = label.height + 2 * v("space.1");
-    if (pillWidth > inner) throw new Error("Table status pill does not fit its column; widen the column");
-    return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, pill: { width: pillWidth, height: pillHeight, color: t(state.color) }, height: pillHeight };
+    if (pillWidth > inner) throw new Error(`Table ${cell.type === "tag" ? "tag" : "status"} pill does not fit its column; widen the column`);
+    return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, pill: { width: pillWidth, height: pillHeight, color: t(pillState.color) }, height: pillHeight };
   }
   if (cell.type === "lights") {
     if (!LIGHT_STATES[cell.value]) throw new Error("Table lights cells take green, amber or red");
@@ -1011,9 +1033,10 @@ function layoutLegend(id, scale, width, size, gap, absent = false, named = false
 // refuses on), or 0 for a cell of words.
 function minimumDrawnWidth(cell, props = {}) {
   const gap = v(props.density === "compact" || props.density === "dense" ? "space.1" : "space.2");
-  if (cell.type === "rag") {
-    const state = RAG_STATES[cell.value];
-    return state ? Math.ceil(measure(cell.text || state.label, 100000, true, "type.label").width + 2 * v("space.3")) : 0;
+  if (cell.type === "rag" || cell.type === "tag") {
+    // A cell the layout will refuse (an unknown state, a tag with no word) reserves nothing here; the layout says why.
+    const label = cell.type === "rag" ? cell.text || RAG_STATES[cell.value]?.label : String(cell.text ?? "").trim();
+    return label ? Math.ceil(measure(label, 100000, true, "type.label").width + 2 * v("space.3")) : 0;
   }
   if (cell.type === "lights") return 3 * v("icon.small") + 2 * gap;
   if (cell.type === "progress") {
@@ -1720,7 +1743,10 @@ function drawRowBands(table) {
   const { id, frame, props, m, nodes, xs, ys, tint, labelTint } = table;
   // Zebra rows (house style): every second body row on a muted band, no row
   // rules, for open and standard tables that carry no filled category column.
-  const zebra = (props.zebra ?? (houseStyle("style.tableRows") === "zebra")) && props.treatment !== "categories" && props.headerShape !== "chevron";
+  // Banding is an aid to reading across many rows. It stands down where a row is already marked out (a band beside a
+  // highlighted row reads as a second highlight) and on a table short enough to read without it, unless the author asks.
+  const marked = props.highlightRow !== undefined || (props.rows || []).some((row) => !Array.isArray(row) && ["accented", "total"].includes(String(row?.style ?? "")));
+  const zebra = (props.zebra ?? (houseStyle("style.tableRows") === "zebra" && !marked && (props.rows || []).length >= 5)) && props.treatment !== "categories" && props.headerShape !== "chevron";
   // The stripes restart under each group subheading, so every group opens on
   // a white row rather than on whichever parity the rows above left it.
   const striped = new Set();
@@ -1815,6 +1841,11 @@ function drawRowBands(table) {
   return { zebra, striped, quietVerdict };
 }
 
+// A bubble's padding above and below its figure, and the room its cell keeps under the pill for a `sub` line: the line
+// and a small gap. The pill and the line are centred in the row as one stack.
+const BUBBLE_PAD_Y = () => v("space.1");
+const bubbleUnder = (layout) => (layout?.sub ? layout.sub.height + v("space.1") : 0);
+
 /** Where cells sit: one pill per bubble column. Every cell centres in its row (drawTextCell). */
 function cellPlacements(table) {
   const { m } = table;
@@ -1835,12 +1866,13 @@ function cellPlacements(table) {
     const seen = bubbleText.get(c) ?? { width: 0, height: 0 };
     bubbleText.set(c, { width: Math.max(seen.width, block.width), height: Math.max(seen.height, block.height) });
   }));
-  const BUBBLE_PAD_X = v("space.3"), BUBBLE_PAD_Y = v("space.1");
-  const bubblePill = (c, area, height) => {
+  const BUBBLE_PAD_X = v("space.3");
+  // `under`: the height kept beneath the pill for the cell's `sub` line (bubbleUnder), 0 for a figure alone.
+  const bubblePill = (c, area, height, under = 0) => {
     const text = bubbleText.get(c) ?? { width: 0, height: 0 };
     const width = Math.min(text.width + 2 * BUBBLE_PAD_X, area.width - m.gap);
-    const pillHeight = Math.min(text.height + 2 * BUBBLE_PAD_Y, height - m.gap);
-    return { x: area.x + (area.width - m.gap - width) / 2, y: area.y + (height - pillHeight) / 2, width, height: pillHeight };
+    const pillHeight = Math.min(text.height + 2 * BUBBLE_PAD_Y(), height - m.gap - under);
+    return { x: area.x + (area.width - m.gap - width) / 2, y: area.y + (height - pillHeight - under) / 2, width, height: pillHeight };
   };
   return { bubblePill };
 }
@@ -1893,7 +1925,7 @@ function drawTableCell(table, cell, r, c) {
         id: cellId,
         role: bubble ? "table-bubble" : "table-cell",
         frame: bubble
-          ? bubblePill(c, area, height)
+          ? bubblePill(c, area, height, bubbleUnder(l))
           : {
               ...area,
               y: area.y + m.gap / 2,
@@ -1983,7 +2015,7 @@ function drawCellContent(table, cell, at) {
   const { l, bubble } = at;
   if (cell.blank) {
     // nothing to draw: a group row's continuation cells
-  } else if (cell.type === "rag") drawStatusPill(table, cell, at);
+  } else if (cell.type === "rag" || cell.type === "tag") drawStatusPill(table, cell, at);
   else if (cell.type === "lights") drawLights(table, cell, at);
   else if (cell.type === "progress") drawProgress(table, cell, at);
   else if (cell.type === "sparkline") drawSparkline(table, cell, at);
@@ -2010,14 +2042,19 @@ function drawVerticalLabel(table, cell, at) {
     style: { ...textStyle(l.bold, color, "center", l.size), lineHeight: block.lineHeight, rotate: -90 }, data: { ...data, textLayout: block, vertical: true } }));
 }
 
-/** A RAG status as a pill with its state's word. */
+/**
+ * A status or a tag as a pill with its word. The word is set in whichever of the reversed white and the ink reads better
+ * on the pill's own fill (onFill): white on every fill put white on the rule grey of a "not started" pill, 1.2:1 where a
+ * brand's hairline is pale, and the build's own contrast gate refused the page.
+ */
 function drawStatusPill(table, cell, at) {
   const { m, nodes, putText } = table;
   const { l, height, area, cellId, data } = at;
   const { width: pw, height: ph, color: pc } = l.pill;
   const px0 = area.x + (area.width - m.gap - pw) / 2, py0 = area.y + (height - ph) / 2;
-  nodes.push(rectPrimitive({ id: stableId(cellId, "pill"), role: "table-status-pill", frame: { x: px0, y: py0, width: pw, height: ph }, style: { fill: pc, stroke: "none", lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, state: cell.value } }));
-  putText(stableId(cellId, "pill-label"), "table-status-label", { x: px0, y: py0 + (ph - l.blocks[0].height) / 2, width: pw }, l.blocks[0], textStyle(true, white, "center", "type.label"), { ...data, state: cell.value });
+  const pillData = cell.type === "tag" ? { tone: cell.tone ?? "neutral" } : { state: cell.value };
+  nodes.push(rectPrimitive({ id: stableId(cellId, "pill"), role: "table-status-pill", frame: { x: px0, y: py0, width: pw, height: ph }, style: { fill: pc, stroke: "none", lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, ...pillData } }));
+  putText(stableId(cellId, "pill-label"), "table-status-label", { x: px0, y: py0 + (ph - l.blocks[0].height) / 2, width: pw }, l.blocks[0], textStyle(true, foreground(pc), "center", "type.label"), { ...data, ...pillData });
 }
 
 /** Three lamps, the cell's state lit. */
@@ -2183,17 +2220,23 @@ function drawImplicationMark(table, cell, at) {
   );
 }
 
-/** A bubble's figure, centred in its column's pill. */
+/** A bubble's figure, centred in its column's pill, and the cell's `sub` line centred under the pill. */
 function drawBubbleLabel(table, cell, at) {
-  const { putText, bubblePill } = table;
-  const { c, l, height, area, cellId, data, color } = at;
+  const { m, putText, bubblePill, tint } = table;
+  const { c, l, height, area, cellId, data, color, band, onLabel } = at;
   // The figure sits centred in its pill, not on the cell's own alignment:
   // a column of identical pills whose numbers are not on one centre line
   // reads as a column of near-misses.
-  const pill = bubblePill(c, area, height);
+  const pill = bubblePill(c, area, height, bubbleUnder(l));
   putText(stableId(cellId, "bubble-label"), "table-bubble-label",
     { x: pill.x, y: pill.y + (pill.height - l.blocks[0].height) / 2, width: pill.width },
     l.blocks[0], textStyle(true, color, "center", l.size), data);
+  // The qualifier a text cell sets under its figure ("+18% since 2014"), here under the pill: in a bubble column it was
+  // measured into the row's height and then never drawn. It sits on the row, not the pill, so it takes the row's type colour, on the pill's centre line.
+  if (l.sub)
+    putText(stableId(cellId, "cell-sub"), "table-cell-sub",
+      { x: area.x, y: pill.y + pill.height + v("space.1"), width: area.width - m.gap },
+      l.sub, textStyle(false, band ? foreground(band) : onLabel ? readableOn(t("color.textSecondary"), tint) : t("color.textSecondary"), "center", "type.label"), data);
 }
 
 /**

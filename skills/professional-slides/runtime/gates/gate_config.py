@@ -60,7 +60,7 @@ THRESHOLDS = {
     # column a quarter of the page wide: the same fifteen words take five or six
     # lines there.
     "side_title_lines_max": 7,
-    # The share of the page's body an empty band may run to before it is advised (SCENE_VOID) - a gap between two
+    # The share of the page's body an empty band may run to before the render is read as having drifted from the scene - a gap between two
     # blocks, a trailing band under the content, a band of one column - and before the render's band is drift.
     "internal_void_max": 0.13,
     "dead_band_max": 0.08,
@@ -125,8 +125,6 @@ GATE_CODES = {
     "AREA_BASELINE": "a filled area whose baseline is not zero, so its fill overstates every change",
     "MISSING_RENDER": "a page the gates could not measure because it did not render",
     "RENDER_DRIFT": "the render shows an empty band the scene does not draw: something the scene holds did not reach the page",
-    # Advised, never refused: an empty band is the author's to judge.
-    "SCENE_VOID": "a band of the page's body, measured on the scene, that nothing crosses",
 }
 
 

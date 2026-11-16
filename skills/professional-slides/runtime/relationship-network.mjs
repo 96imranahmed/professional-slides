@@ -118,7 +118,7 @@ export const RELATIONSHIP_NETWORK_VARIANTS=Object.freeze({
 
 export function registerRelationshipNetwork(registry){
  registry.set('relationship-network',{
-  id:'relationship-network',version:'1.0.0',category:'relationship',role:'relationship-network',
+  id:'relationship-network', sizing: "fill",version:'1.0.0',category:'relationship',role:'relationship-network',
   tokens:[...RELATIONSHIP_NETWORK_TOKENS],preferredSize:{width:1160,height:430},
   sample:RELATIONSHIP_NETWORK_VARIANTS['hub-ring'].props,variants:RELATIONSHIP_NETWORK_VARIANTS,
   defaultVariant:'hub-ring',variantProp:'variant',resolveVariant:(props={})=>{const variant=props.variant??'hub-ring';check(Object.hasOwn(RELATIONSHIP_NETWORK_VARIANTS,variant),'unsupported variant');return variant;},

@@ -12,7 +12,7 @@ import { sampleImage, MEDIA_SAMPLE, WORDMARK_RECORDS, mediaNode } from "./media.
 import { SECONDARY, MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS, LABEL, textStyle, boxStyle, component, INK, DISPLAY } from "./registry-shared.mjs";
 
 function defineImageFrame() {
-  return component({ id: "image-frame", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small", "radius.round"], preferredSize: { width: 520, height: 300 }, sample: { alt: "(Insert image)" }, render: ({ id, frame, props }) => { if (props.dataUri) {
+  return component({ id: "image-frame", sizing: "fill", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small", "radius.round"], preferredSize: { width: 520, height: 300 }, sample: { alt: "(Insert image)" }, render: ({ id, frame, props }) => { if (props.dataUri) {
     if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(props.dataUri) || !props.alt?.trim() || !props.authorization?.trim()) throw new Error("Image requires embedded PNG/JPEG, alt text and authorization");
     return { nodes: [primitive({ type: "image", id: stableId(id, "image"), role: "image", frame, data: { dataUri: props.dataUri, alt: props.alt, authorization: props.authorization, circular: false } })] };
   } return ({
@@ -498,7 +498,7 @@ function registerIconTrends(registry, tokens) {
 // A logo collage: wordmarks and logos set in a wall of cells.
 function registerLogoCollage(registry, tokens) {
   registry.set("logo-collage", {
-    id: "logo-collage",
+    id: "logo-collage", sizing: "fill",
     version: "1.0.0",
     category: "media",
     role: "logo-collage",

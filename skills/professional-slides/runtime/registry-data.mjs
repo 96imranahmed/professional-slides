@@ -70,6 +70,7 @@ function defineChartCallout() {
 function defineTable() {
   return component({
     id: "table",
+    anchor: "top",
     category: "data",
     role: "table",
     tokens: [
@@ -132,7 +133,7 @@ function defineComparisonTable() {
 
 function defineHeatmap() {
   return component({
-    id: "heatmap",
+    id: "heatmap", sizing: "fill",
     category: "data",
     role: "heatmap",
     tokens: [

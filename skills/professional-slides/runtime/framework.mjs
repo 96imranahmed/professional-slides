@@ -85,8 +85,8 @@ function pyramidNodes({ id, frame, props }) {
     const rightW = frame.x + frame.width - rightX;
     if (!inside || tier.text) {
       const parts = [!inside ? tier.label : null, tier.text].filter(Boolean);
-      const tm = measure(parts.join("\n"), Math.max(80, rightW), "type.compact");
-      if (rightW >= 80) nodes.push(label(stableId(tid, "text"), "framework-tier-text", { x: rightX, y: y + (tierHeight - tm.height) / 2, width: rightW }, tm, style("type.compact", INK, false, "left")));
+      const tm = measure(parts.join("\n"), Math.max(80, rightW), "type.body");
+      if (rightW >= 80) nodes.push(label(stableId(tid, "text"), "framework-tier-text", { x: rightX, y: y + (tierHeight - tm.height) / 2, width: rightW }, tm, style("type.body", INK, false, "left")));
     }
   });
   return nodes;
@@ -105,7 +105,7 @@ export function registerFramework(registry) {
       // pillar width, tiers with the frame width.
       if (props.variant === "pyramid") {
         const tiers = props.tiers || [];
-        const tallest = Math.max(0, ...tiers.map((t) => measure([t.label, t.text].filter(Boolean).join("\n"), Math.max(80, frame.width * 0.28), "type.compact").height + 2 * v("space.2")));
+        const tallest = Math.max(0, ...tiers.map((t) => measure([t.label, t.text].filter(Boolean).join("\n"), Math.max(80, frame.width * 0.28), "type.body").height + 2 * v("space.2")));
         return { height: Math.max(48, tallest) * tiers.length + v("space.1") * (tiers.length - 1) };
       }
       const pillars = props.pillars || [], gap = v("space.3"), pad = v("space.3");

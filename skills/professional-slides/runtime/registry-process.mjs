@@ -254,8 +254,7 @@ function waveRoadmapLayout(frame, props) {
   // its last deliverable and the commentary under it. The stages open up: most
   // between the rail and the lists and between the two lists (up to 40px more
   // each, so no gap passes 56px - wider, and the lists read as separate blocks
-  // with a band of nothing between them, which SCENE_VOID reports past a
-  // seventh of the body), less between the heading and its marker (32px) - a
+  // with a band of nothing between them), less between the heading and its marker (32px) - a
   // heading that drifts further from its marker stops labelling it - and least
   // between the date and the heading (8px). Proportionally, so the gaps keep
   // their relation to one another; past the caps the page keeps the rest as
@@ -524,7 +523,7 @@ function defineJourney() {
 
 function defineTree() {
   return component({
-    id: "tree",
+    id: "tree", sizing: "fill",
     category: "relationship",
     role: "tree",
     tokens: [
@@ -542,7 +541,7 @@ function defineTree() {
 
 function defineOrganization() {
   return component({
-    id: "organization",
+    id: "organization", sizing: "fill",
     category: "relationship",
     role: "organization",
     tokens: [

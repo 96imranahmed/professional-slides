@@ -4,7 +4,7 @@ import os from "node:os";
 import { diagnose } from "../doctor.mjs";
 import { readJson, writeJsonWhole, pythonBin } from "../cli.mjs";
 import { runProcess } from "../process.mjs";
-import { complete, blocked, packageRoot, runtime, digest, python } from "./workspace.mjs";
+import { complete, blocked, packageRoot, digest, python } from "./workspace.mjs";
 
 export async function checkEnvironment({probe=false,renderer="auto"}={}) {
   if(!["auto","powerpoint","libreoffice"].includes(renderer))throw new Error("renderer must be auto, powerpoint or libreoffice");

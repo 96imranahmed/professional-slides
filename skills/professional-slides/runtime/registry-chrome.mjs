@@ -190,7 +190,7 @@ function sectionContentInsets(frame, props = {}) {
 
 function defineSectionBoundary() {
   return component({
-    id: "section-boundary", category: "relationship", role: "section-boundary",
+    id: "section-boundary", sizing: "fill", category: "relationship", role: "section-boundary",
     tokens: ["color.rule", "color.componentPrimary", "color.onPrimary", "line.hairline", "line.standard", "space.1", "icon.medium", "radius.round"],
     preferredSize: { width: 54, height: 400 }, sample: { variant: "related" },
     render: ({ id, frame, props }) => {
@@ -510,7 +510,7 @@ const owning = (definition, ownGround) => Object.assign(definition, { ownGround 
 
 function defineCover() {
   return owning(component({
-    id: "cover",
+    id: "cover", sizing: "fill",
     category: "navigation",
     role: "cover",
     tokens: [
@@ -757,7 +757,7 @@ function renderSectionDivider({ id, frame, props }) {
 
 function defineSectionDivider() {
   return owning(component({
-    id: "section-divider",
+    id: "section-divider", sizing: "fill",
     category: "navigation",
     role: "divider",
     tokens: [

@@ -1,32 +1,33 @@
 // The arrangements a page's evidence is laid out in, each one function from
 // the page (its slide, layout and exhibits) to the layout-tree regions it
 // pushes onto the page's items: peer exhibits in a row (`peerExhibitsRow`), an
-// exhibit beside its commentary (`exhibitBesideCommentary`) or over it
-// (`exhibitOverCommentary`, with the staircase variant `commentaryOverSteps`),
-// labelled rows of blocks (`labelledRows`), the points set under a row of
-// panels, and the single-layout pages: an exhibit across the page or a figure
-// with its points, a table in halves, a hero number, a split-tone pair, a
-// stack and a grid of exhibits.
+// exhibit over its commentary (`exhibitOverCommentary`, with the staircase
+// variant `commentaryOverSteps`), labelled rows of blocks (`labelledRows`), the
+// points set under a row of panels, a figure with its points and a table in
+// halves. The arrangements that are grids - an exhibit beside its commentary,
+// a hero number, a split-tone pair, a stack, a grid of exhibits, a picture
+// beside its argument - are written as templates (`builtInGrid`) and set by
+// the one composer an author's own `grid` takes (`templatePage`).
 import { defaultHighlightStyle } from "./core.mjs";
-import { measureCaption, proseMeasure, measureProse, measureInsight } from "./registry-text.mjs";
+import { isSlot, resolveTemplate } from "./layout-templates.mjs";
+import { measureCaption, proseMeasure } from "./registry-text.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
 import { plotHeadroom, topBand, horizontalChart, oneMagnitude } from "./chart-axes.mjs";
 import { FLAT_SHARE } from "./chart-sense.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { stepsLayout } from "./extras.mjs";
 import { detailedStages, stagesLayout } from "./schedule-stages.mjs";
-import { factGridLayout } from "./figures.mjs";
 import { renderTable, withoutInferredBars } from "./tables.mjs";
-import { metricHeight } from "./panels.mjs";
-import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, LINK_GUTTER, BODY_HEIGHT, SIDE_COLUMN_SHORT, SIDE_COLUMN_DEPTH, SIDE_COLUMN_MIN_WIDTH } from "./compose-body.mjs";
+import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, LINK_GUTTER, BODY_HEIGHT } from "./compose-body.mjs";
 import { heavyTable, styleTable } from "./compose-tables.mjs";
-import { sharedBound, SIDEWAYS_CATEGORIES } from "./compose-charts.mjs";
+import { sharedBound } from "./compose-charts.mjs";
 import { exhibitItem, headedPanel } from "./compose-exhibits.mjs";
-import { paragraph, pointColumns, pointsItem, sideTreatment, listDepth, pointsPerRow, proseOf, bridgeVariant, pointBullets, pointRun } from "./compose-points.mjs";
-import { photoStrip } from "./compose-pictures.mjs";
-import { metricsColumn } from "./compose-metrics.mjs";
-import { hasCommentary } from "./compose-layouts.mjs";
+import { paragraph, pointColumns, pointsItem, pointWays, sideTreatment, listDepth, proseOf, bridgeVariant, pointBullets, soWhatItem } from "./compose-points.mjs";
+import { pictureFrame, photoStrip } from "./compose-pictures.mjs";
+import { metricsColumn, metricsStrip } from "./compose-metrics.mjs";
+import { hasCommentary, needsFullWidth } from "./compose-layouts.mjs";
 import { fitsQuarter } from "./compose-text-pages.mjs";
+import { REGISTRY } from "./registry.mjs";
 
 /** A link's end by the exhibit's place on the page: `1`, or `{ exhibit: 1, ... }` as the compile writes it. */
 const placeOf = (end) => (typeof end === "number" ? end : end?.exhibit ?? 0);
@@ -279,7 +280,7 @@ function sharePlotFrame(charts) {
  * card's own surface.
  */
 export function pointsUnderPanels(points, { id, slide, layout, panels, fill, pointsStyle, tone = sideTreatment(slide), most }) {
-  const column = (list, at, size) => ({ id: `${id}-points-${at}`, layout: "flow.column", size, items: [pointsItem(list, `${id}-points-${at}-list`, tone, fill, false, pointsStyle)] });
+  const column = (list, at, size) => ({ id: `${id}-points-${at}`, layout: "flow.column", size, items: [pointsItem(list, `${id}-points-${at}-list`, tone, fill, pointsStyle)] });
   // One point is a paragraph, at the capped measure paragraphs keep, its lead
   // running into the sentence in bold and its phrase in the accent.
   if (points.length === 1 && !pointBullets(points[0])) {
@@ -317,7 +318,7 @@ function commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }
   let L;
   try { L = stepsLayout({ x: 0, y: 0, width: BODY_WIDTH, height: STAIR_FIT_HEIGHT }, ex); } catch { return null; }
   const n = L.items.length, heading = slide.pointsHeading === false ? null : slide.pointsHeading || "What it means";
-  const list = pointsItem(slide.points, `${id}-points`, "open", fill, false, pointsStyle);
+  const list = pointsItem(slide.points, `${id}-points`, "open", fill, pointsStyle);
   for (let under = n - 1; under >= 1; under -= 1) {
     const width = under * L.width + (under - 1) * L.gap;
     // The points keep a reading measure: wider than it, they run past CPL.
@@ -362,26 +363,6 @@ export function acrossOverCommentary(ex) {
 export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves = false }) {
   const stair = slide.pageType && !halves ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
   if (stair) { items.push(stair); return; }
-  // Three or four facts in a row over two or three points are a strip of
-  // tiles and a strip of text with a third of the page empty under them. When
-  // the page type left the geometry to the composer and the stack would stop
-  // that short, the facts run down a stat column at the left and the points
-  // down the rest, both the body's height.
-  const facts = exhibits[0];
-  if (slide.pageType && facts?.type === "fact-grid" && facts.columns === undefined && (facts.items || []).length <= 4 && slide.points.length <= 3) {
-    const row = factGridLayout({ x: 0, y: 0, width: BODY_WIDTH, height: BODY_HEIGHT }, facts);
-    const across = pointsPerRow(slide.points.length);
-    const below = Math.max(...slide.points.map((point) => measureProse(pointRun(point), (BODY_WIDTH - COLUMN_GAP * (across - 1)) / across)));
-    if (row.rows === 1 && (row.height * 1.35 + COLUMN_GAP + 44 + below) / BODY_HEIGHT < SIDE_COLUMN_SHORT) {
-      items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-        exhibitItem({ ...facts, columns: 1 }, `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" }),
-        { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: "open", layout: "flow.column",
-          // Narrow enough to read: a line of body type under ninety characters.
-          size: { width: { fr: 1.2 }, height: "fill" }, items: [pointsItem(slide.points, `${id}-points`, "open", fill, true, pointsStyle)] },
-      ] });
-      return;
-    }
-  }
   // The exhibit across the full width, its commentary in columns beneath it.
   // A wide exhibit - ten categories, a twelve-row table - has no width to
   // give a side column, and three findings read better as three columns than
@@ -400,12 +381,14 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   // set under a full-width exhibit is a band, and a well-made page sets the
   // band to the width of the thing it is read off - under a chart, the width
   // of the chart; under a full-width table, the width of the page.
-  const loneBand = slide.points.length === 1;
+  // Prose written in place of points (`paragraphs`) is set the same way: a column a paragraph.
+  const written = slide.points ?? slide.paragraphs ?? [];
+  const loneBand = written.length === 1;
   // One style for the row: decided point by point, a sentence that begins in
   // lower case ("flydubai is ...") would run its lead inline while its
   // neighbour's lead stood as a heading, and one band would read as two
   // devices.
-  const entries = slide.points.map((point) => (typeof point === "string" ? { text: point } : point));
+  const entries = written.map((point) => (typeof point === "string" ? { text: point } : point));
   // A lead over bullets always stands as its column's heading: the bullets are its parts, not a sentence it runs into.
   // `pointsStyle: "inline"` keeps each lead in its sentence, bold and before a colon, as the style says.
   const inline = pointsStyle === "inline", boxed = pointsStyle === "boxed";
@@ -436,7 +419,7 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
       items: [...(text ? [paragraph(`${id}-col-${at}-text`, text, entry.highlight, { ...lead, ...(loneBand ? { maxMeasure: false } : {}) })] : []),
         // Dashed, as a point's bullets are beside an exhibit: the same device on every page, whatever the house's list marker.
-        ...(pointBullets(entry) ? [dashed(pointsItem(pointBullets(entry), `${id}-col-${at}-list`, "open", fill, false, "bulleted"))] : [])] };
+        ...(pointBullets(entry) ? [dashed(pointsItem(pointBullets(entry), `${id}-col-${at}-list`, "open", fill, "bulleted"))] : [])] };
   });
   // The columns share one heading, the way the side column does: without it
   // the page drops straight from the plot into three paragraphs with nothing
@@ -476,7 +459,7 @@ export function labelledRows(items, { id, slide, baseDir, fill }) {
     const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary", ...(block.icon ? { icon: block.icon } : {}) },
       size: { width: BLOCK_LABEL_WIDTH, height: "fill" } };
     const text = { id: `${id}-text-${at}`, layout: "flow.column", leftover: "center", size: { width: { fr: 1 }, height: "fill" },
-      items: [pointsItem(block.points, `${id}-points-${at}`, "open", fill, false, null)] };
+      items: [pointsItem(block.points, `${id}-points-${at}`, "open", fill, null)] };
     const side = block.metric
       ? { id: `${id}-metric-${at}`, component: "metric", props: { value: String(block.metric.value), label: block.metric.label, ...(block.metric.delta ? { delta: block.metric.delta } : {}), ...(block.metric.better ? { better: block.metric.better } : {}) },
           size: { width: BLOCK_SIDE_WIDTH, height: "fill" } }
@@ -540,215 +523,17 @@ export const centredCards = (ex) => ex.type === "cards" && ex.tone !== "header" 
 export const centredFigure = (ex) => ["steps", "cycle", "chevron-process"].includes(ex?.type)
   || (ex?.type === "roadmap" && ["phase-workstreams", "wave-columns"].includes(ex.variant));
 
-/**
- * The evidence-beside-its-commentary row: `exhibit-left` and `exhibit-right`.
- *
- * One of `composeSlide`'s layout branches, in a function of its own: the
- * column's width is measured against what it holds, its vertical alignment
- * against how much of the track it fills, its heading against whether the
- * points carry their own leads. It pushes into the caller's `items`, so the
- * page keeps the caller's order.
- */
-export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle }) {
-  // Side ratios: chart + points 2:1, table + points 3:2 — a starting point,
-  // not a constant. The column is then measured against what it holds (below).
-  // A pair of values takes half the row, as strong decks set it (chart-sense.mjs comparesTooLittle).
-  const pairOf = (ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.categories) && ex.categories.length <= 2 && Array.isArray(ex.series) && ex.series.length === 1;
-  const heroFr = exhibits[0].type === "table" || exhibits[0].type === "rows" || exhibits[0].type === "compare" ? 3 : pairOf(exhibits[0]) ? 1 : 2;
-  const baseSideFr = heroFr === 3 ? 2 : 1;
-  // A chart beside a text column keeps a one-line heading with the unit
-  // inline; the two-line heading is for peers in a row, where the bands align.
-  const heroItem = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: heroFr }, height: "fill" });
-  if (String(exhibits[0].type).startsWith("chart.") && heroItem.props?.unit && !heroItem.props.unitPlacement) heroItem.props.unitPlacement = "inline";
-  const { tone, list, kpiTile, insightBoxes, prose, sideItems, heading, hero } = sideColumnContents({ id, slide, exhibits, fill, pointsStyle, heroItem });
-  const { sideExtras, trackHeight, sideFr } = sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading, pair: pairOf(exhibits[0]) });
-  // A column of points alone that stays short at its narrowest is set under
-  // the exhibit instead, in columns across it, and the exhibit takes the row:
-  // two or three points beside a scatter run 45-55% down the page and leave
-  // the rest of the column empty. A number, a statement box or prose in the
-  // column has no place below, so those columns stay where they are. Only a
-  // layout the page type derived is rebalanced (its `commentary` says where
-  // the explanation lives, beside the exhibit; the geometry is the
-  // composer's); a layout written by hand is the author's.
-  const pointsOnly = list && !kpiTile && !insightBoxes.length && !prose.length && !slide.photo && Boolean(slide.pageType);
-  // Measured at the width the row will give it: no connector unless the page
-  // asks for one, and one gap between the exhibit and the column.
-  const drawnTrack = (fr) => (BODY_WIDTH - (bridgeVariant(slide, id) ? CONNECTOR_WIDTH + COLUMN_GAP : 0) - COLUMN_GAP) * (fr / (heroFr + fr));
-  // The exhibit that takes the row is one that uses width: a chart whose
-  // categories run across, or a flow read left to right. Bars read down their
-  // rows and a table down its lines; set under points they lose the height
-  // they are read by.
-  // A radar is round: under its points it would sit no larger in a band the page's width, so it keeps its column beside them.
-  // Two values in one series do not use the width either: strong decks set a pair at about half the page, beside its
-  // column (chart-sense.mjs comparesTooLittle).
-  const widens = ((String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow") && !pairOf(exhibits[0]);
-  if (pointsOnly && widens && fill !== "airy" && slide.pointsAlign !== "middle" && slide.points.length <= 4
-      && (sideExtras + listDepth(list, drawnTrack(sideFr), slide.density)) / trackHeight < SIDE_COLUMN_SHORT) {
-    // A hairline between points is a column's device; set under the exhibit, the varied style takes its panels instead.
-    exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle: pointsStyle === "ruled" && !slide.pointsStyle ? "boxed" : pointsStyle });
-    return;
-  }
-  besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr });
-}
-
-/** What the side column holds - a number, statements, prose, the points - its heading, and the hero panel headed to match. */
-function sideColumnContents({ id, slide, exhibits, fill, pointsStyle, heroItem }) {
-  // The side column is a headed section so its rule shares the chart heading's
-  // band and the points start level with the plot, not with the heading text.
-  // `pointsAlign: "middle"` centres the points on the exhibit instead.
-  const tone = sideTreatment(slide);
-  // The list starts at the top of its track, level with the exhibit, and
-  // spreads its gaps to their cap; what the cap leaves is the column's foot.
-  // Centred in an unheaded track, a column carries a band of air above its
-  // first point as tall as the one under its last, and the gates read by
-  // column. The answer to a column that still ends high is a narrower column
-  // (sideFr, below), not a centred one.
-  const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, tone, fill, true, pointsStyle, false) : null;
-  // `kpi: { value, label }`: the one big number the chart proves, in the accent
-  // at the top of the side column, above the points.
-  const kpiTile = slide.kpi ? { id: `${id}-kpi`, component: "metric", props: { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}), tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } } : null;
-  // `insight`: the so-what as a tonal box in the side column, centred on the
-  // exhibit when it stands alone, above the points when there are some. The
-  // column then carries no heading unless `pointsHeading` names one.
-  // `insights: [a, b]` is the familiar pattern of flanking an exhibit with two
-  // statements that carry the numbers in words; `insight` is the single box.
-  const insightSpecs = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry !== undefined && entry !== null);
-  if (insightSpecs.length > 2) throw new Error(`${id}: a side column carries at most two insights`);
-  // Two statements are a reading, then its consequence: the first set plain in
-  // the column and the second in the box under it. Two equal boxes make the
-  // column read as two unrelated labels with a gap between them.
-  const insightBoxes = insightSpecs.map((entry, at) => {
-    const variant = insightSpecs.length > 1 && at === 0 ? "plain" : "tonal";
-    const accent = slide.highlight === undefined ? {} : { highlight: slide.highlight };
-    return { id: insightSpecs.length > 1 ? `${id}-insight-${at + 1}` : `${id}-insight`, component: "insight",
-      props: typeof entry === "string" ? { text: entry, variant, ...accent } : { variant, ...accent, ...entry }, size: HUG };
-  });
-  const insightBox = insightBoxes[0] ?? null;
-  if (!list && !insightBox && !kpiTile && !(slide.paragraphs || []).length) throw new Error(`${id}: a side column needs points, an insight or a kpi`);
-  // Authored prose belongs in the column too: `paragraphs` written next to a
-  // chart are its commentary, and the content audit reports any the page
-  // drops as MISSING_AUTHORED_CONTENT.
-  const prose = proseOf(slide, id);
-  const sideItems = [kpiTile, ...insightBoxes, ...prose, list].filter(Boolean);
-  // "What it means" above three lines of text is a label on a mostly empty
-  // column. The heading earns its line when the column holds a list; a column
-  // that is one number or one box takes the blank band and keeps the rule.
-  // "What it means" earns its line over a column of plain points, where
-  // nothing else says what the column is. Over points that carry their own
-  // leads it is a label on labelled things: the same three words, naming no
-  // measure, no period and no question, over leads that name all three.
-  const ledPoints = Boolean(list) && (slide.points || []).every((point) => point && typeof point === "object" && point.lead);
-  const heading = slide.pointsHeading === false || (insightBox && !slide.pointsHeading)
-    || (!list && !slide.pointsHeading) || (ledPoints && !slide.pointsHeading)
-    ? null : slide.pointsHeading || "What it means";
-  // The hero's blank heading band exists to line its content up with the
-  // column's heading. With no heading beside it the band is an empty rule, so
-  // the exhibit starts at the top of the body instead.
-  const hero = headedPanel(exhibits[0], heroItem, `${id}-exhibit`, Boolean(heading));
-  return { tone, list, kpiTile, insightBoxes, prose, sideItems, heading, hero };
-}
-
-/** The side column's width, negotiated with what it holds against the row's height. */
-function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insightBoxes, heading, pair = false }) {
-  // The column's width is negotiated with its content, not fixed by the
-  // layout: forty words in a 361px track leave two fifths of the column
-  // empty, and the exhibit beside it wants that width anyway. A short column
-  // narrows until it runs SIDE_COLUMN_DEPTH down its track or reaches
-  // SIDE_COLUMN_MIN_WIDTH (its text wraps to more lines, and the hero grows);
-  // a column that would overrun widens. A single step to 0.8 leaves a
-  // three-point column filling three fifths of its track and the rest of it
-  // air.
-  const sideColumns = heroFr + baseSideFr + (slide.photo ? 1 : 0);
-  const sideTrack = (fr) => Math.max(140, (BODY_WIDTH - CONNECTOR_WIDTH - COLUMN_GAP * sideColumns) * (fr / (heroFr + fr + (slide.photo ? 1 : 0))));
-  const sideExtras = (kpiTile ? 126 : 0) + insightBoxes.length * 104 + (heading ? 44 : 0);
-  // The row's own height: the body less the closing band under it. Measured
-  // against the whole body, a column beside an exhibit with a so-what bar
-  // reads as deep enough and stops a fifth of the page short of its foot.
-  const closingText = typeof slide.soWhat === "string" ? slide.soWhat : slide.soWhat?.text;
-  const trackHeight = BODY_HEIGHT - (closingText ? measureInsight({ x: 0, y: 0, width: BODY_WIDTH, height: BODY_HEIGHT }, { text: closingText, variant: "tonal" }).height + COLUMN_GAP : 0);
-  const sideFr = (() => {
-    if (fill === "airy" || !list) return baseSideFr;
-    const depth = (fr) => (sideExtras + listDepth(list, sideTrack(fr), slide.density)) / trackHeight;
-    // A photograph strip takes a quarter of the row, which leaves the
-    // commentary a 267px gutter that nothing reads comfortably. The column
-    // keeps a floor of 300px; the photograph gives up the width.
-    if (slide.photo && sideTrack(baseSideFr) < 300) return baseSideFr * 1.25;
-    if (depth(baseSideFr) > 0.98) return baseSideFr * 1.2;
-    // The width goes to an exhibit that can use it. A chart's plot scales with
-    // its frame; a table set wider wraps less and ends higher, trading the
-    // column's band for one under the table, so beside a table the column
-    // gives up a fifth at most.
-    // A pair of values cannot use more width, so its column keeps its half.
-    const floor = heroFr === 3 ? baseSideFr * 0.8 : pair ? baseSideFr : 0;
-    let fr = baseSideFr;
-    while (depth(fr) < SIDE_COLUMN_DEPTH && fr * 0.95 >= floor - 1e-9 && sideTrack(fr * 0.95) >= SIDE_COLUMN_MIN_WIDTH) fr *= 0.95;
-    return fr;
-  })();
-  return { sideExtras, trackHeight, sideFr };
-}
-
-/** The row: the hero, the bridge and the side column in reading order, and a photograph strip at the right. */
-function besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr }) {
-  // A column of statements and nothing else - one box, or a statement above a
-  // box - has nothing that can spread down the track.
-  const boxesOnly = sideItems.length > 0 && sideItems.every((item) => insightBoxes.includes(item));
-  // A column of blocks starts at the top of its track, level with the exhibit;
-  // `pointsAlign: "middle"` centres it on the exhibit when the author asks.
-  // A list that owns its column - nothing above or below it, no heading -
-  // spreads its points to the capped gap and centres what is left, so the
-  // slack sits round the block rather than pooled under the last point.
-  // Centred whole, a short column of statements is a hole above as well as
-  // below, and the band gates read by column. A headed column starts under its
-  // heading, level with the exhibit's.
-  const centre = slide.pointsAlign === "middle";
-  // A toned panel is always a section (it needs a surface); it takes the
-  // heading unless the author suppresses it with `pointsHeading: false`.
-  // A column of several blocks (a number, a box, the points) spreads them down
-  // the track rather than stacking them under the heading with the bottom
-  // third left over.
-  // Spreading blocks down the track works when one of them can absorb the
-  // slack (a points list, which spreads its own items). Statements alone have
-  // nothing to absorb it, so distributing would pin them to opposite ends of
-  // an empty track; they sit together at the top instead.
-  if (centre && list) { list.size = HUG; list.props = { ...list.props, distribute: false }; }
-  else if (list && !heading && sideItems.length === 1 && sideItems[0] === list && list.props?.distribute) {
-    list.props = { ...list.props, centre: true };
-  }
-  const spread = !centre && fill !== "airy" && sideItems.length > 1 && !boxesOnly ? "distribute" : null;
-  const side = tone === "open" && centre && !heading
-    ? { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, leftover: "center", items: sideItems }
-    : { id: `${id}-side`, ...(heading ? { heading } : {}), treatment: tone, layout: "flow.column", ...(centre ? { leftover: "center" } : spread ? { leftover: spread } : {}), size: { width: { fr: sideFr }, height: "fill" }, items: sideItems };
-  // The relationship is authored; adjacent slides cannot add or remove it.
-  const bridge = bridgeVariant(slide, id);
-  const chevron = bridge
-    ? { id: `${id}-implication`, component: "connector", props: { variant: bridge }, size: { width: 44, height: "fill" } } : null;
-  // `photo`: a photograph strip at the right edge, full body height, cropped
-  // to fit (a familiar pattern: chart, commentary, photo).
-  const photo = photoStrip(slide, `${id}-photo`, baseDir);
-  const ordered = layout === "exhibit-left" ? [hero, chevron, side] : [side, chevron, hero];
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [...ordered.filter(Boolean), ...(photo ? [photo] : [])] });
-}
-
 // Icon cards with a line each hug their content at the top of the body,
 // like the figures, with the points under them; centred, they would carry
 // as much air above the row as below it. Header and numbered cards fill the
 // page as columns.
 export function figureWithPoints(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle }) {
   const below = layout === "exhibit-full" && slide.points?.length
-    ? [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle)] : [];
+    ? [pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, pointsStyle)] : [];
   items.push({ id: `${id}-figure-frame`, layout: "flow.column", size: SIZE, items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, HUG), ...below] });
   return below.length > 0;
 }
 
-// The exhibit across the page, with the measures in a column at its left when they stand beside it.
-export function fullWidthExhibit(items, { id, slide, exhibits, baseDir, metricsBeside }) {
-  const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir);
-  if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
-  // The measures in a column at the left, the exhibit the other two thirds.
-  if (metricsBeside) items.push({ id: `${id}-row`, layout: "flow.row", gap: "space.6", size: SIZE, items: [
-    metricsColumn(slide.metrics, `${id}-metrics`, slide.metricsTone), { ...item, size: { width: { fr: 2 }, height: "fill" } }] });
-  else items.push(item);
-}
 
 // One table, two panels. The rows split in reading order - the first half
 // down the left, the second down the right - so the ranking still reads 1
@@ -779,69 +564,155 @@ function halvesRow(id, ex, baseDir) {
   return { id: `${id}-row`, layout: "flow.row", size: SIZE, items: [half(body.slice(0, at), "a"), half(body.slice(at), "b")] };
 }
 
-// One figure carries the page: the number set large with its explanation,
-// the exhibit beside it as the proof rather than as the subject.
-export function heroNumber(items, { id, slide, exhibits, baseDir, fill, pointsStyle }) {
-  const kpiProps = { value: slide.kpi.value, label: slide.kpi.label, ...(slide.kpi.sublabel ? { sublabel: slide.kpi.sublabel } : {}),
-    ...(slide.kpi.delta ? { delta: slide.kpi.delta } : {}), ...(slide.kpi.better ? { better: slide.kpi.better } : {}), tone: "hero", variant: "prominent" };
-  // The column's width is negotiated with what it holds, as a column beside
-  // an exhibit is: points that stop short of the foot at a third of the row
-  // narrow it, their lines wrap longer, and the exhibit takes the width.
-  const track = (fr) => (BODY_WIDTH - COLUMN_GAP) * (fr / (2 + fr));
-  // The points hug: a column over its height is then the column's to report,
-  // by how many lines, rather than a list's to fail on.
-  const list = slide.points?.length ? pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle) : null;
-  const depth = (fr) => (metricHeight(track(fr), kpiProps) + COLUMN_GAP + listDepth(list, track(fr), slide.density)) / BODY_HEIGHT;
-  let sideFr = 1;
-  if (list && fill !== "airy") while (depth(sideFr) < SIDE_COLUMN_DEPTH && track(sideFr * 0.95) >= SIDE_COLUMN_MIN_WIDTH) sideFr *= 0.95;
-  // The number is as tall as it is drawn and its points start under it. A
-  // fixed 150px box would leave 70px of air between the figure and the first
-  // thing said about it; the points' own spread carries the rest of the track.
-  const kpi = { id: `${id}-kpi`, component: "metric", props: kpiProps,
-    size: { width: { fr: 1 }, height: list ? Math.ceil(metricHeight(track(sideFr), kpiProps)) : "fill" } };
-  const hero = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 2 }, height: "fill" });
-  // The number and its points start at the top of the column, level with
-  // the exhibit; centred, the column would carry air above the number as
-  // tall as the band under its last point.
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-    { id: `${id}-side`, layout: "flow.column", size: { width: { fr: sideFr }, height: "fill" }, items: list ? [kpi, list] : [kpi] },
-    headedPanel(exhibits[0], hero, `${id}-exhibit`, false),
-  ] });
+/**
+ * The built-in arrangements, as the grids they are (layout-templates.mjs): an author's `grid` and the runtime's own
+ * layouts are the same thing, read by the same composer. Each takes whichever of its slots the page carries.
+ *
+ * - `exhibit-left`, `exhibit-right`: the exhibit beside its commentary - the number, the statements, the prose and the
+ *   points in one headed column. A chart takes 2 to the column's 1, a table 3 to 2, a pair of values half the row, as
+ *   strong decks set them (chart-sense.mjs comparesTooLittle); the marker between them and a photograph strip at the
+ *   right take tracks of their own where the page asks for them.
+ * - `hero-number`: one figure carries the page, set large over its explanation, the exhibit beside it as the proof.
+ * - `grid`: two rows of two headed exhibits, the points in a band under them.
+ * - `split-tone`: two exhibits side by side, the left on a tinted ground, so the page reads as two halves.
+ * - `stack`: the exhibits stacked in the hero column, the commentary beside them; a value table under a chart hugs its
+ *   rows and carries no heading band.
+ */
+export function builtInGrid(layout, slide, exhibits, id) {
+  const commentary = { content: ["kpi", "insight", "paragraphs", "points"], optional: true };
+  if (layout === "exhibit-left" || layout === "exhibit-right") {
+    const first = exhibits[0], pair = String(first.type).startsWith("chart.") && Array.isArray(first.categories) && first.categories.length <= 2 && Array.isArray(first.series) && first.series.length === 1;
+    const hero = ["table", "rows", "compare"].includes(first.type) ? 3 : pair ? 1 : 2;
+    const bridge = bridgeVariant(slide, id) ? ["implication"] : [];
+    const row = layout === "exhibit-left" ? ["exhibit", ...bridge, "side"] : ["side", ...bridge, "exhibit"];
+    const widths = { exhibit: `${hero}fr`, side: `${hero === 3 ? 2 : 1}fr`, implication: `${CONNECTOR_WIDTH}px`, photo: "1fr" };
+    const areas = [...row, ...(slide.photo ? ["photo"] : [])];
+    // A reading note sits over the side column, in a row of its own that the exhibit and the rest span.
+    const lines = slide.callout ? [areas.map((name) => (name === "side" ? "callout" : name)).join(" "), areas.join(" ")] : [areas.join(" ")];
+    return resolveTemplate({ columns: areas.map((name) => widths[name]).join(" "), ...(slide.callout ? { rows: "auto 1fr" } : {}), areas: lines,
+      place: { side: { ...commentary, heading: "commentary", ...(slide.pointsAlign === "middle" ? { align: "center" } : {}) } } }, null, id, { name: "row" });
+  }
+  // `arranged`: the exhibit and its commentary are two blocks the engine sets beside each other or one over the other,
+  // whichever reads better at what they measure (tasteful-layout); the points are blocks of their own, so under a wide
+  // exhibit they run across and beside it they stack.
+  if (layout === "arranged") return resolveTemplate({ areas: ["exhibit side"], place: { side: { ...commentary, heading: "commentary" } } }, null, id, { name: "row", arrange: true });
+  if (layout === "hero-number") return resolveTemplate({ columns: "1fr 2fr", areas: ["side exhibit"], place: { side: { content: ["kpi", "points"], optional: true }, exhibit: { content: "exhibit", unit: false } } }, null, id, { name: "row" });
+  if (layout === "split-tone") return resolveTemplate({ areas: ["left right"], place: { left: { content: "exhibit", tone: "muted" }, right: "exhibit-2" } }, null, id, { name: "row" });
+  // The measures in a column at the left, the exhibit the other two thirds.
+  if (layout === "metrics-beside") return resolveTemplate({ columns: "1fr 2fr", gap: "space.6", areas: ["metrics exhibit"], place: { metrics: { content: "metrics", metrics: "column" }, exhibit: { content: "exhibit", panel: false } } }, null, id, { name: "row" });
+  // One subject, the argument beside it: the copy takes the left column (a toned panel when `pointsTone` says so), the picture the right, both full height.
+  if (layout === "picture-hero") return resolveTemplate({ columns: "1.2fr 1fr", areas: ["side picture"],
+    place: { side: { ...commentary, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), ...(slide.pointsAlign === "middle" ? { align: "center" } : {}) },
+      picture: { content: slide.pictures?.length ? "picture" : "photo", gap: "space.3" } } }, null, id, { name: "row" });
+  if (layout === "stack") {
+    const beside = hasCommentary(slide);
+    return resolveTemplate({ columns: beside ? `2fr ${slide.kpi || slide.insight || slide.insights?.length ? 1.5 : 1}fr` : "1fr", areas: [beside ? "stack side" : "stack"],
+      place: { stack: { content: exhibits.map((_, at) => (at ? `exhibit-${at + 1}` : "exhibit")), ...(slide.stackWeights ? { tables: "hug" } : {}) }, ...(beside ? { side: { content: ["kpi", "insight", "points"], optional: true, heading: true } } : {}) } }, null, id, { name: "row" });
+  }
+  if (layout === "grid") {
+    // Three panels: the third takes the second row whole.
+    const cells = ["exhibit", "exhibit-2", "exhibit-3", exhibits.length > 3 ? "exhibit-4" : "exhibit-3"];
+    // Panels of one exhibit are peers, a minor gap apart: the major gap is between a page's different parts.
+    return resolveTemplate({ gap: "space.minor", rows: slide.points?.length ? "1fr 1fr auto" : "1fr 1fr", areas: [cells.slice(0, 2).join(" "), cells.slice(2).join(" "), ...(slide.points?.length ? ["points points"] : [])] }, null, id, { name: "grid" });
+  }
+  return null;
 }
 
-// A comparison with two genuine sides: each exhibit on its own ground, the
-// left tinted so the page reads as two halves rather than as evidence and
-// commentary.
-export function splitTone(items, { id, exhibits, baseDir }) {
-  const half = (ex, at) => {
-    const panel = exhibitItem(ex, `${id}-exhibit-${at}`, baseDir, { width: { fr: 1 }, height: "fill" });
-    return { id: `${id}-half-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: "fill" },
-      ...(at === 0 ? { treatment: "muted" } : {}),
-      items: [headedPanel(ex, panel, `${id}-exhibit-${at}`, true)] };
+/**
+ * A page set on a grid (`grid`, layout-templates.mjs): each area takes the content its template gives it, drawn by the
+ * same builders whatever the arrangement, and the layout engine resolves the tracks. An area of several slots stacks
+ * them; one with a name, a heading, a ground or an alignment of its own is a section. Content the page carries and
+ * its own grid gives no area is refused by name: a grid never drops what the page wrote.
+ */
+export function templatePage(items, { id, slide, exhibits, baseDir, fill, pointsStyle, pictures = [] }) {
+  const { name: gridName, columns, rows, gap, areas } = slide.grid;
+  const insights = (Array.isArray(slide.insights) ? slide.insights : slide.insight !== undefined ? [slide.insight] : []).filter((entry) => entry != null);
+  if (insights.length > 2) throw new Error(`${id}: a column carries at most two insights`);
+  const carries = { exhibit: exhibits.length > 0, points: Boolean(slide.points?.length), paragraphs: Boolean(slide.paragraphs?.length), kpi: Boolean(slide.kpi), insight: insights.length > 0,
+    metrics: Boolean(slide.metrics?.length), callout: Boolean(slide.callout), takeaway: Boolean(slide.soWhat), photo: Boolean(slide.photo), picture: pictures.length > 0, implication: Boolean(bridgeVariant(slide, id)) };
+  exhibits.slice(1).forEach((_, at) => { carries[`exhibit-${at + 2}`] = true; });
+  const placed = new Set(areas.flatMap((area) => area.content));
+  // The furniture the page sets itself where no area takes it (a strip of figures over the grid, the close under it) needs no area.
+  const unplaced = gridName === "template" ? Object.keys(carries).filter((slot) => carries[slot] && !placed.has(slot) && !["metrics", "callout", "takeaway", "implication"].includes(slot)) : [];
+  if (unplaced.length) throw new Error(`${id}: the page carries ${unplaced.map((slot) => `\`${slot}\``).join(", ")} and its grid gives ${unplaced.length === 1 ? "it" : "them"} no area (the areas are ${areas.map((area) => area.name).join(", ")}) - name an area for each, or stack it in one with \`place\``);
+  // "What it means" earns its line over a column of plain points, where nothing else says what the column is. Over
+  // points that carry their own leads it is a label on labelled things, and a column that is one number or one box
+  // takes no heading at all, unless the page names one (`pointsHeading`).
+  const led = carries.points && slide.points.every((point) => point && typeof point === "object" && point.lead);
+  const headingOf = (area) => (area.heading === "commentary" ? (slide.pointsHeading === false || ((carries.insight || !carries.points || led) && !slide.pointsHeading) ? null : slide.pointsHeading || "What it means")
+    : area.heading === true ? (slide.pointsHeading === false ? null : slide.pointsHeading || "What it means") : area.heading || null);
+  // An exhibit's blank heading band exists to line its content up with a heading beside it; with none, it starts at the top of the body.
+  const headed = areas.some((area) => headingOf(area));
+  // A panel wraps what it holds. An area on a ground of its own whose content has a height of its own - a number, a
+  // statement, points - is as tall as that content and no taller, set in the middle of a cell it has to itself: a
+  // tinted box stretched down a column around three points is mostly empty box.
+  const takesFrame = (name) => name.startsWith("exhibit") || ["photo", "picture", "implication"].includes(name);
+  for (const area of areas) if (area.tone && area.tone !== "open" && gridName === "template" && !area.content.some(takesFrame)) Object.assign(area, { hug: true, wraps: true });
+  const slot = (name, area) => {
+    if (!carries[name]) { if (area.optional) return []; throw new Error(`${id}: area "${area.name}" places \`${name}\`, and the page has none`); }
+    if (name.startsWith("exhibit")) {
+      const at = name === "exhibit" ? 0 : Number(name.slice(8)) - 1, eid = exhibits.length > 1 || gridName !== "row" && gridName !== "template" ? `${id}-exhibit-${at}` : `${id}-exhibit`;
+      // `tables: "hug"`: a table in the area is as tall as its rows and carries no heading band (a value table under its chart).
+      const bare = area.tables === "hug" && exhibits[at].type === "table";
+      const item = exhibitItem(exhibits[at], eid, baseDir, area.hug || bare ? HUG : SIZE);
+      if (bare) return [{ ...item, size: HUG }];
+      // What the exhibit reads at, for an arrangement the engine chooses: one that needs the page's width says so.
+      const hints = { minWidth: needsFullWidth(exhibits[at]) ? 900 : 420 };
+      if (slide.grid.arrange) return [{ ...headedPanel(exhibits[at], item, eid, false), hints }];
+      // A chart beside a text column keeps a one-line heading with the unit inline; the two-line heading is for peers in a row, where the bands align.
+      if (exhibits.length === 1 && area.unit !== false && String(exhibits[at].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
+      return [area.panel === false ? item : headedPanel(exhibits[at], item, eid, exhibits.length > 1 || headed)];
+    }
+    // An area the engine arranges takes its points every way they can be set (compose-points.mjs pointWays), and the engine chooses; elsewhere they are a list.
+    if (name === "points") { const ways = pointWays(slide.points, { id: `${id}-points`, tone: area.tone ?? sideTreatment(slide), fill, style: pointsStyle, highlight: slide.highlight }, REGISTRY);
+      if (slide.grid.arrange) return [ways.length > 1 ? { id: `${id}-points`, kind: "points", options: ways } : ways[0]];
+      // In a column the points are blocks of the column itself, so its free height opens between them (`leftover: "spread"`) rather than around one list.
+      const blocks = ways.find((way) => way.label === "blocks");
+      return blocks && !["lettered"].includes(pointsStyle) ? blocks.items : [ways[0]]; }
+    // Several paragraphs are one group, arranged by the engine: side by side where the area is wide enough for each to be read, stacked where it is not.
+    if (name === "paragraphs") { const prose = proseOf(slide, id); return prose.length > 1 ? [{ id: `${id}-prose`, layout: "flow.best", size: HUG, items: prose }] : prose; }
+    if (name === "kpi") {
+      // One figure can be set several ways, and none is right everywhere: the engine weighs them where the figure lands
+      // (tasteful-layout: balance, uniformity, simplicity) and a judge sees them side by side. Each sets the figure at
+      // the largest display size its room allows (panels.mjs figureSize).
+      const { value, label, sublabel, ...rest } = slide.kpi, says = sublabel || label;
+      const figure = { ...rest, value, tone: "hero", variant: "display" };
+      // The figure over what it measures: the plainest, and the largest figure.
+      const stacked = { id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "display", ...(area.justify === "center" ? { align: "center" } : {}) }, size: HUG };
+      if (!says || area.justify === "center") return [stacked];
+      // The figure with its explanation beside it, level with its middle - open, or on a ground of its own (a box, which
+      // counts as a part of the page: `chrome`).
+      const row = (extra) => ({ id: `${id}-kpi`, layout: "grid", gridColumns: [{ fr: 2 }, { fr: 3 }], gridRows: ["hug"], size: HUG, ...extra, items: [
+        { id: `${id}-kpi-figure`, component: "metric", props: figure, size: { width: { fr: 1 }, height: "hug" }, cell: { column: 0, row: 0 }, alignSelf: "center" },
+        { ...paragraph(`${id}-kpi-says`, says, slide.highlight, sublabel && label ? { heading: label } : {}), cell: { column: 1, row: 0 }, alignSelf: "center" }] });
+      return [{ id: `${id}-kpi`, kind: "figure", options: [{ label: "stacked", ...stacked }, { label: "stacked-smaller", family: "stacked", ...stacked, props: { ...stacked.props, ceiling: "type.figureLarge" } }, { label: "beside", ...row({}) }, { label: "boxed", family: "beside", ...row({ treatment: "tint", hints: { chrome: 1 } }) }] }];
+    }
+    if (name === "insight") return insights.map((entry, at) => ({ id: insights.length > 1 ? `${id}-insight-${at + 1}` : `${id}-insight`, component: "insight",
+      props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof entry === "string" ? { text: entry } : entry) }, size: HUG }));
+    if (name === "metrics") return [(area.metrics === "column" ? metricsColumn : metricsStrip)(slide.metrics, `${id}-metrics`, slide.metricsTone)];
+    // The picture's own line sits under it as a statement box, the way a captioned panel does: naming the subject is the picture's job, not the argument's.
+    if (name === "picture") return [pictureFrame(pictures[0], `${id}-picture`, baseDir, SIZE), ...(pictures[0].label || pictures[0].text
+      ? [{ id: `${id}-picture-caption`, component: "insight", props: { text: [pictures[0].label, pictures[0].text].filter(Boolean).join(" — "), variant: "neutral", align: "center" }, size: HUG }] : [])];
+    if (name === "callout") return [{ id: `${id}-callout`, component: "callout", props: typeof slide.callout === "string" ? { text: slide.callout } : slide.callout, size: HUG }];
+    if (name === "takeaway") return [soWhatItem(slide.soWhat, `${id}-sowhat`, slide.highlight, !slide.callout)];
+    if (name === "photo") return [{ ...photoStrip(slide, `${id}-photo`, baseDir, 1), size: SIZE }];
+    if (name === "implication") return [{ id: `${id}-implication`, component: "connector", props: { variant: bridgeVariant(slide, id) }, size: SIZE }];
+    throw new Error(`${id}: area "${area.name}" places \`${name}\`, which this page cannot draw`);
   };
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: exhibits.slice(0, 2).map(half) });
-}
-
-// Exhibits stacked in the hero column, points beside them.
-// A value table under a chart hugs its rows and carries no heading band.
-export function exhibitStack(items, { id, slide, exhibits, baseDir, fill, pointsStyle }) {
-  const stackItem = (ex, i) => {
-    const hug = Boolean(slide.stackWeights) && ex.type === "table";
-    const item = { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, hug ? HUG : SIZE), size: hug ? HUG : SIZE };
-    return hug ? item : headedPanel(ex, item, `${id}-exhibit-${i}`);
-  };
-  const stacked = { id: `${id}-stack`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: exhibits.map(stackItem) };
-  if (hasCommentary(slide)) {
-    const sideItems = [];
-    if (slide.kpi) sideItems.push({ id: `${id}-kpi`, component: "metric", props: { ...slide.kpi, tone: "hero", variant: "prominent" }, size: { width: { fr: 1 }, height: 110 } });
-    const insights = slide.insights || (slide.insight ? [slide.insight] : []);
-    for (const [at, insight] of insights.entries()) sideItems.push({ id: `${id}-insight-${at}`, component: "insight", props: { variant: insights.length > 1 && at === 0 ? "plain" : "tonal", ...(slide.highlight === undefined ? {} : { highlight: slide.highlight }), ...(typeof insight === "string" ? { text: insight } : insight) }, size: HUG });
-    if (slide.points?.length) sideItems.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, true, pointsStyle));
-    // A column: the number over its points. With no layout the section sets
-    // them side by side, and the number's half stands empty under it.
-    const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), layout: "flow.column", size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
-    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
-  } else items.push({ ...stacked, size: SIZE });
+  const cells = areas.map((area) => {
+    const content = area.content.flatMap((name) => slot(name, area));
+    if (!content.length) throw new Error(`${id}: a ${area.name} column needs points, an insight or a kpi`);
+    const heading = headingOf(area), size = area.hug ? HUG : SIZE;
+    const tone = area.tone ?? (area.content.includes("points") ? sideTreatment(slide) : null);
+    // An area named for the one block it holds, with nothing of its own around it, is that block in its cell.
+    if (content.length === 1 && isSlot(area.name) && !heading && !area.tone && !area.leftover) return { ...content[0], size: area.metrics === "column" ? content[0].size : size, cell: area.cell };
+    return { id: `${id}-${area.name}${isSlot(area.name) ? "-area" : ""}`, ...(heading ? { heading } : {}), ...(tone ? { treatment: tone } : {}), layout: area.content.some(takesFrame) ? "flow.column" : "flow.best", leftover: area.leftover ?? "spread", ...(area.gap ? { gap: area.gap } : {}), size, cell: area.cell, items: content,
+      ...(area.wraps ? { alignSelf: area.cell.rowSpan === rows.length ? "center" : "start" } : {}) };
+  });
+  // The engine sets the page's major gap between the areas: they are sections (core.mjs TASTE, `space.major`).
+  if (slide.grid.arrange) { items.push({ id: `${id}-${gridName}`, layout: "flow.best", size: SIZE, items: cells.map(({ cell: _cell, ...block }) => block) }); return; }
+  // The page's areas are its major components: they stand a major gap apart unless the template names its own.
+  items.push({ id: `${id}-${gridName}`, layout: "grid", gridColumns: columns, gridRows: rows, gap: gap ?? "space.major", size: SIZE, items: cells });
 }
 
 /**
@@ -868,9 +739,3 @@ export function exhibitDashboard(items, { id, slide, exhibits, baseDir }) {
   } else items.push(board);
 }
 
-// Two rows of two small exhibits, every panel headed.
-export function exhibitGrid(items, { id, slide, exhibits, baseDir, fill, pointsStyle }) {
-  const panels = exhibits.slice(0, 4).map((ex, i) => headedPanel(ex, { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE }, `${id}-exhibit-${i}`));
-  items.push({ id: `${id}-grid`, layout: "flow.column", size: SIZE, items: [{ id: `${id}-row-a`, layout: "flow.row", size: SIZE, items: panels.slice(0, 2) }, { id: `${id}-row-b`, layout: "flow.row", size: SIZE, items: panels.slice(2, 4) }] });
-  if (slide.points?.length) items.push(pointsItem(slide.points, `${id}-points`, sideTreatment(slide), fill, false, pointsStyle));
-}

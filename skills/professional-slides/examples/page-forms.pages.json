@@ -5382,7 +5382,7 @@
      "Crews and rosters lead",
      "Fleet lead",
      "Stations lead",
-     "Passenger communications lead"
+     "Passenger comms lead"
     ]
    },
    "points": [
@@ -6144,6 +6144,39 @@
    "source": "Source: illustrative data for a fictional operator; programme board terms of reference"
   },
   {
+   "id": "f-parallel-icon-rows",
+   "type": "parallel",
+   "form": "icon-rows",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "title": "Off-peak fares come first for four reasons",
+   "exhibit": {
+    "items": [
+     {
+      "icon": "people",
+      "label": "The seats already run",
+      "text": "Off-peak trains leave two-thirds empty, so every added journey is carried at almost no extra cost."
+     },
+     {
+      "icon": "clock",
+      "label": "It starts within a year",
+      "text": "A fares change needs one timetable round; the wires need four years before they carry a passenger."
+     },
+     {
+      "icon": "shield",
+      "label": "Punctuality is untouched",
+      "text": "No path is added in the peak, so the 90% floor holds while demand grows."
+     },
+     {
+      "icon": "money",
+      "label": "It funds the next phase",
+      "text": "The revenue of the first two years pays for the depot extension that the half-hourly service needs."
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; off-peak fares trial"
+  },
+  {
    "id": "f-parallel-arrow-rows",
    "type": "parallel",
    "form": "arrow-rows",
@@ -6175,6 +6208,44 @@
     ]
    },
    "source": "Source: illustrative data for a fictional operator; demand model scenarios"
+  },
+  {
+   "id": "f-summary-agenda",
+   "type": "summary",
+   "form": "agenda",
+   "commentary": "none",
+   "takeaway": false,
+   "title": "Agenda",
+   "exhibit": {
+    "active": 2,
+    "items": [
+     {
+      "topic": "Where the plan stands",
+      "text": "Journeys, punctuality and spend against the FY26 budget"
+     },
+     {
+      "topic": "Off-peak timetable trial",
+      "text": "What the sixteen trial stations showed"
+     },
+     {
+      "topic": "Power upgrade",
+      "text": "The risk to the 2030 start and the bi-mode fallback"
+     },
+     {
+      "topic": "Depot and station works",
+      "text": "Which the FY27 budget funds first"
+     },
+     {
+      "topic": "Decisions for the board",
+      "text": "Three approvals and their owners"
+     },
+     {
+      "topic": "Next steps",
+      "text": "Actions before the June timetable bid"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; programme board papers"
   },
   {
    "id": "f-profiles-logos",

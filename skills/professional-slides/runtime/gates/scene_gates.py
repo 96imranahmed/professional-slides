@@ -20,7 +20,7 @@ from pathlib import Path
 
 from gate_config import FOOTER_TOP, THRESHOLDS, finding, font_size, layout_of, source_text, text_nodes
 from ink import CANVAS_W, SURFACE_LUMINANCE
-from render_gates import VOID_TOP, column_bands, column_repair, scene_column_rows, void_bands
+from render_gates import VOID_TOP, column_bands, scene_column_rows, void_bands
 # The same measure estimated from the scene, so it runs at authoring, and the
 # scene's colours read the one way both scene measures read them.
 from scene_ink import GLYPH_BAND, SHAPE_TYPES, canvas_of, color_of, grey_of, ground_at
@@ -230,8 +230,10 @@ def scene_text_boxes(slide):
 def scene_void(slide, mask=None):
     """The band of the page's body the scene leaves empty: (bands, void).
 
-    The one decision SCENE_VOID and the author's budget line (page_budget)
-    both read, so a "!" on the budget and the advisory are the same finding.
+    The render's drift check (page_gates gate_render_drift) reads `bands`, to
+    tell a band the page composed from one the export lost. `void` is the band
+    past its bar; no gate reports it since the empty-band advisory was
+    withdrawn (how full a page reads is the layout engine's to weigh).
     The page's rows are asked first (void_bands against THRESHOLDS
     `internal_void_max`, `dead_band_max`); where they pass, its columns
     (column_bands, the render's COLUMN_VOID). `void` is None, the page's band
@@ -249,47 +251,6 @@ def scene_void(slide, mask=None):
         return bands, {"kind": "dead", "band": bands["deadBand"], "from": top, "to": FOOTER_TOP, "threshold": THRESHOLDS["dead_band_max"]}
     column = column_bands(slide, scene_column_rows(mask))
     return bands, ({**column, "kind": "column", "column": column["name"]} if column else None)
-
-
-def gate_scene_void(slide_no, slide, findings):
-    """SCENE_VOID. The render's INTERNAL_VOID and DEAD_BAND, read off the
-    composed scene so the author hears them before the build.
-
-    One definition (void_bands) and one set of thresholds (THRESHOLDS
-    `internal_void_max`, `dead_band_max`) serve both: the pixel gates count the
-    PNG's rows, this counts the rows the scene will draw (scene_rows), so the
-    two name the same pages give or take a band a pixel either side of the bar
-    and the inside of a card, which the render cannot see. Like the render's gates it
-    is a question at mild values - a chart that wants air, a sparse group
-    centred on purpose - and blocks past the fill's `_block` bar for the band
-    it measured (severity); across the deck the habit blocks too
-    (gate_deck_empty_pages).
-
-    Where the page's rows pass, its columns are asked the same question: the
-    finding names the column, and it stays one finding for the page, so the
-    deck count reads a half-empty column as the half-empty page it is.
-    """
-    bands, void = scene_void(slide)
-    if void is None:
-        return
-    measured = {"kind": void["kind"], "band": round(void["band"], 4), "from": void["from"], "to": void["to"],
-                "internalVoid": round(bands["internalVoid"], 4), "deadBand": round(bands["deadBand"], 4)}
-    if "column" in void:
-        measured.update(column=void["column"], columnInternalVoid=round(void["internalVoid"], 4), columnDeadBand=round(void["deadBand"], 4),
-                        **({"plot": True} if void.get("plot") else {}))
-    # The repair names only what the page has not done: a roadmap whose points already sat beside it was told to set them
-    # there, and the author rebuilt for nothing.
-    beside = any(n.get("type") == "text" and str(n.get("role") or "").startswith(("list-", "commentary", "point"))
-                 and (n.get("frame") or {}).get("x", 0) > CANVAS_W * 0.55 for n in slide.get("nodes", []))
-    findings.append(finding(
-        slide_no, "SCENE_VOID", measured, void["threshold"],
-        column_repair(void) if "column" in void else
-        "A band of the page (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
-        "with their detail, the chart at the frame's size - size tiles and cards to what they hold, start "
-        "the body under the title rather than centring it in air, {}or merge the page with a neighbour. Do not "
-        "stretch rows or pad text to cover the band.".format(void["from"], void["to"],
-            "" if beside else "set the commentary beside the exhibit rather than under a strip of air, "),
-    ))
 
 
 # Type and marks read against what they are set on (scene_ink.ground_at): the

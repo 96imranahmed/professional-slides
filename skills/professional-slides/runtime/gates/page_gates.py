@@ -11,8 +11,8 @@ or cannot be read on its ground (GROUND_CONTRAST, and RENDER_CONTRAST on the
 render), a picture frame ships empty (UNSOURCED_PICTURE), a figure prints a
 scale it does not name (UNSCALED_FIGURE), an area chart does not stand on zero
 (AREA_BASELINE), a page did not render (MISSING_RENDER) or the render lost what
-the scene drew (RENDER_DRIFT). A band of the page left empty is advised, never
-refused (SCENE_VOID).
+the scene drew (RENDER_DRIFT). How full a page reads is the layout engine's to
+weigh when it arranges the page, not a gate's to refuse.
 
 Exit 0 when nothing blocks, 2 when a finding blocks, 1 on a crash. Each
 finding is {slide, code, measured, threshold, repair, severity}.
@@ -46,13 +46,11 @@ from scene_gates import *  # noqa: E402,F401,F403
 from gate_config import CANVAS_H, CANVAS_W, DEFAULT_PROFILE, FOOTER_TOP, GATE_CODES, GENERATED_PAGE, PROFILES, THRESHOLDS, finding, is_cover  # noqa: E402
 from render_gates import gate_picture_unreadable, gate_title, gate_type_range, gate_unsourced_picture, source_text, void_bands, without_title_rule  # noqa: E402
 from scene_gates import (GROUND_CONTRAST, _text_box, contrast, gate_area_baseline, gate_ground_contrast, gate_heading_wraps,  # noqa: E402
-                         gate_scene_void, gate_unscaled_figure, scene_text_boxes, scene_void)
+                         gate_unscaled_figure, scene_text_boxes, scene_void)
 from ink import SURFACE_LUMINANCE, grey_contrast, ink_matrix, ink_rows, load_grey, render_path  # noqa: E402
 from scene_ink import NATIVE_PLOT_ROLES, canvas_of, color_of, dark_ground, ground_at  # noqa: E402
 
 GATE_MODULES = (gate_config, render_gates, scene_gates)
-# The one advisory: an empty band of a page is the author's to judge.
-ADVISORY_CODES = {"SCENE_VOID"}
 
 
 def emitted_codes():
@@ -215,14 +213,14 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
             gate_picture_unreadable(slide_no, slide, found)
             gate_unscaled_figure(slide_no, slide, found)
             gate_area_baseline(slide_no, slide, found)
-            gate_scene_void(slide_no, slide, found)
             if grey is not None:
                 gate_render_contrast(slide_no, slide, grey, found)
                 gate_render_drift(slide_no, slide, grey, found)
         # Type off the scale and type lost on its ground, on every page: a cover or a divider set on a ground is read too.
         gate_ground_contrast(slide_no, slide, found)
         gate_type_range(slide_no, slide, found, page_profile)
-    findings = [{**f, "severity": "advisory" if f["code"] in ADVISORY_CODES else "blocker"} for f in found if wanted(f["code"])]
+    # Every page gate blocks: none is advised.
+    findings = [{**f, "severity": "blocker"} for f in found if wanted(f["code"])]
     counts = {}
     for f in findings:
         counts[f["code"]] = counts.get(f["code"], 0) + 1

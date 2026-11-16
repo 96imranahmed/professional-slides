@@ -49,6 +49,9 @@ from color import on_fill  # noqa: E402
 # The renderer's axis ladder (charts.mjs range()).
 from nice_ticks import nice_range  # noqa: E402
 
+# Every named geometry's outline, shared with the HTML emitter (html-shapes.mjs).
+SHAPE_TABLE = json.loads((HERE / "shape-outlines.json").read_text(encoding="utf-8"))
+
 PX = 914400 / 96  # EMU per CSS px at 96 px/in; slide is 1280x720 px = 13.333x7.5 in
 
 # Roles a native chart replaces. Headings, units and rules stay as editable text.
@@ -466,17 +469,23 @@ class Emitter:
         self.stats["shapes"] += 1
         return shape
 
-    # Preset geometries the scene uses, mapped onto PowerPoint's own autoshapes so
-    # a chevron stays a chevron with its yellow adjustment handle.
-    PRESETS = {
-        "chevron": MSO_SHAPE.CHEVRON, "rightArrow": MSO_SHAPE.RIGHT_ARROW, "leftArrow": MSO_SHAPE.LEFT_ARROW,
-        "notchedRightArrow": MSO_SHAPE.NOTCHED_RIGHT_ARROW, "snip1Rect": MSO_SHAPE.SNIP_1_RECTANGLE,
-        "triangle": MSO_SHAPE.ISOSCELES_TRIANGLE, "rtTriangle": MSO_SHAPE.RIGHT_TRIANGLE, "diamond": MSO_SHAPE.DIAMOND,
-        "pentagon": MSO_SHAPE.REGULAR_PENTAGON, "hexagon": MSO_SHAPE.HEXAGON, "parallelogram": MSO_SHAPE.PARALLELOGRAM,
-        "trapezoid": MSO_SHAPE.TRAPEZOID, "downArrow": MSO_SHAPE.DOWN_ARROW, "upArrow": MSO_SHAPE.UP_ARROW,
-    }
-    # Only geometries the HTML adapter can also draw belong here;
-    # test_geometry_parity keeps the two vocabularies in step.
+    # The outline of every named geometry is one table, shape-outlines.json, which
+    # the HTML emitter draws from too (the file says how a coordinate is written).
+    # A geometry used to be mapped here to an Office preset and nudged by its
+    # adjustment handles, and the preset was not the polygon HTML drew: a label
+    # measured to sit inside the scene's arrow spilled out of PowerPoint's.
+    # So a named geometry is written as a freeform of its outline, except the
+    # few in the table's `presets`, whose preset path is proved to be the outline
+    # (test_shape_outlines) and which keep their name and handle in PowerPoint.
+    OUTLINES = SHAPE_TABLE["outlines"]
+    PRESETS = SHAPE_TABLE["presets"]
+
+    @classmethod
+    def outline(cls, geometry: str, width: float, height: float):
+        """A named geometry's outline in the unit square of a width x height frame."""
+        short = min(width, height)
+        along = lambda value, length: value[0] + (value[1] * short / length if length else 0) if isinstance(value, list) else value
+        return [(along(x, width), along(y, height)) for x, y in cls.OUTLINES[geometry]]
 
     def _paint(self, shape, style: dict):
         fill = style_value(style, "fill", None)
@@ -556,24 +565,36 @@ class Emitter:
             cc = f["x"] + f["width"] * float(data.get("caretCenterRatio", 0.2))
             ch = f["width"] * float(data.get("caretWidthRatio", 0.1)) / 2
             left, right, top, bottom, tip = f["x"], f["x"] + f["width"], f["y"], f["y"] + body, f["y"] + f["height"]
-            return self._freeform(slide, node, [[(left, top), (right, top), (right, bottom), (cc + ch, bottom), (cc, tip), (cc - ch, bottom), (left, bottom)]])
+            # The bubble's corners are rounded as the HTML emitter rounds them (html-shapes.mjs
+            # quoteCalloutPath: a quadratic curve through each corner). A freeform holds straight
+            # segments only, so each curve is written as a few of them.
+            r = max(0.0, min(f["width"], f["height"]) * float(data.get("cornerRadiusRatio", 0)))
+            def corner(start, control, end, steps=6 if r else 1):
+                return [((1 - t) ** 2 * start[0] + 2 * (1 - t) * t * control[0] + t * t * end[0],
+                         (1 - t) ** 2 * start[1] + 2 * (1 - t) * t * control[1] + t * t * end[1]) for t in (i / steps for i in range(1, steps + 1))]
+            path = [(left + r, top), (right - r, top), *corner((right - r, top), (right, top), (right, top + r)),
+                    (right, bottom - r), *corner((right, bottom - r), (right, bottom), (right - r, bottom)),
+                    (cc + ch, bottom), (cc, tip), (cc - ch, bottom),
+                    (left + r, bottom), *corner((left + r, bottom), (left, bottom), (left, bottom - r)),
+                    (left, top + r), *corner((left, top + r), (left, top), (left + r, top))]
+            return self._freeform(slide, node, [path])
+        if geometry == "rect":
+            return self.add_rect(slide, node)
+        if geometry not in self.OUTLINES:
+            # The HTML emitter refuses a name it cannot draw; drawing a rectangle
+            # here instead would ship a deck whose shape is silently the wrong one.
+            raise ValueError(f"Unsupported PPTX scene geometry: {geometry}")
+        # A hairline-thin frame still needs a size PowerPoint will open.
+        width, height = max(f["width"], 0.5), max(f["height"], 0.5)
         preset = self.PRESETS.get(geometry)
         if preset is None:
-            return self.add_rect(slide, node)
-        shape = slide.shapes.add_shape(preset, emu(f["x"]), emu(f["y"]), emu(max(f["width"], 0.5)), emu(max(f["height"], 0.5)))
+            return self._freeform(slide, node, [[(f["x"] + x * width, f["y"] + y * height) for x, y in self.outline(geometry, width, height)]])
+        shape = slide.shapes.add_shape(MSO_SHAPE.from_xml(preset["prst"]), emu(f["x"]), emu(f["y"]), emu(width), emu(height))
         shape.name = f"ps:{node['id']}"
-        try:
-            if geometry == "chevron" and f["width"] and f["height"]:
-                # PowerPoint's adj is a share of the shorter side; the scene draws the
-                # point inset at half that side, which is the preset default (50000).
-                shape.adjustments[0] = 0.5
-            elif geometry == "rightArrow" and f["width"] and f["height"]:
-                shape.adjustments[0] = 0.64
-                shape.adjustments[1] = min(1.0, 0.28 * f["width"] / min(f["width"], f["height"]))
-            elif geometry == "snip1Rect" and f["width"] and f["height"]:
-                shape.adjustments[0] = min(0.5, 0.12 * f["width"] / min(f["width"], f["height"]))
-        except (IndexError, ValueError):
-            pass
+        # Written even where it is the preset's default, so the file states the
+        # outline the table proved rather than leaning on PowerPoint's defaults.
+        for index, value in enumerate(preset["adjustments"]):
+            shape.adjustments[index] = value
         self._paint(shape, style)
         self._strip_style(shape)
         self._strip_text(shape)

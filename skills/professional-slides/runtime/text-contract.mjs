@@ -43,9 +43,6 @@ export const quoted = value => `“${String(value).trim().replace(/^[“"‘']+|
 export const proseParts = p => (p && typeof p === 'object')
   ? { lead: typeof p.lead === 'string' ? p.lead.trim() : '', text: String(p.text ?? ''), highlight: [p.highlight ?? []].flat().filter(h => typeof h === 'string' && h.trim()) }
   : { lead: '', text: String(p ?? ''), highlight: [] };
-// The longest paragraph the composer sets in one block before it splits the
-// prose into equal paragraphs (compose-points.mjs).
-export const PROSE_PARAGRAPH_MAX = 60;
 /** A paragraph's words as the reader meets them: its lead, then its prose. */
 export const proseText = p => { const { lead, text } = proseParts(p); return lead ? `${lead} ${text}` : text; };
 const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}\}/g, (_, id) => {

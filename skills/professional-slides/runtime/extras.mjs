@@ -172,7 +172,7 @@ export function stepsLayout(frame, props) {
   const gap = v("space.2"), pad = v("space.3"), tread = 44, disc = markerDiameter();
   const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * pad - disc - v("space.2");
   if (inner < 60) throw new Error("Steps are too narrow for their labels; use fewer steps");
-  const measured = items.map((item) => ({ item, title: measure(item.label, inner, "type.body", true), body: item.text ? measure(item.text, width - 2 * pad, "type.compact") : null }));
+  const measured = items.map((item) => ({ item, title: measure(item.label, inner, "type.body", true), body: item.text ? measure(item.text, width - 2 * pad, "type.body") : null }));
   if (measured.some((m) => m.title.lines.length > 3)) throw new Error("Step labels must fit three lines on the tread; shorten them or use fewer steps");
   // A tread grows to carry a two-line label at a narrow width.
   const treadHeight = Math.max(tread, Math.max(...measured.map((m) => m.title.height)) + 2 * v("space.2"));
@@ -231,7 +231,7 @@ export function stepsNodes({ id, frame, props }) {
       ? iconMarker({ id: stableId(sid, "icon"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, icon: m.item.icon, tone: "inverse" })
       : numberMarker({ id: stableId(sid, "number"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, number: i + 1, reverse: true })));
     nodes.push(label(stableId(sid, "label"), "step-label", { x: x + L.pad + L.disc + v("space.2"), y: top + (L.tread - m.title.height) / 2, width: L.inner }, m.title, text("type.body", WHITE, true)));
-    if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top + L.tread + L.pad, width: L.width - 2 * L.pad }, m.body, text("type.compact", INK)));
+    if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top + L.tread + L.pad, width: L.width - 2 * L.pad }, m.body, text("type.body", INK)));
   });
   nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "step-baseline", x1: frame.x, y1: baseline, x2: frame.x + frame.width, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
   return nodes;
@@ -266,8 +266,8 @@ export function peopleLayout(frame, props, rhythm = 0) {
   const nameGap = v("space.3"), roleGap = v("space.1"), pointsGap = v("space.3"), pointGap = v("space.1");
   const measured = items.map((item) => {
     const name = measure(item.name, inner, "type.body", true);
-    const role = item.role ? measure(item.role, inner, "type.compact") : null;
-    const points = item.points.map((p) => measure(p, inner, "type.compact"));
+    const role = item.role ? measure(item.role, inner, "type.body") : null;
+    const points = item.points.map((p) => measure(p, inner, "type.body"));
     const head = PORTRAIT + nameGap + name.height + (role ? roleGap + role.height : 0);
     const body = points.length ? pointsGap + points.reduce((sum, p) => sum + p.height, 0) + pointGap * (points.length - 1) : 0;
     return { item, name, role, points, head, height: pad + head + body + pad };
@@ -313,7 +313,7 @@ export function peopleNodes({ id, frame, props }) {
     y += PORTRAIT + L.nameGap;
     nodes.push(label(stableId(pid, "name"), "person-name", { x: cx, y, width: L.inner }, m.name, text("type.body", INK, true, "center")));
     y += m.name.height;
-    if (m.role) { y += L.roleGap; nodes.push(label(stableId(pid, "role"), "person-role", { x: cx, y, width: L.inner }, m.role, text("type.compact", SECONDARY, false, "center"))); }
+    if (m.role) { y += L.roleGap; nodes.push(label(stableId(pid, "role"), "person-role", { x: cx, y, width: L.inner }, m.role, text("type.body", SECONDARY, false, "center"))); }
     // Points start level across the row, below the tallest header.
     y = frame.y + L.pad + L.headHeight;
     if (m.points.length) {
@@ -323,7 +323,7 @@ export function peopleNodes({ id, frame, props }) {
     }
     m.points.forEach((p, k) => {
       if (k) y += L.pointGap;
-      nodes.push(label(stableId(pid, "point", k), "person-point", { x: cx, y, width: L.inner }, p, text("type.compact", INK, false, "center")));
+      nodes.push(label(stableId(pid, "point", k), "person-point", { x: cx, y, width: L.inner }, p, text("type.body", INK, false, "center")));
       y += p.height;
     });
   });
@@ -357,7 +357,7 @@ export function logosLayout(frame, props) {
   if (inner < 60) throw new Error("Logo cells are too narrow; use fewer logos");
   const measured = items.map((item) => {
     const name = item.image ? null : measure(item.name, inner, "type.heading", true, DISPLAY);
-    const caption = item.caption ? measure(item.caption, inner, "type.compact") : null;
+    const caption = item.caption ? measure(item.caption, inner, "type.body") : null;
     return { item, name, caption, content: (name ? name.height : 0) + (caption ? captionGap + caption.height : 0) };
   });
   const content = Math.max(...measured.map((m) => m.content + 2 * pad));
@@ -384,7 +384,7 @@ export function logosNodes({ id, frame, props }) {
     }
     if (m.caption) {
       const cy = m.item.image ? y + cell - L.pad - m.caption.height : y + (cell - m.content) / 2 + m.name.height + L.captionGap;
-      nodes.push(label(stableId(lid, "caption"), "logo-caption", { x: x + L.pad, y: cy, width: L.inner }, m.caption, text("type.compact", SECONDARY, false, "center")));
+      nodes.push(label(stableId(lid, "caption"), "logo-caption", { x: x + L.pad, y: cy, width: L.inner }, m.caption, text("type.body", SECONDARY, false, "center")));
     }
   });
   return nodes;

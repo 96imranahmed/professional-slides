@@ -18,7 +18,7 @@ const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.band", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "type.coverTitle", "type.figureLarge", "type.figureHero", "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.band", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false) => measureAt(value, width, { size, bold });
@@ -100,7 +100,7 @@ export function cardsLayout(frame, props, rhythm = 0) {
     const bodyWidth = tone === "big-number" ? inner - 2 * v("space.3") : inner;
     const body = item.text ? measure(item.text, bodyWidth, "type.body") : null;
     const points = item.points.map((p) => measure(p, bodyWidth - v("space.4"), "type.body"));
-    const footer = item.footer ? measure(item.footer, inner, "type.compact", true) : null;
+    const footer = item.footer ? measure(item.footer, inner, "type.body", true) : null;
     const value = item.value && tone !== "stat" ? measure(item.value, inner, "type.metric", true) : null;
     const number = tone === "big-number" ? measure(String(item.number).padStart(2, "0"), inner, "type.deckTitle", true) : null;
     // Header zone: icon (outline/plain/disc), filled band (header), disc + title
@@ -250,7 +250,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     if (m.footer) {
       const fy = frame.y + cardHeight - L.pad - m.footer.height;
       nodes.push(linePrimitive({ id: stableId(cid, "footer-rule"), role: "card-rule", x1: cx, y1: fy - v("space.2"), x2: cx + L.inner, y2: fy - v("space.2"), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
-      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.compact", readableOn(PRIMARY, onCard), true)));
+      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.body", readableOn(PRIMARY, onCard), true)));
     }
   });
   return nodes;
@@ -328,14 +328,41 @@ function ringMetricNodes({ id, frame, props }) {
  * what a column sizes the tile to when the number heads its points, so the
  * first point sits under the number rather than under a fixed box's air.
  */
+/**
+ * The size a metric's figure is set at. `display` is the figure that is the page's point: it takes the largest display
+ * size that sets it on one line in the width it has, so a lone number in an open column is as large as the column
+ * allows and the same number in a narrow cell steps down rather than breaking.
+ */
+function figureSize(props, width) {
+  if (props.variant !== "display") return props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  // `ceiling`: the largest size the figure may take, where the page has less height than its width would allow.
+  // A figure too wide for the width at a size cannot be measured there (it does not break): that size does not fit.
+  const ladder = ["type.figureHero", "type.figureLarge", "type.coverTitle", "type.deckTitle"];
+  return ladder.slice(Math.max(0, ladder.indexOf(props.ceiling))).find((size) => { try { return measureText(String(props.value ?? ""), width, { fontFamily: tokenValue(FIGURES), fontSize: v(size), bold: true }).lines.length === 1; } catch { return false; } }) ?? "type.metric";
+}
+
+/** How much of the scale a display figure could take it gets at a width (1: the largest size; lower as it steps down). */
+const figureEmphasis = (props, width) => (props.variant === "display" ? v(figureSize(props, width)) / v("type.figureHero") : null);
+
+/**
+ * The type a metric's words are set in, read by its measurement and its drawing alike. Under a display figure the words
+ * are the page's content, not a tile's furniture: the label is the statement the figure makes, bold at heading size in
+ * the page's ink, and the sub-line and the delta are body text. A tile in a strip or a KPI card packs several figures
+ * into one row and keeps the caption sizes.
+ */
+function metricType(props) {
+  return props.variant === "display" ? { label: "type.heading", labelBold: true, sublabel: "type.body", delta: "type.body" }
+    : { label: "type.compact", labelBold: false, sublabel: "type.label", delta: "type.label" };
+}
+
 export function metricHeight(width, props) {
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const inner = width - 2 * pad;
-  const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  const valueSize = figureSize(props, inner), type = metricType(props);
   const gap = v("space.1");
   const parts = [measureText(String(props.value ?? ""), inner, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true }).height,
-    ...(props.label ? [measure(props.label, inner, "type.compact").height] : []), ...(props.sublabel ? [measure(props.sublabel, inner, "type.label").height] : []),
-    ...(props.delta ? [measure(props.delta, inner, "type.label", true).height] : [])];
+    ...(props.label ? [measure(props.label, inner, type.label, type.labelBold).height] : []), ...(props.sublabel ? [measure(props.sublabel, inner, type.sublabel).height] : []),
+    ...(props.delta ? [measure(props.delta, inner, type.delta, true).height] : [])];
   return parts.reduce((sum, h) => sum + h, 0) + gap * (parts.length - 1) + 2 * pad;
 }
 
@@ -353,11 +380,12 @@ export function metricNodes({ id, frame, props }) {
   const dark = props.tone === "dark" || ink_;
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const width = frame.width - 2 * pad;
-  const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  const valueSize = figureSize(props, width);
   const value = measureText(String(props.value), width, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true });
-  const labelLayout = props.label ? measure(props.label, width, "type.compact") : null;
-  const sub = props.sublabel ? measure(props.sublabel, width, "type.label") : null;
-  const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
+  const type = metricType(props), display = props.variant === "display";
+  const labelLayout = props.label ? measure(props.label, width, type.label, type.labelBold) : null;
+  const sub = props.sublabel ? measure(props.sublabel, width, type.sublabel) : null;
+  const delta = props.delta ? measure(props.delta, width, type.delta, true) : null;
   const gap = v("space.1");
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
   if (total > frame.height + 0.01) throw new Error(`Metric tile is too short for its ${["value", labelLayout && "label", sub && "sublabel", delta && "delta"].filter(Boolean).join(", ")}: they take ${Math.ceil(total)}px at this width and the tile has ${Math.floor(frame.height)}px. Shorten the ${sub ? "sublabel or the label" : "label"}${delta ? ", or drop the delta" : ""}, or set fewer tiles so each is wider`);
@@ -383,8 +411,11 @@ export function metricNodes({ id, frame, props }) {
   let y = hero || props.valign === "top" ? frame.y : frame.y + (frame.height - total) / 2;
   nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   y += value.height;
-  if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text("type.compact", grey, false, align))); y += labelLayout.height; }
-  if (sub) { y += gap; nodes.push(label(stableId(id, "sublabel"), "metric-sublabel", { x: frame.x + pad, y, width }, sub, text("type.label", grey, false, align))); y += sub.height; }
+  // Under a display figure the label is in the page's ink and the sub-line in the secondary colour, so the two read as a
+  // statement and its qualifier; on a dark tile both keep the tile's pale type.
+  const labelInk = display && !dark ? INK : grey, subInk = display && !dark ? SECONDARY : grey;
+  if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text(type.label, labelInk, type.labelBold, align))); y += labelLayout.height; }
+  if (sub) { y += gap; nodes.push(label(stableId(id, "sublabel"), "metric-sublabel", { x: frame.x + pad, y, width }, sub, text(type.sublabel, subInk, false, align))); y += sub.height; }
   if (delta) {
     y += gap;
     const falling = /^\s*[-−▼↓]/.test(String(props.delta));
@@ -394,7 +425,7 @@ export function metricNodes({ id, frame, props }) {
     const better = props.better ?? "up";
     const good = better === "up" ? rising : falling, bad = better === "up" ? falling : rising;
     const color = dark ? reversedType() : bad ? token("color.negative") : good ? token("color.positive") : PRIMARY;
-    nodes.push(label(stableId(id, "delta"), "metric-delta", { x: frame.x + pad, y, width }, delta, text("type.label", color, true, align)));
+    nodes.push(label(stableId(id, "delta"), "metric-delta", { x: frame.x + pad, y, width }, delta, text(type.delta, color, true, align)));
   }
   return nodes;
 }
@@ -561,7 +592,10 @@ export function registerPanels(registry) {
   if (metric) {
     metric.tokens = [...new Set([...metric.tokens, ...PANEL_TOKENS])];
     metric.render = (input) => ({ nodes: metricNodes(input) });
+    metric.measureContent = ({ frame, props }) => ({ height: Math.ceil(metricHeight(frame.width, props)) });
     metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } }, ink: { props: { tone: "ink", variant: "prominent", value: "1.6x", label: "(Insert what the number is)" } }, ring: { props: { tone: "ring", value: "68%", label: "(Insert what the share is)" } }, rule: { props: { tone: "rule", variant: "prominent", value: "443", label: "(Insert what the number is)" } } };
+    // What a metric is there to make large: its figure (core.mjs emphasisOf, read where the engine weighs an arrangement).
+    metric.emphasis = ({ props, width }) => figureEmphasis(props, width);
     metric.resolveVariant = (props = {}) => ["dark", "hero", "ink", "rule", "ring"].includes(props.tone) ? props.tone : props.variant ?? "default";
   }
   return registry;
