@@ -160,8 +160,11 @@ export const TOKENS = Object.freeze({
   // The most air between the blocks of one group: a column with height to spare opens its gaps this far and no further,
   // and sets what is still left above and below the group (a flow's `leftover: "spread"`).
   "space.loose": length("--space-loose", 48),
-  "measure.min": length("--measure-min", 240),
-  "measure.max": length("--measure-max", 480),
+  // The reading measure at body size, about 8px a character at 12pt. Content text wraps no wider than 75 characters
+  // (text-roles.mjs); a column of running text is not set narrower than about 34, the narrowest that still reads as
+  // lines rather than as a word list (multi-column settings go to that, single columns rarely below 45).
+  "measure.min": length("--measure-min", 270),
+  "measure.max": length("--measure-max", 600),
   "layout.titleContentGap": length("--title-content-gap", 56),
   // The air on either side of the title rule: title (or standfirst) to rule, rule to body.
   "layout.titleRuleGap": length("--title-rule-gap", 12),
@@ -285,7 +288,9 @@ export const cardMuted = () => cardFill(token("color.surfaceMuted")).fill;
 // The gaps and the text measure are tokens (`space.major`, `space.minor`, `measure.min`, `measure.max`); a density
 // overrides weights (`taste`, below).
 export const TASTE = Object.freeze({
-  weights: Object.freeze({ whitespace: 1, balance: 0.6, uniformity: 1.5, regularity: 0.8, proportion: 1, simplicity: 0.1, variety: 1 }),
+  // `setting`: how a text breaks where the arrangement sets it (text-roles.mjs settingOf) - a widow under a figure, a
+  // description broken a line short of its width - weighed as sharply as a figure set below its size.
+  weights: Object.freeze({ whitespace: 1, balance: 0.6, uniformity: 1.5, regularity: 0.8, proportion: 1, setting: 1, simplicity: 0.1, variety: 1 }),
   // `page`: the share of its frame a page's ink should reach before the rest is counted as empty.
   fill: Object.freeze({ page: 0.55, share: 0.4, minHeight: 240, aspect: Object.freeze([1, 2.4]) }),
 });
@@ -780,9 +785,15 @@ function ceilingOf(node, registry, width, available) {
   return { value: content + padding.top + padding.bottom, bounded };
 }
 
-/** How far a node's ink runs at a width: a component's own natural width where it has one narrower than the width; else the width. */
+/**
+ * How far a node's ink runs at a width: what a component's own measurement says its text takes there (`inkWidth`, from
+ * the text roles: content stops at its reading measure however wide the column), else its natural width where it has
+ * one narrower than the width; else the width.
+ */
 function inkWidth(node, registry, width) {
   if (node.nodeType !== "component") return width;
+  const definition = registry.get(node.component), measure = definition?.measureIntrinsic ?? definition?.measureContent;
+  try { const set = measure?.({ frame: { x: 0, y: 0, width }, props: node.props })?.inkWidth; if (Number.isFinite(set) && set > 0) return Math.min(width, set); } catch { /* the solve raises what is wrong */ }
   // A component that cannot say how wide it is on its own inks the width it is given: the estimate is for scoring, and the solve raises what is wrong.
   try { const natural = naturalWidth(node, registry); return Number.isFinite(natural) && natural > 0 ? Math.min(width, natural) : width; } catch { return width; }
 }
@@ -800,6 +811,35 @@ function emphasisOf(node, registry, width) {
   const total = shares ? shares.reduce((sum, share) => sum + (fraction(share) || 0), 0) : 0;
   const found = (node.children || []).map((child, at) => emphasisOf(child, registry, shares && total ? width * (fraction(shares[node.nodeType === "grid" ? child.cell?.column ?? at : at]) || 0) / total : width)).filter((value) => value !== null);
   return found.length ? Math.max(...found) : null;
+}
+
+let settings = new WeakMap();
+/**
+ * How badly a node's texts break at a width (text-roles.mjs settingOf: 0 to 0.5), null where it sets none. A component
+ * says so itself (`setting` on its definition, from the texts it set); a container is laid out at the width and passes on
+ * what it holds taken together (text-roles.mjs together), each at the width it was given there - so a choice between whole grids is weighed by the
+ * statement in its narrow column as a choice between arrangements is.
+ */
+function settingOf(node, registry, width, height = null) {
+  if (node.nodeType === "component") { try { return registry.get(node.component).setting?.({ props: node.props, width }) ?? null; } catch { return null; } }
+  if (node.nodeType === "choice") return settingOf(node.options[0].node, registry, width, height);
+  let known = settings.get(node);
+  if (!known) settings.set(node, known = new Map());
+  const key = `${Math.round(width)}x${height === null ? "" : Math.round(height)}`;
+  if (known.has(key)) return known.get(key);
+  let found = null;
+  try {
+    if (node.nodeType === "section") {
+      const insets = registry.get("section")?.measureInsets?.({ frame: { x: 0, y: 0, width }, props: node }) ?? normalizeInsets(node.padding), inner = sectionContent(node);
+      found = inner ? settingOf(inner, registry, width - insets.left - insets.right, height === null ? null : height - insets.top - insets.bottom) : null;
+    } else {
+      // Laid out in the frame it will have where that is known (a block that fills), so what it holds is arranged as it will be drawn.
+      const values = solve(node, { x: 0, y: 0, width, height }, registry).placements.map((placed) => settingOf(placed.node, registry, placed.frame.width, placed.frame.height)).filter((value) => value !== null);
+      found = values.length ? 1 - values.reduce((kept, value) => kept * (1 - value), 1) : null;
+    }
+  } catch { found = null; }
+  known.set(key, found);
+  return found;
 }
 
 /** Whether a node is read from its head: a component that says so (`anchor: "top"`), or a section or flow holding one. */
@@ -845,7 +885,8 @@ function groupHeight(node, registry, width, available) {
  * group in the middle of it; stacked, a block that fills takes the height the others leave.
  */
 function arrangedFlow(node, choice, registry) {
-  const tall = (child, beside) => (fillsNode(child, registry) || (beside && child.nodeType === "section") ? "fill" : "hug");
+  // A block its composer says fills (`hints.sizing`, a whole grid offered as one of several) takes the height too.
+  const tall = (child, beside) => (fillsNode(child, registry) || child.hints?.sizing === "fill" || (beside && child.nodeType === "section") ? "fill" : "hug");
   const sized = (child, width, beside = true) => ({ ...child, size: { width, height: tall(child, beside) } });
   const base = { id: node.id, gap: node.gap, padding: node.padding, size: node.size, cell: node.cell, frame: node.frame };
   const { children } = node;
@@ -984,7 +1025,7 @@ function solve(root, frame, registry, { inRow = false, layout = null, arranged =
       const at = read(m), blocks = m.arrange.children.map((child) => (child.nodeType === "choice" ? { id: child.id, ...(child.kind ? { kind: child.kind } : {}), options: child.options.map((option) => ({ ...blockOf(option.node), label: option.label, ...(option.family ? { family: option.family } : {}) })) } : blockOf(child)));
       const best = arrange({ id: m.arrange.id, blocks, ...(m.arrange.rhythm ? {} : { gap: m.gap }) }, { width: at.width - m.padding.left - m.padding.right, height: m.tall && !(fitted && m === top) ? at.height - m.padding.top - m.padding.bottom : null },
         // A block that cannot be measured at a width (its component refuses it) rules out the arrangements that set it there, not the page.
-        (block, width) => { try { return naturalHeight(block.node, registry, width); } catch { return NaN; } }, tastePresets(m.arrange.taste), { extent: (block, width) => inkWidth(block.node, registry, width), emphasis: (block, width) => emphasisOf(block.node, registry, width), recent: m.arrange.recent, ...(m.arrange.held ? { choices: { [m.arrange.id]: m.arrange.held } } : {}), ...(m.arrange.refused ? { refused: { [m.arrange.id]: m.arrange.refused } } : {}) });
+        (block, width) => { try { return naturalHeight(block.node, registry, width); } catch { return NaN; } }, tastePresets(m.arrange.taste), { extent: (block, width) => inkWidth(block.node, registry, width), emphasis: (block, width) => emphasisOf(block.node, registry, width), setting: (block, width, height) => settingOf(block.node, registry, width, height ?? null), recent: m.arrange.recent, ...(m.arrange.held ? { choices: { [m.arrange.id]: m.arrange.held } } : {}), ...(m.arrange.refused ? { refused: { [m.arrange.id]: m.arrange.refused } } : {}) });
       // What was chosen and what it was chosen over, for whoever judges the page (`decisions`): the candidates a judge could have instead, best first.
       const open = best.scores.filter((entry) => Number.isFinite(entry.total));
       if (decisions && (open.length > 1 || m.arrange.held)) decisions.push({ id: m.arrange.id, chosen: best.label, ...(m.arrange.held === best.label ? { held: true } : {}), ...(Object.keys(best.families).length ? { families: best.families } : {}),
@@ -1548,6 +1589,7 @@ function compileSlideAsWritten(slideSpec, slideIndex, context) {
       if (!open || tries >= 8) throw first;
       (refused[open.id] ??= []).push(open.chosen);
       naturalHeights = new WeakMap();
+      settings = new WeakMap();
     }
   }
 }

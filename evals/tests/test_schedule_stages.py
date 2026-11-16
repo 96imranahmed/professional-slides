@@ -140,13 +140,15 @@ const items = {json.dumps(items)};
 const layout = (frame, props, roadmap) => {{ try {{ const L = stagesLayout(frame, props, {{ roadmap }}); return {{ orientation: L.orientation, stacked: L.stacked ?? false, natural: L.natural, ceiling: L.ceiling, height: L.height }}; }} catch (error) {{ return {{ error: error.message }}; }} }};
 const wide = {{ x: 0, y: 0, width: 1160 }};
 console.log(JSON.stringify({{
-  unbounded: layout(wide, {{ items }}, false), shallow: layout({{ ...wide, height: 250 }}, {{ items }}, false), tall: layout({{ ...wide, height: 528 }}, {{ items }}, false),
+  unbounded: layout(wide, {{ items }}, false), shallow: layout({{ ...wide, height: 210 }}, {{ items }}, false), tall: layout({{ ...wide, height: 528 }}, {{ items }}, false),
   roomy: layout({{ ...wide, height: 528 }}, {{ items }}, true), tight: layout({{ ...wide, height: 300 }}, {{ items }}, true),
   across: layout({{ ...wide, height: 528 }}, {{ items, orientation: 'across' }}, false), down: layout({{ ...wide, height: 528 }}, {{ items, orientation: 'down' }}, false),
   wrong: layout(wide, {{ items, orientation: 'sideways' }}, false), unlabelled: layout(wide, {{ items: [{{ date: '2027' }}] }}, false) }}));
 ''')
         self.assertEqual(result["unbounded"]["orientation"], "across")  # a height not yet known: the columns
-        self.assertEqual(result["shallow"]["orientation"], "across")    # no height for rows
+        # No height for rows: a timeline's rows set each label beside its detail (the detail at its reading measure), so
+        # five of them need about 216px across the page's width; 210px is too little and takes the columns.
+        self.assertEqual(result["shallow"]["orientation"], "across")
         self.assertEqual(result["tall"]["orientation"], "down")
         self.assertEqual(result["across"]["orientation"], "across")
         self.assertEqual(result["down"]["orientation"], "down")

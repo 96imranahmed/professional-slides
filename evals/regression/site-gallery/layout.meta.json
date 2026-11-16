@@ -1,0 +1,33 @@
+{
+ "commit": "f629c87761f7040cd124e151c160c1257f3039a1",
+ "clean": false,
+ "uncommitted": [
+  "skills/professional-slides/runtime/README.md",
+  "skills/professional-slides/runtime/build-deck.mjs",
+  "skills/professional-slides/runtime/compose-arrangements.mjs",
+  "skills/professional-slides/runtime/compose-exhibits.mjs",
+  "skills/professional-slides/runtime/compose-page.mjs",
+  "skills/professional-slides/runtime/compose-points.mjs",
+  "skills/professional-slides/runtime/content-audit.mjs",
+  "skills/professional-slides/runtime/core.mjs",
+  "skills/professional-slides/runtime/extras.mjs",
+  "skills/professional-slides/runtime/figures.mjs",
+  "skills/professional-slides/runtime/layout-templates.mjs",
+  "skills/professional-slides/runtime/marks.mjs",
+  "skills/professional-slides/runtime/page-types.mjs",
+  "skills/professional-slides/runtime/panels.mjs",
+  "skills/professional-slides/runtime/planner.mjs",
+  "skills/professional-slides/runtime/public/judge.mjs",
+  "skills/professional-slides/runtime/public/workspace.mjs",
+  "skills/professional-slides/runtime/quote-cluster.mjs",
+  "skills/professional-slides/runtime/registry-data.mjs",
+  "skills/professional-slides/runtime/registry-diagrams.mjs",
+  "skills/professional-slides/runtime/registry-media.mjs",
+  "skills/professional-slides/runtime/registry-process.mjs",
+  "skills/professional-slides/runtime/registry-shared.mjs",
+  "skills/professional-slides/runtime/registry-text.mjs",
+  "skills/professional-slides/runtime/schedule-stages.mjs",
+  "skills/professional-slides/runtime/tasteful-layout/index.mjs",
+  "skills/professional-slides/runtime/text-roles.mjs"
+ ]
+}

@@ -40,6 +40,11 @@
 //   regularity  the arrangement is not a clean grid: columns ending at different heights, a last row not full;
 //   proportion  a fill block squeezed below its share or its least height, or stretched past the proportions it reads at;
 //               or the page's point (a display figure) set smaller than the room would let it be (`settings.emphasis`);
+//   setting     a text the arrangement breaks badly: a last line under a third of its measure (a widow), or a short text
+//               broken onto a line it would not need at a little more width (`settings.setting`, which each component
+//               answers for the text it sets, so this module knows no component). A choice between whole grids is
+//               weighed by it as much as a choice between arrangements: the wider column that sets a figure's statement
+//               on one line wins over the narrower one that leaves its last word alone;
 //   simplicity  a small cost per column, so the plainer arrangement wins a tie;
 //   variety     the candidate sets a kind of content the way the caller says it was last set (`settings.recent`):
 //               a deck that sets every figure, every list, the same way reads as a template, not as pages. It
@@ -62,8 +67,8 @@ initSync({ module: readFileSync(new URL("../vendor/taffy-layout/taffy_wasm_bg.wa
 //   measure  { min, max }       the widths a line of body text is read at;
 //   fill     { page, share, minHeight, aspect: [tallest, flattest] }   the share of the frame a page's ink should
 //                               reach, and what a fill block wants of it;
-//   weights  one weight per measure above (whitespace, balance, uniformity, regularity, proportion, simplicity, variety).
-const MEASURES = ["whitespace", "balance", "uniformity", "regularity", "proportion", "simplicity", "variety"];
+//   weights  one weight per measure above (whitespace, balance, uniformity, regularity, proportion, setting, simplicity, variety).
+const MEASURES = ["whitespace", "balance", "uniformity", "regularity", "proportion", "setting", "simplicity", "variety"];
 // How much repeating the last setting of a kind of content counts: enough to lose to a sound alternative, not to a poor one.
 const REPEATED = 0.5;
 // Quality first: a repeat is only marked down where a fresh setting scores within this much of it. Where every other
@@ -165,7 +170,7 @@ function layOut(group, candidate, frame, context) {
 function scoreOf(group, candidate, laid, frame, context, families = {}) {
   const { presets, extent } = context;
   const height = frame.height ?? laid.height, area = Math.max(1, frame.width * height);
-  const parts = { overflow: 0, narrow: 0, whitespace: 0, balance: 0, uniformity: 0, regularity: 0, proportion: 0, simplicity: 0, variety: 0 };
+  const parts = { overflow: 0, narrow: 0, whitespace: 0, balance: 0, uniformity: 0, regularity: 0, proportion: 0, setting: 0, simplicity: 0, variety: 0 };
   if (Object.entries(families).some(([kind, family]) => context.recent[kind] === family)) parts.variety = REPEATED;
   if (frame.height !== null && laid.height > frame.height + 0.5) parts.overflow = (laid.height - frame.height) / frame.height;
   // Each block's ink: a fill block inks its frame; text inks as far as its words run, from its left edge.
@@ -174,6 +179,9 @@ function scoreOf(group, candidate, laid, frame, context, families = {}) {
   group.blocks.forEach((block, at) => {
     const box = laid.frames[at], min = block.minWidth ?? presets.measure.min, max = block.maxWidth ?? presets.measure.max;
     if (box.width < min - 0.5) parts.narrow = Math.max(parts.narrow, (min - box.width) / min);
+    // How the block's texts break at this width, whether it fills its frame or not: a grid that fills holds text too.
+    // Each block's fault adds to the others' (1 - product(1 - each)): none hides another.
+    parts.setting = 1 - (1 - parts.setting) * (1 - (context.setting(block, box.width, fills(block) && frame.height !== null ? box.height : null) ?? 0));
     if (fills(block)) {
       const ratio = box.width / Math.max(1, box.height), [tallest, flattest] = block.aspect ?? presets.fill.aspect;
       parts.proportion = Math.max(parts.proportion, Math.max(0, presets.fill.share - (box.width * box.height) / area), box.height < presets.fill.minHeight ? (presets.fill.minHeight - box.height) / presets.fill.minHeight : 0,
@@ -221,7 +229,8 @@ function scoreOf(group, candidate, laid, frame, context, families = {}) {
  * it can be used - a judge's decision, recorded by whoever asked;
  * `settings.extent(block, width)` says how wide a text block's ink runs at a width;
  * `settings.emphasis(block, width)` how far a block gets with what it is there to
- * make large (0 to 1, null where it holds no such thing); `settings.recent`
+ * make large (0 to 1, null where it holds no such thing); `settings.setting(block, width, height)`
+ * how badly its texts break at a width (and, for a block that fills, the height it is given) (0 to 0.5, null where it sets none); `settings.recent`
  * (`{ <kind>: <family> }`) how each kind of content was last set, for `variety`; and
  * `settings.refused` (`{ <group id>: [<label>] }`) rules candidates out: ones the
  * caller found it could not draw. `presets` is required (see the
@@ -239,7 +248,7 @@ export function arrange(group, frame, measure, presets, settings = {}) {
     return memo.get(key);
   };
   // A block's ink width at a width: the caller's, where it can say how far the words run; else the width it was given.
-  const context = { presets, natural, extent: settings.extent ?? ((_block, width) => width), emphasis: settings.emphasis ?? (() => null), recent: settings.recent ?? {} };
+  const context = { presets, natural, extent: settings.extent ?? ((_block, width) => width), emphasis: settings.emphasis ?? (() => null), setting: settings.setting ?? (() => null), recent: settings.recent ?? {} };
   function choose(target, at) {
     const refused = new Set(settings.refused?.[target.id]);
     const scored = realisations(target.blocks).flatMap(({ blocks, picks, families }) => { const drawn = { ...target, blocks };

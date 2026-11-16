@@ -25,11 +25,12 @@ const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.dec
 
 
 class ComposeLayoutTests(unittest.TestCase):
-    def test_single_bottom_implication_runs_the_exhibit_width_without_widening_peers(self):
+    def test_single_bottom_implication_starts_at_the_exhibit_and_keeps_its_measure_without_widening_peers(self):
         run_node(r'''
 import assert from 'node:assert/strict';
 import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+import {roleMeasure} from './skills/professional-slides/runtime/text-roles.mjs';
 const text='The model retains the same service boundary. Additional capacity changes one constraint but does not establish permission, funding or readiness. Those conditions must be verified together before the later commitment.';
 const build=count=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'bottom',tracker:false,slides:[{id:'s',title:'One implication uses the region below its evidence',layout:'exhibit-top',pointsHeading:false,exhibit:{type:'table',columns:['Case','Value'],rows:[['A',10],['B',20]]},points:Array.from({length:count},(_,i)=>({lead:`Finding ${i+1}`,text}))}]})).deck;
 const one=build(1),two=build(2),three=build(3);
@@ -37,11 +38,12 @@ const paragraphs=deck=>deck.slides[0].nodes.filter(n=>n.role==='paragraph');
 const rows=deck=>deck.slides[0].nodes.filter(n=>String(n.role).startsWith('table-'));
 const span=deck=>{const r=rows(deck);return [Math.min(...r.map(n=>n.frame.x)),Math.max(...r.map(n=>n.frame.x+n.frame.width))];};
 // One implication takes the track of the exhibit it is read off, left edge to
-// left edge, rather than hugging its own measure in the middle of the region.
+// left edge, rather than hugging its own measure in the middle of the region;
+// its lines keep the reading measure every paragraph keeps (text-roles.mjs).
 const a=paragraphs(one);assert.equal(a.length,1);
 const [left,right]=span(one);
 assert.ok(Math.abs(a[0].frame.x-left)<1,`paragraph starts at ${a[0].frame.x}, exhibit at ${left}`);
-assert.ok(a[0].frame.x+a[0].frame.width>=right-1,`paragraph ends at ${a[0].frame.x+a[0].frame.width}, exhibit at ${right}`);
+assert.ok(a[0].frame.width<=roleMeasure('body')*1.1+0.5&&right-left>a[0].frame.width,`paragraph is ${a[0].frame.width} wide under an exhibit ${right-left} wide`);
 assert.equal(a[0].text.split(/\s+/).join(' '),text);
 for(const [d,count,max] of [[two,2,580],[three,3,390]]){
  const p=paragraphs(d);assert.equal(p.length,count);assert.ok(p.every(n=>n.frame.width<max));assert.equal(new Set(p.map(n=>n.frame.width)).size,1);

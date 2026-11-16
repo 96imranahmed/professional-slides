@@ -14,6 +14,16 @@
 // shares with a floor. The layout engine (core.mjs, Taffy) resolves them as a
 // browser would, and the HTML emitter writes the same grid.
 //
+// A share fixed in advance is a guess about content the template has not seen: a third of the page for a figure's
+// column is right for "33%" over four words and wrong for the same figure over a sentence that breaks on its last
+// word. So `columns` and `rows` may list alternatives, the template's preference first:
+//
+//   { columns: ["1fr 2fr", "2fr 3fr", "1fr 1fr"], areas: ["side exhibit"] }
+//
+// and the page's grid becomes a choice between those grids. The layout engine weighs them as it weighs any other way of
+// setting a page (tasteful-layout: a statement left with a widow in the narrow column counts against it), records what
+// it chose and over what as a decision a judge sees, and a page's recorded `choices` hold it. A tie goes to the first.
+//
 // A deck keeps its own templates under `layouts`, beside its palette; a page
 // takes one by name (`grid: "<name>"`) or writes one in place.
 import { TOKENS } from "./core.mjs";
@@ -26,22 +36,39 @@ export const SLOTS = Object.freeze({
 const ALIGN = Object.freeze({ start: "start", center: "center", end: "end", "space-between": "distribute" });
 export const isSlot = (name) => name in SLOTS || /^exhibit-[2-9]$/.test(name);
 
-/** One track as the engine reads it: `{ fr }`, "hug", a length in pixels, or `{ min, fr }` for `minmax(<px>, <fr>)`. */
+/**
+ * One track as the planner reads it: `{ fr }`, "hug", `{ px }` for a length, or `{ min, fr }` for `minmax(<px>, <fr>)`.
+ * A length is `{ px }` and never a bare number, because a bare number is a weight in a dashboard's plan (`[2, 1]`): read
+ * as one, `240px` beside `1fr` took 240 shares of the row and left the column beside it a few pixels.
+ */
 function track(text, where) {
   const fr = /^(\d*\.?\d+)fr$/.exec(text), px = /^(\d*\.?\d+)(px)?$/.exec(text);
   const floor = /^minmax\((\d*\.?\d+)(?:px)?,(\d*\.?\d+)fr\)$/.exec(text);
   if (fr) return { fr: Number(fr[1]) };
   if (text === "auto") return "hug";
   if (floor) return { min: Number(floor[1]), fr: Number(floor[2]) };
-  if (px && px[2]) return Number(px[1]);
+  if (px && px[2]) return { px: Number(px[1]) };
   throw new Error(`${where}: a track is \`<n>fr\`, \`auto\`, a length in px or \`minmax(<px>, <n>fr)\` (got "${text}")`);
 }
 
 /** A track list - "2fr auto 240px", or weights [2, 1] - as the engine's tracks. */
 export function tracksOf(value, where) {
+  if (Array.isArray(value) && value.length && value.every((entry) => typeof entry === "string")) throw new Error(`${where}: a list of track lists is a set of alternatives, which only a page's grid takes (layout-templates.mjs alternativesOf)`);
   if (Array.isArray(value)) return value.map((weight) => { if (!(Number.isFinite(weight) && weight > 0)) throw new Error(`${where}: weights are positive numbers`); return { fr: weight }; });
   if (typeof value !== "string" || !value.trim()) throw new Error(`${where}: tracks are written as CSS writes them - "2fr 1fr", "auto 1fr"`);
   return value.trim().replace(/\(\s*/g, "(").replace(/\s*,\s*/g, ",").replace(/\s*\)/g, ")").split(/\s+/).map((text) => track(text, where));
+}
+
+/**
+ * A grid's `columns` or `rows` as the alternatives it offers, each `{ label, tracks }`, the preference first: one track
+ * list ("1fr 2fr", or weights) is one alternative; a list of track lists (["1fr 2fr", "2fr 3fr"]) is several.
+ */
+export function alternativesOf(value, where) {
+  const lists = Array.isArray(value) && value.length && value.every((entry) => typeof entry === "string") ? value : [value];
+  const found = lists.map((list) => ({ label: Array.isArray(list) ? list.map((weight) => `${weight}fr`).join(" ") : String(list).trim().replace(/\s+/g, " "), tracks: tracksOf(list, where) }));
+  const twice = found.find((entry, at) => found.findIndex((other) => other.label === entry.label) !== at);
+  if (twice) throw new Error(`${where}: "${twice.label}" is offered twice`);
+  return found;
 }
 
 /** `areas: ["a a", "b c"]` as each name's cell: its first column and row, and how many it spans. A `.` leaves a cell empty. */
@@ -82,9 +109,14 @@ export function resolveTemplate(grid, layouts, id, { name = "template", arrange 
     throw new Error(`${id}: a grid is { columns, rows, areas, place } - \`areas\` names where the page's content sits, as CSS \`grid-template-areas\` does - or the name of one of the deck's \`layouts\``);
   for (const key of Object.keys(template)) if (!["columns", "rows", "gap", "areas", "place"].includes(key)) throw new Error(`${id}: a grid takes columns, rows, gap, areas and place (got \`${key}\`)`);
   const { named, columns: across, rows: down } = areasOf(template.areas, `${id}: grid.areas`);
-  const columns = template.columns === undefined ? Array.from({ length: across }, () => ({ fr: 1 })) : tracksOf(template.columns, `${id}: grid.columns`);
-  const rows = template.rows === undefined ? Array.from({ length: down }, () => ({ fr: 1 })) : tracksOf(template.rows, `${id}: grid.rows`);
-  if (columns.length !== across || rows.length !== down) throw new Error(`${id}: grid.areas is ${across} by ${down} and the tracks are ${columns.length} by ${rows.length}`);
+  const even = (count) => [{ label: Array.from({ length: count }, () => "1fr").join(" "), tracks: Array.from({ length: count }, () => ({ fr: 1 })) }];
+  const columnWays = template.columns === undefined ? even(across) : alternativesOf(template.columns, `${id}: grid.columns`);
+  const rowWays = template.rows === undefined ? even(down) : alternativesOf(template.rows, `${id}: grid.rows`);
+  for (const { tracks: columns } of columnWays) for (const { tracks: rows } of rowWays) if (columns.length !== across || rows.length !== down) throw new Error(`${id}: grid.areas is ${across} by ${down} and the tracks are ${columns.length} by ${rows.length}`);
+  // Every pairing of a column alternative with a row alternative, the preference (the first of each) first. Each is
+  // labelled by what it varies, so a recorded choice reads as the tracks it chose.
+  const tracks = columnWays.flatMap((columns) => rowWays.map((rows) => ({ label: [columnWays.length > 1 ? columns.label : null, rowWays.length > 1 ? rows.label : null].filter(Boolean).join(" / ") || columns.label, columns: columns.tracks, rows: rows.tracks })));
+  const [{ columns, rows }] = tracks;
   if (template.gap !== undefined && !(typeof template.gap === "string" && template.gap.startsWith("space.") && Object.hasOwn(TOKENS, template.gap))) throw new Error(`${id}: grid.gap names a spacing token ("space.4")`);
   for (const name of Object.keys(template.place || {})) if (!named[name]) throw new Error(`${id}: grid.place names area "${name}", and the areas are ${Object.keys(named).join(", ")}`);
   const areas = Object.entries(named).map(([name, cell]) => {
@@ -103,5 +135,6 @@ export function resolveTemplate(grid, layouts, id, { name = "template", arrange 
   const twice = areas.flatMap((area) => area.content).filter((slot, at, all) => all.indexOf(slot) !== at);
   if (twice.length) throw new Error(`${id}: ${[...new Set(twice)].map((slot) => `"${slot}"`).join(", ")} is placed in more than one area`);
   // `arrange`: the areas are blocks the engine arranges itself (tasteful-layout) rather than cells of fixed tracks.
-  return { name, columns, rows, ...(template.gap ? { gap: template.gap } : {}), areas, ...(arrange ? { arrange: true } : {}) };
+  // `tracks`: the alternatives, where the template offers more than one (`columns` and `rows` are the preference).
+  return { name, columns, rows, ...(tracks.length > 1 ? { tracks } : {}), ...(template.gap ? { gap: template.gap } : {}), areas, ...(arrange ? { arrange: true } : {}) };
 }

@@ -12,7 +12,7 @@ import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrim
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
-import { measureTextRuns } from "./text-layout.mjs";
+import { setText, drawText, settingOfAll, TEXT_ROLE_TOKENS } from "./text-roles.mjs";
 import { quoted } from "./text-contract.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink"), MID = token("color.chartSeries1");
@@ -29,12 +29,18 @@ export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
   "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary", "color.chartSeries1",
   "color.rule", "color.surface", "color.surfaceMuted", "color.surfaceTint", "color.band", "font.body", "font.display", "type.metric", "type.heading", "type.body",
   "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6", "space.8", "space.loose", "icon.medium",
-  "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+  "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round", ...TEXT_ROLE_TOKENS])]);
 
 const style = (size, color = INK, bold = false, align = "left", font = FONT, valign = "top") =>
   ({ fontFamily: font, fontSize: token(size), color, bold, align, valign, wrap: false });
 const measure = (value, width, size, bold = false, font = FONT) => measureAt(value, Math.max(1, width), { size, bold, font });
 const label = measuredLabel;
+// Every text a figure draws is set in its role (text-roles.mjs) and drawn as it was measured: the figure's own words -
+// a step's name, a layer's text, a statistic's sentence - as the page's content at body size or larger, at their reading
+// measure; the words read off a chart-like figure (a rank's entity, a sankey's node, a zone's name, an arrow's label) as
+// its furniture; its numbers as figures and the numerals in its markers as marks. `set` measures, `put` draws.
+const set = (role, value, width, options) => setText(role, String(value), Math.max(1, width), options);
+const put = (id, nodeRole, at, layout, color, align = "left") => drawText(id, nodeRole, at, layout, { color, align });
 const clean = (value) => (typeof value === "string" && value.trim() ? value.trim() : null);
 const between = (items, lo, hi, what) => {
   if (!Array.isArray(items) || items.length < lo || items.length > hi) throw new Error(`${what} takes ${lo} to ${hi} entries`);
@@ -78,11 +84,11 @@ export function statListLayout(frame, props) {
   // 12px past the panel's right edge (the Manhattan deck's m43).
   const inset = props.tone === "dark" ? v("space.3") : 0;
   const colWidth = (frame.width - 2 * inset - colGap * (columns - 1)) / columns;
-  const values = items.map((item) => measure(item.value, colWidth, "type.metric", true, FIGURES));
+  const values = items.map((item) => set("figure", item.value, colWidth, { size: "type.metric" }));
   const valueWidth = Math.min(colWidth * 0.42, Math.max(...values.map((m) => m.width)) + v("space.2"));
   const textWidth = colWidth - valueWidth - v("space.4");
   if (textWidth < 120) throw new Error("A stat list is too narrow for its sentences; widen it or shorten the values");
-  const texts = items.map((item) => measure(item.text, textWidth, "type.body"));
+  const texts = items.map((item) => set("body", item.text, textWidth));
   if (texts.some((m) => m.lines.length > 4)) throw new Error("Each statistic takes a sentence of four lines at most; move the rest into the note");
   const rows = items.map((item, i) => ({ item, value: values[i], text: texts[i], height: Math.max(values[i].height, texts[i].height) }));
   const perColumn = Math.ceil(rows.length / columns);
@@ -106,10 +112,8 @@ export function statListNodes({ id, frame, props }) {
     const x = frame.x + L.inset + c * (L.colWidth + L.colGap);
     rows.forEach((r, i) => {
       const rid = stableId(id, "stat", c * L.perColumn + i);
-      nodes.push(label(stableId(rid, "value"), "stat-value", { x, y, width: L.valueWidth }, r.value,
-        style("type.metric", dark ? WHITE : ACCENT, true, "left", FIGURES)));
-      nodes.push(label(stableId(rid, "text"), "stat-text", { x: x + L.valueWidth + v("space.4"), y: y + Math.max(0, (r.value.height - r.text.height) / 2), width: L.textWidth }, r.text,
-        style("type.body", dark ? WHITE : INK)));
+      nodes.push(put(stableId(rid, "value"), "stat-value", { x, y, width: L.valueWidth }, r.value, dark ? WHITE : ACCENT));
+      nodes.push(put(stableId(rid, "text"), "stat-text", { x: x + L.valueWidth + v("space.4"), y: y + Math.max(0, (r.value.height - r.text.height) / 2), width: L.textWidth }, r.text, dark ? WHITE : INK));
       y += r.height;
       if (i < rows.length - 1) {
         nodes.push(line(stableId(rid, "rule"), "stat-rule", x, y + gap / 2, x + L.colWidth, y + gap / 2, dark ? WHITE : RULE));
@@ -165,7 +169,7 @@ export function flowLayout(frame, props) {
   const rowGap = v("space.4");
   // A label sits in the gutter it names, clear of both steps' frames, so the
   // gutter is measured on the widest label (up to two lines of it).
-  const labelled = edges.filter((e) => e.label).map((e) => Math.ceil(measure(e.label, 1000, "type.label").width) + 2 * v("space.2"));
+  const labelled = edges.filter((e) => e.label).map((e) => Math.ceil(set("tag", e.label, 1000).width) + 2 * v("space.2"));
   const wanted = labelled.length ? Math.min(FLOW_LABEL_GAP_MAX, Math.max(FLOW_GAP, Math.max(...labelled) / (Math.max(...labelled) > FLOW_LABEL_GAP_MAX ? 2 : 1))) : FLOW_GAP;
   const widthAt = (gap) => (frame.width - gap * (layers - 1)) / layers;
   const colGap = widthAt(wanted) >= 120 ? wanted : FLOW_GAP;
@@ -187,8 +191,8 @@ export function flowLayout(frame, props) {
   let tallest = 0;
   columns.forEach((col, c) => {
     const measured = col.map(({ node }) => {
-      const title = measure(node.label, inner, "type.body", true);
-      const body = node.text ? measure(node.text, inner, "type.body") : null;
+      const title = set("body", node.label, inner, { bold: true });
+      const body = node.text ? set("body", node.text, inner) : null;
       if (title.lines.length > 3) throw new Error(`Flow step "${node.label}" is too long to label; shorten it`);
       return { node, title, body, height: title.height + (body ? v("space.1") + body.height : 0) + 2 * v("space.3") };
     });
@@ -277,8 +281,8 @@ export function flowNodes({ id, frame, props }) {
       out.push(fillRect(stableId(id, "step", m.node.id), "flow-step", box, tone, { radius: "radius.small" }));
       // The copy centres in a step that grew.
       const top = y + v("space.3") + (h - m.height) / 2;
-      out.push(label(stableId(id, "label", m.node.id), "flow-step-label", { x: x + v("space.3"), y: top, width: L.inner }, m.title, style("type.body", ink, true, "center")));
-      if (m.body) out.push(label(stableId(id, "text", m.node.id), "flow-step-text", { x: x + v("space.3"), y: top + m.title.height + v("space.1"), width: L.inner }, m.body, style("type.body", ink, false, "center")));
+      out.push(put(stableId(id, "label", m.node.id), "flow-step-label", { x: x + v("space.3"), y: top, width: L.inner }, m.title, ink, "center"));
+      if (m.body) out.push(put(stableId(id, "text", m.node.id), "flow-step-text", { x: x + v("space.3"), y: top + m.title.height + v("space.1"), width: L.inner }, m.body, ink, "center"));
       y += h + L.gap;
     }
   });
@@ -292,10 +296,10 @@ export function flowNodes({ id, frame, props }) {
     out.push(line(stableId(id, "arrow", i), "flow-arrow", x1, y1, x2, y2, SECONDARY, "line.standard", { endArrow: true }));
     if (e.label) {
       const gutter = { x: a.x + a.width + 4, width: Math.max(1, b.x - a.x - a.width - 8) };
-      const m = measure(e.label, gutter.width, "type.label");
+      const m = set("tag", e.label, gutter.width);
       const box = arrowLabelFrame(arrow, m, gutter, arrows, taken);
       taken.push(box);
-      out.push(label(stableId(id, "arrow-label", i), "flow-arrow-label", box, m, style("type.label", SECONDARY, false, "center")));
+      out.push(put(stableId(id, "arrow-label", i), "flow-arrow-label", box, m, SECONDARY, "center"));
     }
   });
   return out;
@@ -375,9 +379,10 @@ export function spectrumLayout(frame, props) {
   // The poles' quotes share the row under it, half each, a gutter between.
   const quoteWidth = (frame.width - v("space.5")) / 2;
   const rows = items.map((item, i) => {
-    const left = measure(item.left, poleWidth, "type.body", true), right = item.right ? measure(item.right, poleWidth, "type.body", true) : null;
-    const text = item.text ? measure(item.text, trackWidth, "type.body") : null;
-    const quotes = item.quotes && Object.fromEntries(["left", "right"].map((side) => [side, item.quotes[side] ? measure(item.quotes[side], quoteWidth, "type.compact") : null]));
+    const left = set("body", item.left, poleWidth, { bold: true }), right = item.right ? set("body", item.right, poleWidth, { bold: true }) : null;
+    const text = item.text ? set("note", item.text, trackWidth) : null;
+    // A pole's voice is a quotation, the page's content: body text at its measure, never caption type.
+    const quotes = item.quotes && Object.fromEntries(["left", "right"].map((side) => [side, item.quotes[side] ? set("body", item.quotes[side], quoteWidth) : null]));
     for (const side of ["left", "right"]) if (quotes?.[side] && quotes[side].lines.length > QUOTE_LINES)
       throw new Error(`Spectrum row ${i + 1}'s ${side} quote runs to ${quotes[side].lines.length} lines in its half of the row; a pole's voice is ${QUOTE_LINES} lines at most - cut it to the words that make the pole`);
     const said = quotes ? Math.max(quotes.left?.height ?? 0, quotes.right?.height ?? 0) : 0;
@@ -386,8 +391,8 @@ export function spectrumLayout(frame, props) {
   });
   const gap = v("space.5");
   const segGap = 4, segWidth = segments ? (trackWidth - segGap * (segments - 1)) / segments : 0;
-  const scale = segments && props.scale ? props.scale.map((step) => measure(step, segWidth, "type.label")) : null;
-  const key = props.markers ? props.markers.map((marker) => measure(String(marker.label), trackWidth, "type.compact", true)) : null;
+  const scale = segments && props.scale ? props.scale.map((step) => set("axis", step, segWidth)) : null;
+  const key = props.markers ? props.markers.map((marker) => set("legend", marker.label, trackWidth, { bold: true })) : null;
   const header = scale ? Math.max(...scale.map((m) => m.height)) + v("space.2") : key ? Math.max(...key.map((m) => m.height)) + v("space.4") : 0;
   return { rows, segments, segGap, segWidth, scale, key, header, rightPole, poleWidth, trackWidth, quoteWidth, gap, height: header + rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
 }
@@ -400,7 +405,7 @@ export function spectrumNodes({ id, frame, props }) {
   let y = frame.y;
   const trackX = frame.x + L.poleWidth + v("space.4");
   const segX = (k) => trackX + k * (L.segWidth + L.segGap);
-  if (L.scale) L.scale.forEach((m, k) => out.push(label(stableId(id, "scale", k), "spectrum-scale", { x: segX(k), y: y + L.header - v("space.2") - m.height, width: L.segWidth }, m, style("type.label", SECONDARY, false, "center"))));
+  if (L.scale) L.scale.forEach((m, k) => out.push(put(stableId(id, "scale", k), "spectrum-scale", { x: segX(k), y: y + L.header - v("space.2") - m.height, width: L.segWidth }, m, SECONDARY, "center")));
   // The key: each marker's dot and name, in a row centred over the track.
   const MARKER_FILLS = [ACCENT, PRIMARY, SECONDARY], keyDot = 10;
   if (L.key) {
@@ -409,24 +414,24 @@ export function spectrumNodes({ id, frame, props }) {
     L.key.forEach((m, k) => {
       const ky = y + L.header - v("space.4") - m.height;
       out.push(ellipsePrimitive({ id: stableId(id, "key-dot", k), role: "spectrum-key-dot", frame: { x: kx, y: ky + (m.height - keyDot) / 2, width: keyDot, height: keyDot }, style: { fill: MARKER_FILLS[k], stroke: MARKER_FILLS[k], lineWidth: token("line.hairline") }, data: { marker: props.markers[k].id } }));
-      out.push(label(stableId(id, "key-label", k), "spectrum-key-label", { x: kx + keyDot + v("space.2"), y: ky, width: m.width + 2 }, m, style("type.compact", INK, true, "left")));
+      out.push(put(stableId(id, "key-label", k), "spectrum-key-label", { x: kx + keyDot + v("space.2"), y: ky, width: m.width + 2 }, m, INK));
       kx += widths[k] + v("space.5");
     });
   }
   y += L.header;
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i), mid = y + r.head / 2, dot = 16;
-    out.push(label(stableId(rid, "left"), "spectrum-pole", { x: frame.x, y: mid - r.left.height / 2, width: L.poleWidth }, r.left, style("type.body", INK, true, "right")));
-    if (r.right) out.push(label(stableId(rid, "right"), "spectrum-pole", { x: trackX + L.trackWidth + v("space.4"), y: mid - r.right.height / 2, width: L.poleWidth }, r.right, style("type.body", ACCENT, true, "left")));
+    out.push(put(stableId(rid, "left"), "spectrum-pole", { x: frame.x, y: mid - r.left.height / 2, width: L.poleWidth }, r.left, INK, "right"));
+    if (r.right) out.push(put(stableId(rid, "right"), "spectrum-pole", { x: trackX + L.trackWidth + v("space.4"), y: mid - r.right.height / 2, width: L.poleWidth }, r.right, ACCENT));
     // Each pole's voice under its own end of the row: the left quote set from the left edge, the right one to the right edge.
     if (r.quotes) {
       const qy = y + r.head + v("space.2");
-      if (r.quotes.left) out.push(label(stableId(rid, "quote-left"), "spectrum-quote", { x: frame.x, y: qy, width: L.quoteWidth }, r.quotes.left, style("type.compact", INK, false, "left")));
-      if (r.quotes.right) out.push(label(stableId(rid, "quote-right"), "spectrum-quote", { x: frame.x + frame.width - L.quoteWidth, y: qy, width: L.quoteWidth }, r.quotes.right, style("type.compact", INK, false, "right")));
+      if (r.quotes.left) out.push(put(stableId(rid, "quote-left"), "spectrum-quote", { x: frame.x, y: qy, width: L.quoteWidth }, r.quotes.left, INK));
+      if (r.quotes.right) out.push(put(stableId(rid, "quote-right"), "spectrum-quote", { x: frame.x + frame.width - L.quoteWidth, y: qy, width: L.quoteWidth }, r.quotes.right, INK, "right"));
     }
     if (L.segments) {
       for (let k = 0; k < L.segments; k++) out.push(fillRect(stableId(rid, "segment", k), k === r.item.level - 1 ? "spectrum-level" : "spectrum-segment", { x: segX(k), y: mid - 7, width: L.segWidth, height: 14 }, k === r.item.level - 1 ? ACCENT : MUTED, { data: { level: k + 1, selected: k === r.item.level - 1 } }));
-      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.body", SECONDARY, false, "left")));
+      if (r.text) out.push(put(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, SECONDARY));
       y += r.height + gap;
       return;
     }
@@ -437,14 +442,14 @@ export function spectrumNodes({ id, frame, props }) {
         const value = r.item.values[k];
         out.push(ellipsePrimitive({ id: stableId(rid, "marker", props.markers[k].id), role: "spectrum-marker", frame: { x: trackX + L.trackWidth * value - dot / 2, y: mid - dot / 2, width: dot, height: dot }, style: { fill: MARKER_FILLS[k], stroke: WHITE, lineWidth: token("line.standard") }, data: { value, marker: props.markers[k].id } }));
       });
-      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.body", SECONDARY, false, "center")));
+      if (r.text) out.push(put(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, SECONDARY, "center"));
       y += r.height + gap;
       return;
     }
     out.push(fillRect(stableId(rid, "track"), "spectrum-track", { x: trackX, y: mid - 3, width: L.trackWidth, height: 6 }, MUTED, { radius: "radius.round" }));
     out.push(fillRect(stableId(rid, "fill"), "spectrum-fill", { x: trackX, y: mid - 3, width: L.trackWidth * r.item.value, height: 6 }, TINT, { radius: "radius.round" }));
     out.push(ellipsePrimitive({ id: stableId(rid, "marker"), role: "spectrum-marker", frame: { x: trackX + L.trackWidth * r.item.value - dot / 2, y: mid - dot / 2, width: dot, height: dot }, style: { fill: ACCENT, stroke: WHITE, lineWidth: token("line.standard") }, data: { value: r.item.value } }));
-    if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.body", SECONDARY, false, "center")));
+    if (r.text) out.push(put(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, SECONDARY, "center"));
     y += r.height + gap;
   });
   return out;
@@ -475,10 +480,10 @@ export function layersLayout(frame, props) {
   const rows = layers.map((layer, i) => {
     const inset = (layers.length - 1 - i) * LAYER_STEP;
     const textWidth = frame.width - 2 * inset - labelWidth - 3 * pad;
-    const title = measure(layer.label, labelWidth, "type.body", true);
+    const title = set("body", layer.label, labelWidth, { bold: true });
     let text = null;
     if (layer.text) {
-      try { text = measure(layer.text, textWidth, "type.body"); } catch (error) {
+      try { text = set("body", layer.text, textWidth); } catch (error) {
         throw new Error(`The layer "${layer.label}" leaves ${Math.max(0, Math.floor(textWidth))}px for its text beside a ${Math.floor(labelWidth)}px label, and the text does not set in it: ${error.message}. Give the stack more width (commentary below it, not beside), or shorten that layer's text`);
       }
     }
@@ -504,8 +509,8 @@ export function layersNodes({ id, frame, props }) {
     const band = { x: frame.x + r.inset, y, width: frame.width - 2 * r.inset, height: h };
     const fill = i === 0 ? tones[0] : tones[1];
     out.push(fillRect(stableId(rid, "band"), "layer-band", band, fill, { radius: "radius.small" }));
-    out.push(label(stableId(rid, "label"), "layer-label", { x: band.x + L.pad, y: y + (h - r.title.height) / 2, width: L.labelWidth }, r.title, style("type.body", WHITE, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "layer-text", { x: band.x + L.pad * 2 + L.labelWidth, y: y + (h - r.text.height) / 2, width: r.textWidth }, r.text, style("type.body", WHITE)));
+    out.push(put(stableId(rid, "label"), "layer-label", { x: band.x + L.pad, y: y + (h - r.title.height) / 2, width: L.labelWidth }, r.title, WHITE));
+    if (r.text) out.push(put(stableId(rid, "text"), "layer-text", { x: band.x + L.pad * 2 + L.labelWidth, y: y + (h - r.text.height) / 2, width: r.textWidth }, r.text, WHITE));
     y += h + L.gap;
   });
   return out;
@@ -534,9 +539,10 @@ export function placementLayout(frame, props) {
   const { columns, items } = normalizePlacement(props);
   const gap = v("space.4"), width = (frame.width - gap * (columns.length - 1)) / columns.length;
   const inner = width - 2 * v("space.3");
-  const heads = columns.map((c) => ({ title: measure(c.label, inner - (c.icon ? 32 : 0), "type.body", true), text: c.text ? measure(c.text, inner, "type.body") : null }));
+  const heads = columns.map((c) => ({ title: set("body", c.label, inner - (c.icon ? 32 : 0), { bold: true }), text: c.text ? set("body", c.text, inner) : null }));
   const headHeight = Math.max(...heads.map((h) => h.title.height + (h.text ? v("space.1") + h.text.height : 0))) + 2 * v("space.3");
-  const pills = items.map((item) => ({ item, m: measure(item.label, inner, "type.compact", item.highlight) }));
+  // The items placed are what the page sorts - its content - set as body text in their tiles, bold where highlighted.
+  const pills = items.map((item) => ({ item, m: set("body", item.label, inner, { bold: item.highlight }) }));
   const pillGap = v("space.2");
   const stacks = columns.map((_, c) => pills.filter((p) => p.item.column === c));
   const stackHeight = Math.max(...stacks.map((s) => s.reduce((sum, p) => sum + p.m.height + 2 * v("space.2"), 0) + pillGap * Math.max(0, s.length - 1)));
@@ -563,14 +569,14 @@ export function placementNodes({ id, frame, props }) {
     out.push(fillRect(stableId(cid, "head"), "placement-head", { x, y: frame.y, width: L.width, height: L.headHeight }, PRIMARY));
     let hx = x + v("space.3");
     if (col.icon) { out.push(...iconMarker({ id: stableId(cid, "icon"), role: "placement-icon", x: hx, y: frame.y + v("space.3"), size: 24, icon: col.icon, tone: "inverse" })); hx += 32; }
-    out.push(label(stableId(cid, "label"), "placement-label", { x: hx, y: frame.y + v("space.3"), width: L.inner - (col.icon ? 32 : 0) }, head.title, style("type.body", WHITE, true)));
-    if (head.text) out.push(label(stableId(cid, "text"), "placement-text", { x: x + v("space.3"), y: frame.y + v("space.3") + head.title.height + v("space.1"), width: L.inner }, head.text, style("type.body", WHITE)));
+    out.push(put(stableId(cid, "label"), "placement-label", { x: hx, y: frame.y + v("space.3"), width: L.inner - (col.icon ? 32 : 0) }, head.title, WHITE));
+    if (head.text) out.push(put(stableId(cid, "text"), "placement-text", { x: x + v("space.3"), y: frame.y + v("space.3") + head.title.height + v("space.1"), width: L.inner }, head.text, WHITE));
     out.push(fillRect(stableId(cid, "well"), "placement-well", { x, y: frame.y + L.headHeight, width: L.width, height: frame.height - L.headHeight }, MUTED));
     let y = frame.y + L.headHeight + v("space.3");
     L.stacks[c].forEach((p, i) => {
       const pid = stableId(cid, "item", i), tile = tileOf(p);
       out.push(fillRect(stableId(pid, "pill"), "placement-item", { x: x + v("space.2"), y, width: L.width - 2 * v("space.2"), height: tile }, p.item.highlight ? ACCENT : WHITE, { stroke: p.item.highlight ? "none" : RULE, radius: "radius.small" }));
-      out.push(label(stableId(pid, "label"), "placement-item-label", { x: x + v("space.3"), y: y + (tile - p.m.height) / 2, width: L.inner }, p.m, style("type.compact", p.item.highlight ? WHITE : INK, p.item.highlight, "center")));
+      out.push(put(stableId(pid, "label"), "placement-item-label", { x: x + v("space.3"), y: y + (tile - p.m.height) / 2, width: L.inner }, p.m, p.item.highlight ? WHITE : INK, "center"));
       y += tile + L.pillGap;
     });
   });
@@ -603,7 +609,7 @@ export function nestedLayout(frame, props) {
   if (diameter < 160) throw new Error("Nested circles need more room; widen the frame");
   const largest = items[0].value;
   const circles = items.map((item) => ({ item, d: diameter * Math.sqrt(item.value / largest),
-    figure: measure(item.display, labelWidth, "type.heading", true), name: measure(item.label, labelWidth, "type.body", true), text: item.text ? measure(item.text, labelWidth, "type.body") : null }));
+    figure: set("figure", item.display, labelWidth), name: set("body", item.label, labelWidth, { bold: true }), text: item.text ? set("note", item.text, labelWidth) : null }));
   return { items, circles, diameter, labelWidth, gap, height: diameter };
 }
 
@@ -621,9 +627,9 @@ export function nestedNodes({ id, frame, props }) {
     const top = bottom - c.d, block = c.figure.height + c.name.height + (c.text ? v("space.1") + c.text.height : 0);
     const y = Math.max(floor, top - c.figure.height / 2);
     out.push(line(stableId(id, "leader", i), "nested-leader", cx, top, lx - v("space.2"), y + c.figure.height / 2, SECONDARY));
-    out.push(label(stableId(id, "figure", i), "nested-figure", { x: lx, y, width: L.labelWidth }, c.figure, style("type.heading", i === L.circles.length - 1 ? ACCENT : INK, true)));
-    out.push(label(stableId(id, "name", i), "nested-label", { x: lx, y: y + c.figure.height, width: L.labelWidth }, c.name, style("type.body", INK, true)));
-    if (c.text) out.push(label(stableId(id, "text", i), "nested-text", { x: lx, y: y + c.figure.height + c.name.height + v("space.1"), width: L.labelWidth }, c.text, style("type.body", SECONDARY)));
+    out.push(put(stableId(id, "figure", i), "nested-figure", { x: lx, y, width: L.labelWidth }, c.figure, i === L.circles.length - 1 ? ACCENT : INK));
+    out.push(put(stableId(id, "name", i), "nested-label", { x: lx, y: y + c.figure.height, width: L.labelWidth }, c.name, INK));
+    if (c.text) out.push(put(stableId(id, "text", i), "nested-text", { x: lx, y: y + c.figure.height + c.name.height + v("space.1"), width: L.labelWidth }, c.text, SECONDARY));
     floor = y + block + v("space.3");
   });
   if (floor > frame.y + frame.height + 0.01) throw new Error(`The circles' labels need ${Math.ceil(floor - frame.y)}px and have ${Math.floor(frame.height)}px; shorten their lines`);
@@ -680,10 +686,10 @@ export function vennNodes({ id, frame, props }) {
   L.sets.forEach((set, i) => {
     const [x, y] = centres[i], dx = x - middle[0], dy = y - middle[1], len = Math.hypot(dx, dy) || 1;
     const px = x + (dx / len) * r * 0.45, py = y + (dy / len) * r * 0.45;
-    const name = measure(set.label, width, "type.heading", true), text = set.text ? measure(set.text, width, "type.body") : null;
+    const name = setText("lead", set.label, width), text = set.text ? setText("note", set.text, width) : null;
     const block = name.height + (text ? v("space.1") + text.height : 0);
-    out.push(label(stableId(id, "set-label", set.id), "venn-label", { x: px - width / 2, y: py - block / 2, width }, name, style("type.heading", INK, true, "center")));
-    if (text) out.push(label(stableId(id, "set-text", set.id), "venn-text", { x: px - width / 2, y: py - block / 2 + name.height + v("space.1"), width }, text, style("type.body", SECONDARY, false, "center")));
+    out.push(put(stableId(id, "set-label", set.id), "venn-label", { x: px - width / 2, y: py - block / 2, width }, name, INK, "center"));
+    if (text) out.push(put(stableId(id, "set-text", set.id), "venn-text", { x: px - width / 2, y: py - block / 2 + name.height + v("space.1"), width }, text, SECONDARY, "center"));
   });
   // Each overlap's name at the middle of the sets it joins - a pair's of three
   // pushed out of the third circle, into the part only the pair shares.
@@ -695,8 +701,9 @@ export function vennNodes({ id, frame, props }) {
       ox += (dx / len) * r * 0.32; oy += (dy / len) * r * 0.32;
     }
     const lensWidth = o.sets.length === 3 ? r * 0.6 : r * 0.7;
-    const m = measure(o.label, lensWidth, "type.compact", true);
-    out.push(label(stableId(id, "overlap", k), "venn-overlap", { x: ox - lensWidth / 2, y: oy - m.height / 2, width: lensWidth }, m, style("type.compact", INK, true, "center")));
+    // What the sets share is the point of the figure: content, in bold body text in its lens.
+    const m = set("body", o.label, lensWidth, { bold: true });
+    out.push(put(stableId(id, "overlap", k), "venn-overlap", { x: ox - lensWidth / 2, y: oy - m.height / 2, width: lensWidth }, m, INK, "center"));
   }
   return out;
 }
@@ -729,7 +736,8 @@ export function rankFlowLayout(frame, props) {
   // wraps "United Kingdom" to two lines and the table grows rather than
   // clipping. Placed in a taller frame, rows may open up a little to fill it.
   const labelWidth = Math.min((frame.width - 28) / R.periods.length * 0.62, 180);
-  const tallest = Math.max(...R.entities.map((e) => measure(e.name, labelWidth - 12, "type.label", true).height));
+  // A rank flow is a chart: its periods, ranks and entities are read off it as axis and data labels are (furniture).
+  const tallest = Math.max(...R.entities.map((e) => set("tag", e.name, labelWidth - 12, { bold: true }).height));
   const natural = Math.max(24, tallest + 8);
   const header = 28, row = Number.isFinite(frame.height) ? Math.max(natural, Math.min(natural * 1.6, (frame.height - header) / R.depth)) : natural;
   return { ...R, header, row, labelWidth, height: header + row * R.depth };
@@ -742,12 +750,12 @@ export function rankFlowNodes({ id, frame, props }) {
   const rankWidth = 28, cellWidth = (frame.width - rankWidth) / n, labelWidth = L.labelWidth;
   const x0 = frame.x + rankWidth, rowY = (rank) => frame.y + L.header + (rank - 1) * L.row;
   L.periods.forEach((p, i) => {
-    const m = measure(p, labelWidth, "type.compact", true);
-    out.push(label(stableId(id, "period", i), "rank-period", { x: x0 + i * cellWidth, y: frame.y, width: labelWidth }, m, style("type.compact", INK, true)));
+    const m = set("axis", p, labelWidth, { bold: true });
+    out.push(put(stableId(id, "period", i), "rank-period", { x: x0 + i * cellWidth, y: frame.y, width: labelWidth }, m, INK));
   });
   for (let r = 1; r <= L.depth; r++) {
-    const m = measure(String(r), rankWidth, "type.label");
-    out.push(label(stableId(id, "rank", r), "rank-number", { x: frame.x, y: rowY(r) + (L.row - m.height) / 2, width: rankWidth - 6 }, m, style("type.label", SECONDARY, false, "right")));
+    const m = set("tag", r, rankWidth - 6);
+    out.push(put(stableId(id, "rank", r), "rank-number", { x: frame.x, y: rowY(r) + (L.row - m.height) / 2, width: rankWidth - 6 }, m, SECONDARY, "right"));
   }
   // Grey entities first, highlighted last, so the lines that matter sit on top.
   const ordered = [...L.entities].sort((a, b) => Number(L.focus.has(a.name)) - Number(L.focus.has(b.name)));
@@ -760,8 +768,8 @@ export function rankFlowNodes({ id, frame, props }) {
     e.ranks.forEach((r, i) => {
       const cell = { x: x0 + i * cellWidth, y: rowY(r) + 2, width: labelWidth, height: L.row - 4 };
       out.push(fillRect(stableId(eid, "cell", i), "rank-cell", cell, on ? ACCENT : MUTED, { radius: "radius.small" }));
-      const m = measure(e.name, labelWidth - 12, "type.label", on);
-      out.push(label(stableId(eid, "name", i), "rank-name", { x: cell.x + 6, y: cell.y + (cell.height - m.height) / 2, width: labelWidth - 12 }, m, style("type.label", on ? WHITE : INK, on)));
+      const m = set("tag", e.name, labelWidth - 12, { bold: on });
+      out.push(put(stableId(eid, "name", i), "rank-name", { x: cell.x + 6, y: cell.y + (cell.height - m.height) / 2, width: labelWidth - 12 }, m, on ? WHITE : INK));
     });
   }
   return out;
@@ -793,7 +801,8 @@ export function sankeyLayout(frame, props) {
   const labelWidth = Math.min(200, frame.width * 0.2);
   // Each node needs room for its label at this width; a narrow sankey wraps its
   // labels and grows rather than letting them overlap the next node.
-  const tallest = Math.max(...[...S.left, ...S.right].map((n) => measure(n.label, labelWidth, "type.compact", true).height));
+  // A sankey is a chart: its nodes' labels are read off it as a chart's data labels are (furniture).
+  const tallest = Math.max(...[...S.left, ...S.right].map((n) => set("datum", n.label, labelWidth, { bold: true }).height));
   const perNode = Math.max(36, tallest + v("space.2"));
   return { ...S, labelWidth, height: Math.max(S.left.length, S.right.length) * perNode };
 }
@@ -829,9 +838,9 @@ export function sankeyNodes({ id, frame, props }) {
   const side = (nodes, at, x, align) => nodes.forEach((n) => {
     const p = at.get(n.id), on = L.focus.has(n.id);
     out.push(fillRect(stableId(id, "node", n.id), "sankey-node", { x, y: p.y, width: bar, height: p.h }, on ? ACCENT : PRIMARY));
-    const m = measure(n.label, L.labelWidth, "type.compact", on);
+    const m = set("datum", n.label, L.labelWidth, { bold: on });
     const lx = align === "right" ? frame.x : x + bar + v("space.2");
-    out.push(label(stableId(id, "label", n.id), "sankey-label", { x: lx, y: p.y + (p.h - m.height) / 2, width: L.labelWidth }, m, style("type.compact", INK, on, align)));
+    out.push(put(stableId(id, "label", n.id), "sankey-label", { x: lx, y: p.y + (p.h - m.height) / 2, width: L.labelWidth }, m, INK, align));
   });
   side(L.left, leftAt, xl, "right");
   side(L.right, rightAt, xr, "left");
@@ -861,7 +870,7 @@ export function pictogramLayout(frame, props) {
   const size = Math.min(48, (iconArea - (P.of - 1) * 6) / P.of);
   if (size < 12) throw new Error("A pictogram is too narrow for its figures; widen it");
   const rows = P.rows.map((row) => {
-    const title = measure(row.label, labelWidth, "type.body", true), text = row.text ? measure(row.text, labelWidth, "type.body") : null;
+    const title = set("body", row.label, labelWidth, { bold: true }), text = row.text ? set("note", row.text, labelWidth) : null;
     return { row, title, text, height: Math.max(size, title.height + (text ? v("space.1") + text.height : 0)) };
   });
   const gap = v("space.5");
@@ -875,8 +884,8 @@ export function pictogramNodes({ id, frame, props }) {
   let y = frame.y;
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i);
-    out.push(label(stableId(rid, "label"), "pictogram-label", { x: frame.x, y, width: L.labelWidth }, r.title, style("type.body", INK, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "pictogram-text", { x: frame.x, y: y + r.title.height + v("space.1"), width: L.labelWidth }, r.text, style("type.body", SECONDARY)));
+    out.push(put(stableId(rid, "label"), "pictogram-label", { x: frame.x, y, width: L.labelWidth }, r.title, INK));
+    if (r.text) out.push(put(stableId(rid, "text"), "pictogram-text", { x: frame.x, y: y + r.title.height + v("space.1"), width: L.labelWidth }, r.text, SECONDARY));
     const x0 = frame.x + L.labelWidth + v("space.5"), iy = y + (r.height - L.size) / 2;
     for (let k = 0; k < L.of; k++) {
       const filled = k < Math.round(r.row.value);
@@ -904,11 +913,13 @@ export function arrowRowsLayout(frame, props) {
   const arrowWidth = Math.min(340, frame.width * 0.36), inner = arrowWidth - 2 * v("space.4") - 24;
   const textWidth = frame.width - arrowWidth - v("space.5");
   const rows = items.map((item) => {
-    const title = measure(item.label, inner - (item.icon ? 32 : 0), "type.body", true), text = item.text ? measure(item.text, textWidth, "type.body") : null;
+    // The label is the row's lead at body size in bold, in the arrow; what follows from it is body text beside, at its measure.
+    const title = setText("body", item.label, inner - (item.icon ? 32 : 0), { bold: true }), text = item.text ? setText("body", item.text, textWidth) : null;
     return { item, title, text, height: Math.max(title.height + 2 * v("space.3"), text ? text.height : 0, 52) };
   });
   const gap = v("space.4");
-  return { rows, arrowWidth, inner, textWidth, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+  return { rows, arrowWidth, inner, textWidth, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1),
+    inkWidth: arrowWidth + v("space.5") + Math.max(0, ...rows.map((r) => r.text?.width ?? 0)), texts: rows.flatMap((r) => [r.title, r.text]) };
 }
 
 export function arrowRowsNodes({ id, frame, props }) {
@@ -925,8 +936,8 @@ export function arrowRowsNodes({ id, frame, props }) {
       frame: { x: frame.x, y, width: L.arrowWidth, height: r.height }, style: { fill: last ? ACCENT : PRIMARY, stroke: "none" } }));
     let tx = frame.x + v("space.4");
     if (r.item.icon) { out.push(...iconMarker({ id: stableId(rid, "icon"), role: "arrow-row-icon", x: tx, y: y + (r.height - 24) / 2, size: 24, icon: r.item.icon, tone: "inverse" })); tx += 32; }
-    out.push(label(stableId(rid, "label"), "arrow-row-label", { x: tx, y: y + (r.height - r.title.height) / 2, width: L.inner - (r.item.icon ? 32 : 0) }, r.title, style("type.body", WHITE, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "arrow-row-text", { x: frame.x + L.arrowWidth + v("space.5"), y: y + (r.height - r.text.height) / 2, width: L.textWidth }, r.text, style("type.body", INK)));
+    out.push(drawText(stableId(rid, "label"), "arrow-row-label", { x: tx, y: y + (r.height - r.title.height) / 2, width: L.inner - (r.item.icon ? 32 : 0) }, r.title, { color: WHITE }));
+    if (r.text) out.push(drawText(stableId(rid, "text"), "arrow-row-text", { x: frame.x + L.arrowWidth + v("space.5"), y: y + (r.height - r.text.height) / 2, width: L.textWidth }, r.text));
     y += r.height + gap;
   });
   return out;
@@ -955,12 +966,15 @@ export function iconRowsLayout(frame, props) {
   const tile = v("space.8"), textX = tile + v("space.4"), textWidth = frame.width - textX, between = v("space.1");
   if (textWidth < 160) throw new Error("Icon rows are too narrow for their text; give the list more width");
   const rows = items.map((item) => {
-    const title = measure(item.label, textWidth, "type.heading", true), text = item.text ? measure(item.text, textWidth, "type.body") : null;
+    // The lead and the description each stop at their reading measure (text-roles.mjs): in a column wider than that the
+    // rows keep their left edge and the rest of the column is air, which the engine can give to what stands beside them.
+    const title = setText("lead", item.label, textWidth), text = item.text ? setText("note", item.text, textWidth) : null;
     const copy = title.height + (text ? between + text.height : 0);
     return { item, title, text, copy, height: Math.max(tile, copy) };
   });
   const gap = v("space.5");
-  return { rows, tile, textX, textWidth, between, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+  return { rows, tile, textX, textWidth, between, gap, height: rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1),
+    inkWidth: textX + Math.max(...rows.map((r) => Math.max(r.title.width, r.text?.width ?? 0))), texts: rows.flatMap((r) => [r.title, r.text]) };
 }
 
 export function iconRowsNodes({ id, frame, props }) {
@@ -973,13 +987,13 @@ export function iconRowsNodes({ id, frame, props }) {
     out.push(fillRect(stableId(rid, "tile"), "icon-row-tile", { x: frame.x, y, width: L.tile, height: L.tile }, TINT, { radius: "radius.small", data: { index: i } }));
     if (r.item.icon) out.push(...iconMarker({ id: stableId(rid, "icon"), role: "icon-row-icon", x: frame.x + (L.tile - glyph) / 2, y: y + (L.tile - glyph) / 2, size: glyph, icon: r.item.icon, tone: "accent" }));
     else {
-      const numeral = measure(r.item.number, L.tile, "type.heading", true);
-      out.push(label(stableId(rid, "number"), "icon-row-number", { x: frame.x, y: y + (L.tile - numeral.height) / 2, width: L.tile }, numeral, style("type.heading", readableOn(ACCENT, TINT, 3), true, "center")));
+      const numeral = set("mark", r.item.number, L.tile, { size: "type.heading" });
+      out.push(put(stableId(rid, "number"), "icon-row-number", { x: frame.x, y: y + (L.tile - numeral.height) / 2, width: L.tile }, numeral, readableOn(ACCENT, TINT, 3), "center"));
     }
     // Copy shorter than the tile (a lead alone) is centred on it; taller copy starts at the tile's top.
     const ty = y + Math.max(0, (L.tile - r.copy) / 2);
-    out.push(label(stableId(rid, "label"), "icon-row-label", { x: frame.x + L.textX, y: ty, width: L.textWidth }, r.title, style("type.heading", INK, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "icon-row-text", { x: frame.x + L.textX, y: ty + r.title.height + L.between, width: L.textWidth }, r.text, style("type.body", SECONDARY)));
+    out.push(drawText(stableId(rid, "label"), "icon-row-label", { x: frame.x + L.textX, y: ty, width: L.textWidth }, r.title));
+    if (r.text) out.push(drawText(stableId(rid, "text"), "icon-row-text", { x: frame.x + L.textX, y: ty + r.title.height + L.between, width: L.textWidth }, r.text));
     y += r.height + gap;
   });
   return out;
@@ -1025,11 +1039,11 @@ export function agendaRowsLayout(frame, props) {
   const textX = described ? Math.round(frame.width * AGENDA_TEXT_AT) : frame.width;
   const topicWidth = textX - AGENDA_TILE_MAX - gap - (described ? gap : 0), textWidth = frame.width - textX;
   if (topicWidth < 160) throw new Error("An agenda is too narrow for its topics; give it the page's width");
-  const rows = items.map((item, i) => ({ item, active: i === active, topic: measure(item.topic, topicWidth, "type.heading", true), text: item.text ? measure(item.text, textWidth, "type.body") : null }));
+  const rows = items.map((item, i) => ({ item, active: i === active, topic: setText("lead", item.topic, topicWidth), text: item.text ? setText("note", item.text, textWidth) : null }));
   const wrapped = rows.findIndex((r) => r.topic.lines.length > 2 || (r.text?.lines.length ?? 0) > 2);
   if (wrapped >= 0) throw new Error(`Agenda item ${wrapped + 1} runs past two lines; a topic is a few words and its description one line`);
   const rowHeight = Math.max(AGENDA_ROW_MIN, ...rows.map((r) => Math.max(r.topic.height, r.text?.height ?? 0) + 2 * pad));
-  return { rows, gap, topicWidth, textX, textWidth, rowHeight, height: rowHeight * rows.length };
+  return { rows, gap, topicWidth, textX, textWidth, rowHeight, height: rowHeight * rows.length, texts: rows.flatMap((r) => [r.topic, r.text]) };
 }
 
 /** The most height the rows use: each at AGENDA_ROW_MAX, or at what its copy needs where that is more. */
@@ -1049,11 +1063,11 @@ export function agendaRowsNodes({ id, frame, props }) {
   const out = [];
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i), y = frame.y + i * rowHeight, cy = y + rowHeight / 2;
-    const fill = r.active ? ACCENT : PRIMARY, numeral = measure(r.item.number, tile, numeralSize);
+    const fill = r.active ? ACCENT : PRIMARY, numeral = set("mark", r.item.number, tile, { size: numeralSize, bold: false });
     out.push(fillRect(stableId(rid, "tile"), "agenda-row-tile", { x: frame.x, y: cy - tile / 2, width: tile, height: tile }, fill, { radius: "radius.small", data: { index: i, active: r.active } }));
-    out.push(label(stableId(rid, "number"), "agenda-row-number", { x: frame.x, y: cy - numeral.height / 2, width: tile }, numeral, style(numeralSize, onFill(fill), false, "center")));
-    out.push(label(stableId(rid, "topic"), "agenda-row-topic", { x: frame.x + tile + L.gap, y: cy - r.topic.height / 2, width: L.topicWidth }, r.topic, style("type.heading", r.active ? readableOn(ACCENT, token("color.surface"), 3) : INK, true)));
-    if (r.text) out.push(label(stableId(rid, "text"), "agenda-row-text", { x: frame.x + L.textX, y: cy - r.text.height / 2, width: L.textWidth }, r.text, style("type.body", SECONDARY)));
+    out.push(put(stableId(rid, "number"), "agenda-row-number", { x: frame.x, y: cy - numeral.height / 2, width: tile }, numeral, onFill(fill), "center"));
+    out.push(drawText(stableId(rid, "topic"), "agenda-row-topic", { x: frame.x + tile + L.gap, y: cy - r.topic.height / 2, width: L.topicWidth }, r.topic, { color: r.active ? readableOn(ACCENT, token("color.surface"), 3) : undefined }));
+    if (r.text) out.push(drawText(stableId(rid, "text"), "agenda-row-text", { x: frame.x + L.textX, y: cy - r.text.height / 2, width: L.textWidth }, r.text));
     out.push(line(stableId(rid, "rule"), "agenda-row-rule", frame.x, y + rowHeight, frame.x + frame.width, y + rowHeight));
   });
   return out;
@@ -1078,7 +1092,7 @@ export function capsulesLayout(frame, props) {
   // pretending every width sets them the same.
   const gap = v("space.6"), width = Math.min(frame.width * 0.2, (frame.width - gap * (items.length - 1)) / items.length);
   const inner = width - 2 * v("space.4");
-  const measured = items.map((item) => ({ item, title: measure(item.title, inner, "type.body", true), text: item.text ? measure(item.text, inner, "type.body") : null }));
+  const measured = items.map((item) => ({ item, title: set("body", item.title, inner, { bold: true }), text: item.text ? set("body", item.text, inner) : null }));
   const content = Math.max(...measured.map((m) => m.title.height + (m.text ? v("space.2") + m.text.height : 0)));
   const disc = 56, icon = 32;
   return { measured, gap, width, inner, disc, icon, content, height: v("space.5") + disc + v("space.4") + content + v("space.4") + icon + v("space.5") };
@@ -1102,9 +1116,9 @@ export function capsulesNodes({ id, frame, props }) {
     // the foot of each pillar an empty dark slab.
     const top = y0 + v("space.5") + L.disc + v("space.4"), room = h - (v("space.5") + L.disc + v("space.4")) - (v("space.4") + L.icon + v("space.5"));
     let y = top + Math.max(0, (room - L.content) / 2);
-    out.push(label(stableId(cid, "title"), "capsule-title", { x: x + v("space.4"), y, width: L.inner }, m.title, style("type.body", type, true, "center")));
+    out.push(put(stableId(cid, "title"), "capsule-title", { x: x + v("space.4"), y, width: L.inner }, m.title, type, "center"));
     y += m.title.height + v("space.2");
-    if (m.text) out.push(label(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, style("type.body", type, false, "center")));
+    if (m.text) out.push(put(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, type, "center"));
     if (m.item.icon) out.push(...iconMarker({ id: stableId(cid, "icon"), role: "capsule-icon", x: x + (L.width - L.icon) / 2, y: y0 + h - v("space.5") - L.icon, size: L.icon, icon: m.item.icon, tone: "inverse" }));
   });
   return out;
@@ -1164,9 +1178,9 @@ export function factGridLayout(frame, props) {
     const rows = Math.ceil(items.length / n);
     const width = (frame.width - gap * (n - 1)) / n, inner = width - 2 * pad;
     const tiles = items.map((item) => {
-      const value = measure(item.value, inner, "type.metric", true, FIGURES);
-      const label = measure(item.label, inner, "type.body", true);
-      const text = item.text ? measure(item.text, inner, "type.body") : null;
+      const value = set("figure", item.value, inner, { size: "type.metric" });
+      const label = set("body", item.label, inner, { bold: true });
+      const text = item.text ? set("body", item.text, inner) : null;
       const top = item.icon ? 28 + v("space.2") : 0;
       return { item, value, label, text, height: 2 * pad + top + value.height + v("space.1") + label.height + (text ? v("space.1") + text.height : 0) + (item.gauge !== null ? v("space.2") + 6 : 0) };
     });
@@ -1232,11 +1246,11 @@ export function factGridNodes({ id, frame, props }) {
       // copy centres in what is above it by the same half of the growth.
       let ty = y + L.pad + Math.max(0, h - t.height) / 2;
       if (t.item.icon) { out.push(...iconMarker({ id: stableId(tid, "icon"), role: "fact-icon", x: x + L.pad, y: ty, size: 28, icon: t.item.icon, tone: dark ? "inverse" : "accent" })); ty += 28 + v("space.2"); }
-      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", valueColor, true, "left", FIGURES)));
+      out.push(put(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, valueColor));
       ty += t.value.height + v("space.1");
-      out.push(label(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, style("type.body", dark ? WHITE : INK, true)));
+      out.push(put(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, dark ? WHITE : INK));
       ty += t.label.height;
-      if (t.text) { out.push(label(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, style("type.body", textColor))); ty += v("space.1") + t.text.height; }
+      if (t.text) { out.push(put(stableId(tid, "text"), "fact-text", { x: x + L.pad, y: ty + v("space.1"), width: L.inner }, t.text, textColor)); ty += v("space.1") + t.text.height; }
       if (t.item.gauge !== null) {
         const gy = y + h - L.pad - 6;
         out.push(fillRect(stableId(tid, "gauge-track"), "fact-gauge-track", { x: x + L.pad, y: gy, width: L.inner, height: 6 }, dark ? SECONDARY : RULE, { radius: "radius.round" }));
@@ -1290,31 +1304,31 @@ export function zoneMatrixNodes({ id, frame, props }) {
   }
   if (L.zoneLabels) for (const [key, at] of [["low", [0, L.size - 1]], ["high", [L.size - 1, 0]]]) {
     const text = clean(L.zoneLabels[key]); if (!text) continue;
-    const m = measure(text, cell - 12, "type.label", true);
+    const m = set("tag", text, cell - 12, { bold: true });
     const [i, j] = at, dark = key === "high";
-    out.push(label(stableId(id, "zone-label", key), "zone-label", { x: x0 + i * cell + 6, y: y0 + j * cell + 6, width: cell - 12 }, m, style("type.label", dark ? WHITE : SECONDARY, true)));
+    out.push(put(stableId(id, "zone-label", key), "zone-label", { x: x0 + i * cell + 6, y: y0 + j * cell + 6, width: cell - 12 }, m, dark ? WHITE : SECONDARY));
   }
   // Ids by position, not by text: both axes default their ends to "Low" and
   // "High", and two labels named for their words collide.
-  const ax = (key, text, frameBox, align) => { const m = measure(text, frameBox.width, "type.compact", true); out.push(label(stableId(id, "axis", key), "zone-axis", frameBox, m, style("type.compact", INK, true, align))); };
+  const ax = (key, text, frameBox, align) => { const m = set("axis", text, frameBox.width, { bold: true }); out.push(put(stableId(id, "axis", key), "zone-axis", frameBox, m, INK, align)); };
   ax("x-label", L.x.label, { x: x0, y: y0 + side + 20, width: side }, "center");
   ax("x-low", L.x.low, { x: x0, y: y0 + side + 4, width: side / 2 }, "left");
   ax("x-high", L.x.high, { x: x0 + side / 2, y: y0 + side + 4, width: side / 2 }, "right");
   ax("y-high", L.y.high, { x: frame.x, y: y0, width: L.axisWidth - 6 }, "right");
   ax("y-low", L.y.low, { x: frame.x, y: y0 + side - 18, width: L.axisWidth - 6 }, "right");
-  const yl = measure(L.y.label, L.axisWidth - 6, "type.compact", true);
-  out.push(label(stableId(id, "axis-y"), "zone-axis", { x: frame.x, y: y0 + side / 2 - yl.height / 2, width: L.axisWidth - 6 }, yl, style("type.compact", INK, true, "right")));
+  const yl = set("axis", L.y.label, L.axisWidth - 6, { bold: true });
+  out.push(put(stableId(id, "axis-y"), "zone-axis", { x: frame.x, y: y0 + side / 2 - yl.height / 2, width: L.axisWidth - 6 }, yl, INK, "right"));
   const listX = x0 + side + v("space.5"), listW = frame.x + frame.width - listX;
   L.points.forEach((pt, k) => {
     const cx = x0 + pt.x * side, cy = y0 + (1 - pt.y) * side, r = 13;
     // A highlighted item is drawn white on its zone, ringed in ink: an accent
     // disc on the accent zone vanished into it.
     out.push(ellipsePrimitive({ id: stableId(id, "item", k), role: "zone-item", frame: { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r }, style: { fill: pt.highlight ? WHITE : PRIMARY, stroke: pt.highlight ? INK : WHITE, lineWidth: token("line.standard") } }));
-    const n = measure(String(k + 1), 2 * r, "type.label", true);
-    out.push(label(stableId(id, "item-number", k), "zone-item-number", { x: cx - r, y: cy - n.height / 2, width: 2 * r }, n, style("type.label", pt.highlight ? INK : WHITE, true, "center")));
+    const n = set("mark", k + 1, 2 * r);
+    out.push(put(stableId(id, "item-number", k), "zone-item-number", { x: cx - r, y: cy - n.height / 2, width: 2 * r }, n, pt.highlight ? INK : WHITE, "center"));
     if (listW > 120) {
-      const m = measure(`${k + 1}  ${pt.label}`, listW, "type.compact", pt.highlight);
-      out.push(label(stableId(id, "legend", k), "zone-legend", { x: listX, y: y0 + k * Math.max(22, m.height + 6), width: listW }, m, style("type.compact", INK, pt.highlight)));
+      const m = set("legend", `${k + 1}  ${pt.label}`, listW, { bold: pt.highlight });
+      out.push(put(stableId(id, "legend", k), "zone-legend", { x: listX, y: y0 + k * Math.max(22, m.height + 6), width: listW }, m, INK));
     }
   });
   return out;
@@ -1365,8 +1379,9 @@ export function deviceFrameNodes({ id, frame, props }) {
   if (props.image.dataUri) out.push(mediaNode({ id: stableId(id, "screen"), role: "image", frame: screen, props: props.image, fit: "cover" }));
   else {
     out.push(fillRect(stableId(id, "screen"), "image-frame", screen, MUTED, { data: { alt: props.image.alt } }));
-    const m = measure(props.image.alt, screen.width - 24, "type.compact");
-    out.push(label(stableId(id, "alt"), "device-alt", { x: screen.x + 12, y: screen.y + (screen.height - m.height) / 2, width: screen.width - 24 }, m, style("type.compact", SECONDARY, false, "center")));
+    // The screen's description stands in for the screenshot until it is supplied: a note in the screen's middle.
+    const m = set("note", props.image.alt, screen.width - 24);
+    out.push(put(stableId(id, "alt"), "device-alt", { x: screen.x + 12, y: screen.y + (screen.height - m.height) / 2, width: screen.width - 24 }, m, SECONDARY, "center"));
   }
   return out;
 }
@@ -1393,7 +1408,7 @@ export function worksheetLayout(frame, props) {
   if (row.length) rows.push(row);
   const measured = rows.map((r) => r.map((f) => {
     const w = unit * f.span + gap * (f.span - 1) - 2 * v("space.3");
-    return { ...f, width: w, title: measure(f.label, w, "type.body", true), text: measure(f.prompt, w, "type.body") };
+    return { ...f, width: w, title: set("body", f.label, w, { bold: true }), text: set("note", f.prompt, w) };
   }));
   const min = measured.map((r) => Math.max(...r.map((f) => f.title.height + v("space.1") + f.text.height)) + 2 * v("space.3") + 40);
   return { rows: measured, columns, gap, unit, min, height: min.reduce((a, b) => a + b, 0) + gap * (rows.length - 1) };
@@ -1409,8 +1424,8 @@ export function worksheetNodes({ id, frame, props }) {
     row.forEach((f, c) => {
       const w = L.unit * f.span + L.gap * (f.span - 1), fid = stableId(id, "field", r, c);
       out.push(fillRect(stableId(fid, "box"), "worksheet-box", { x, y, width: w, height: h }, "none", { stroke: RULE, radius: "radius.small" }));
-      out.push(label(stableId(fid, "label"), "worksheet-label", { x: x + v("space.3"), y: y + v("space.3"), width: f.width }, f.title, style("type.body", INK, true)));
-      out.push(label(stableId(fid, "prompt"), "worksheet-prompt", { x: x + v("space.3"), y: y + v("space.3") + f.title.height + v("space.1"), width: f.width }, f.text, style("type.body", SECONDARY)));
+      out.push(put(stableId(fid, "label"), "worksheet-label", { x: x + v("space.3"), y: y + v("space.3"), width: f.width }, f.title, INK));
+      out.push(put(stableId(fid, "prompt"), "worksheet-prompt", { x: x + v("space.3"), y: y + v("space.3") + f.title.height + v("space.1"), width: f.width }, f.text, SECONDARY));
       x += w + L.gap;
     });
     y += h + L.gap;
@@ -1432,8 +1447,10 @@ function normalizeSpeech(props) {
 export function speechLayout(frame, props) {
   const items = normalizeSpeech(props), gap = v("space.5");
   const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * v("space.4");
-  const measured = items.map((item) => ({ item, quote: measure(`“${item.quote}”`, inner, "type.body"),
-    name: measure(item.speaker, width, "type.compact", true), role: item.role ? measure(item.role, width, "type.label") : null }));
+  // What each said is the page's content (body text at its measure); who said it is the bubble's byline and their role
+  // a tag under it.
+  const measured = items.map((item) => ({ item, quote: set("body", `“${item.quote}”`, inner),
+    name: set("byline", item.speaker, width, { size: "type.compact" }), role: item.role ? set("tag", item.role, width) : null }));
   if (measured.some((m) => m.quote.lines.length > 8)) throw new Error("A quote in a speech bubble runs to eight lines at most; cut it to the line that matters");
   const bubble = Math.max(...measured.map((m) => m.quote.height)) + 2 * v("space.4");
   const avatar = 52, foot = avatar + v("space.2") + Math.max(...measured.map((m) => m.name.height + (m.role ? m.role.height : 0)));
@@ -1448,18 +1465,18 @@ export function speechNodes({ id, frame, props }) {
     const x = frame.x + i * (L.width + L.gap), sid = stableId(id, "speaker", i);
     out.push(shapePrimitive({ id: stableId(sid, "bubble"), role: "speech-bubble", geometry: "quoteCallout", frame: { x, y: top, width: L.width, height: bubbleH },
       style: { fill: i % 2 ? MUTED : TINT, stroke: "none" }, data: { bodyRatio: 0.84, caretCenterRatio: 0.5, caretWidthRatio: 0.12 } }));
-    out.push(label(stableId(sid, "quote"), "speech-quote", { x: x + v("space.4"), y: top + v("space.4"), width: L.inner }, m.quote, style("type.body", INK)));
+    out.push(put(stableId(sid, "quote"), "speech-quote", { x: x + v("space.4"), y: top + v("space.4"), width: L.inner }, m.quote, INK));
     const ay = top + bubbleH + v("space.3"), ax = x + (L.width - L.avatar) / 2;
     if (m.item.icon) out.push(...iconMarker({ id: stableId(sid, "avatar"), role: "speech-avatar", x: ax, y: ay, size: L.avatar, icon: m.item.icon, tone: "filled" }));
     else {
       out.push(ellipsePrimitive({ id: stableId(sid, "avatar"), role: "speech-avatar", frame: { x: ax, y: ay, width: L.avatar, height: L.avatar }, style: { fill: PRIMARY, stroke: "none" } }));
       const initials = m.item.speaker.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-      const im = measure(initials, L.avatar, "type.body", true);
-      out.push(label(stableId(sid, "initials"), "speech-initials", { x: ax, y: ay + (L.avatar - im.height) / 2, width: L.avatar }, im, style("type.body", WHITE, true, "center")));
+      const im = set("mark", initials, L.avatar, { size: "type.body" });
+      out.push(put(stableId(sid, "initials"), "speech-initials", { x: ax, y: ay + (L.avatar - im.height) / 2, width: L.avatar }, im, WHITE, "center"));
     }
     let ny = ay + L.avatar + v("space.2");
-    out.push(label(stableId(sid, "name"), "speech-name", { x, y: ny, width: L.width }, m.name, style("type.compact", INK, true, "center")));
-    if (m.role) out.push(label(stableId(sid, "role"), "speech-role", { x, y: ny + m.name.height, width: L.width }, m.role, style("type.label", SECONDARY, false, "center")));
+    out.push(put(stableId(sid, "name"), "speech-name", { x, y: ny, width: L.width }, m.name, INK, "center"));
+    if (m.role) out.push(put(stableId(sid, "role"), "speech-role", { x, y: ny + m.name.height, width: L.width }, m.role, SECONDARY, "center"));
   });
   return out;
 }
@@ -1485,10 +1502,10 @@ export function sideStatementLayout(frame, props) {
   if (!clean(props.text)) throw new Error("A side statement needs its text");
   const inner = Math.min(frame.width - 2 * v("space.5"), STATEMENT_MEASURE);
   const emphasis = statementRuns(props);
-  const text = emphasis ? measureTextRuns(emphasis.runs, inner, { fontFamily: v("font.display"), fontSize: v("type.heading") })
-    : measure(props.text, inner, "type.heading", true, DISPLAY);
+  // The statement is the page's one idea, set as a statement in the display face; the label over it is a kicker.
+  const text = setText("statement", props.text, inner, { face: "font.display", ...(emphasis ? { runs: emphasis.runs, bold: emphasis.accent } : {}) });
   if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
-  const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;
+  const kicker = clean(props.kicker) ? set("kicker", props.kicker, inner) : null;
   const icon = props.icon ? SIDE_ICON : 0;
   return { inner, text, kicker, emphasis, icon, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + (icon ? icon + v("space.3") : 0) + 2 * v("space.5") };
 }
@@ -1501,7 +1518,7 @@ export function sideStatementNodes({ id, frame, props }) {
   let y = frame.y + Math.max(v("space.5"), (frame.height - L.height) / 2 + v("space.5"));
   const x = frame.x + v("space.5");
   if (L.icon) { out.push(...iconMarker({ id: stableId(id, "icon"), role: "side-panel-icon", x, y, size: L.icon, icon: props.icon, tone: light ? "plain" : "inverse" })); y += L.icon + v("space.3"); }
-  if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : reversedType(), true))); y += L.kicker.height + v("space.3"); }
+  if (L.kicker) { out.push(put(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, light ? SECONDARY : reversedType())); y += L.kicker.height + v("space.3"); }
   // The statement ends inside its panel. A labelled-rows page gives each label a fifth of the body, and a three-line label
   // ran past its 96px block into the white gap and under the next one, clipped, with no check reading it.
   const room = frame.y + frame.height - v("space.2") - y;
@@ -1509,8 +1526,7 @@ export function sideStatementNodes({ id, frame, props }) {
     const holds = Math.max(0, Math.floor((room + 0.5) / L.text.lineHeight));
     throw new Error(`The statement "${clean(props.text)}" sets on ${L.text.lines.length} lines and its ${Math.round(frame.height)}px panel holds ${holds}; shorten it to ${holds} line${holds === 1 ? "" : "s"}${L.icon ? ", or drop its icon" : ""}`);
   }
-  const text = label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, !L.emphasis || L.emphasis.accent, "left", DISPLAY));
-  out.push(L.emphasis ? { ...text, runs: L.text.runs } : text);
+  out.push(drawText(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, { color: ink, runs: L.emphasis ? L.text.runs : null }));
   return out;
 }
 
@@ -1541,7 +1557,9 @@ function normalizeRadial(props) {
 
 export function radialBarsLayout(frame, props) {
   const items = normalizeRadial(props), max = props.max ?? 100;
-  const valueWidth = Math.max(...items.map((item) => measure(item.display, 400, "type.body", true).width)) + 2;
+  // The rings are a chart read like a bar chart's: each ring's figure a data label set at body size in bold, its label a
+  // category label (furniture, `axis`).
+  const valueWidth = Math.max(...items.map((item) => set("datum", item.display, 400, { size: "type.body", bold: true }).width)) + 2;
   // Measured for its height, the figure asks for a 420px circle; placed, it takes
   // the height it is given. In a narrow frame the circle gives up radius until
   // every label sits on its own ring's line: a smaller figure that reads beats
@@ -1553,7 +1571,7 @@ export function radialBarsLayout(frame, props) {
     if (thickness < 10) { failure ??= "The radial bar is too small for its rings; enlarge it or drop a ring"; break; }
     const labelMax = frame.width - R - valueWidth - v("space.3") - v("space.2");
     if (labelMax < 90) { failure = "A radial bar needs room left of its centre for the ring labels; widen it"; continue; }
-    const rows = items.map((item) => ({ item, text: measure(item.label, labelMax, "type.compact"), sweep: RADIAL_SWEEP * item.value / max }));
+    const rows = items.map((item) => ({ item, text: set("axis", item.label, labelMax), sweep: RADIAL_SWEEP * item.value / max }));
     const tall = rows.find((row) => row.text.height > band + 0.01);
     if (tall) { failure = `Radial ring label "${tall.item.label}" needs ${Math.ceil(tall.text.height)}px and its ring has ${Math.floor(band)}px; shorten it`; continue; }
     const labelWidth = Math.max(...rows.map((row) => row.text.width)) + 2;
@@ -1586,9 +1604,9 @@ export function radialBarsNodes({ id, frame, props }) {
     // The figure sits against the vertical through the centre, the label to its
     // left, both centred on the ring's own band.
     const mid = cy - outer + L.thickness / 2;
-    const value = measure(row.item.display, L.valueWidth, "type.body", true);
-    out.push(label(stableId(rid, "value"), "radial-value", { x: cx - v("space.2") - L.valueWidth, y: mid - value.height / 2, width: L.valueWidth }, value, style("type.body", row.item.highlight ? ACCENT : INK, true, "right")));
-    out.push(label(stableId(rid, "label"), "radial-label", { x: cx - v("space.2") - L.valueWidth - v("space.3") - L.labelWidth, y: mid - row.text.height / 2, width: L.labelWidth }, row.text, style("type.compact", SECONDARY, false, "right")));
+    const value = set("datum", row.item.display, L.valueWidth, { size: "type.body", bold: true });
+    out.push(put(stableId(rid, "value"), "radial-value", { x: cx - v("space.2") - L.valueWidth, y: mid - value.height / 2, width: L.valueWidth }, value, row.item.highlight ? ACCENT : INK, "right"));
+    out.push(put(stableId(rid, "label"), "radial-label", { x: cx - v("space.2") - L.valueWidth - v("space.3") - L.labelWidth, y: mid - row.text.height / 2, width: L.labelWidth }, row.text, SECONDARY, "right"));
   });
   return out;
 }
@@ -1674,11 +1692,16 @@ const RENDER = {
 const CEILING = { "fact-grid": factGridCeiling, "agenda-rows": agendaRowsCeiling, "icon-rows": listCeiling(iconRowsLayout), "arrow-rows": listCeiling(arrowRowsLayout), pictogram: listCeiling(pictogramLayout),
   spectrum: listCeiling(spectrumLayout), "stat-list": listCeiling(statListLayout, (L) => L.perColumn) };
 
+// The figures whose layouts set their words by role (text-roles.mjs) and so report the texts they set.
+const SETS_TEXT = new Set(["icon-rows", "arrow-rows", "agenda-rows"]);
+
 export function registerFigures(registry) {
   for (const [id, [nodes, layout, preferredSize]] of Object.entries(RENDER)) {
     registry.set(id, { id, version: "1.0.0", category: "diagram", role: id, tokens: [...FIGURE_TOKENS], preferredSize,
       sample: SAMPLES[id], render: (input) => ({ nodes: nodes(input) }), measureContent: ({ frame, props }) => layout(frame, props),
       ...(CEILING[id] ? { measureCeiling: ({ frame, props }) => CEILING[id](frame, props) } : {}),
+      // A figure that sets its words in their roles says how they break at a width (text-roles.mjs settingOf).
+      ...(SETS_TEXT.has(id) ? { setting: ({ props, width }) => settingOfAll(layout({ x: 0, y: 0, width, height: Infinity }, props).texts) } : {}),
       guidance: GUIDANCE[id] });
   }
   return registry;

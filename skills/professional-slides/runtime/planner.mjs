@@ -253,6 +253,15 @@ function layoutKind(plan, items) {
 }
 
 function makeItem(item, index, cell = null) {
+  // A grid offering alternative tracks (`tracks`, each { label, columns, rows }; layout-templates.mjs) is a choice between
+  // those grids, the preference first, made by the engine where the grid lands as any other way of setting a page is
+  // (tasteful-layout), recorded as a decision and held by a recorded choice. Each grid fills the frame the one grid
+  // would (`hints.sizing`), so the tracks are all that differs between them.
+  if (item.layout === "grid" && item.tracks?.length > 1) {
+    const { tracks, ...grid } = item, size = item.size || { width: { fr: 1 }, height: "fill" };
+    const options = tracks.map((way) => ({ label: way.label, node: makeItem({ ...grid, gridColumns: way.columns, gridRows: way.rows, hints: { ...item.hints, sizing: "fill" } }, index, cell) }));
+    return Object.assign(flow({ id: `${item.id}-tracks`, direction: "best", gap: token("space.minor"), leftover: "center", size, cell, children: [choice({ id: item.id, options })] }), { rhythm: true });
+  }
   // The same content realised several ways (`options`, each { label, ...item }): the engine draws the one that reads best.
   if (item.options) return choice({ id: item.id, kind: item.kind, options: item.options.map(({ label, family, ...option }, at) => ({ label, ...(family ? { family } : {}), node: makeItem({ ...option, ...(item.cell ? { cell: item.cell } : {}), ...(item.size ? { size: item.size } : {}) }, at, cell) })) });
   const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "callout", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
@@ -350,7 +359,8 @@ function makeComposition(plan, items, { root = false } = {}) {
     // Tracks a plan sets (a dashboard's: weights each way), else equal ones by the square root of the count.
     const columns = plan.gridColumns?.length ?? Math.min(3, Math.ceil(Math.sqrt(items.length)));
     const rows = plan.gridRows?.length ?? Math.ceil(items.length / columns);
-    // A track is a weight (a dashboard's) or a track as the engine reads one (a template's: `{ fr }`, "hug", `{ min, fr }`), or a fixed length `{ px }`.
+    // A track is a weight (a dashboard's plain number) or a track as a template writes one (layout-templates.mjs: `{ fr }`,
+    // "hug", `{ min, fr }`, or a fixed length `{ px }`, which the engine takes as a bare number of pixels).
     const tracks = (given, count) => (given ? given.map((spec) => (typeof spec === "number" ? { fr: spec } : spec?.px !== undefined ? spec.px : spec)) : Array.from({ length: count }, () => ({ fr: 1 })));
     return grid({
       id: `${plan.id}-grid`,

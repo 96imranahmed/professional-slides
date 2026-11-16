@@ -3,7 +3,7 @@
 // they match to the pixel; every icon-in-a-circle likewise. Components pass a
 // frame and get primitives back; they never draw a numeral themselves.
 import { rectPrimitive, token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrimitive, reversedType } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { setText, drawText } from "./text-roles.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 
 export const MARK_TOKENS = Object.freeze(["color.componentPrimary", "color.accent", "color.onPrimary", "color.ink", "color.surface", "color.rule", "color.textSecondary", "font.body", "type.compact", "type.label", "icon.medium", "line.standard", "line.hairline", "radius.round"]);
@@ -20,10 +20,11 @@ export function markerSize() { return tokenValue(token("icon.medium")); }
  */
 export function numberMarker({ id, role = "marker", labelRole = `${role}-label`, x, y, size = markerSize(), number, reverse = false, data = {} }) {
   const fill = reverse ? WHITE : PRIMARY, ink = reverse ? PRIMARY : WHITE;
-  const label = measureText(String(number), size, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(token("type.compact")), bold: true });
+  // The numeral is a mark (text-roles.mjs), set at the compact size the disc holds and drawn as it was measured.
+  const label = setText("mark", String(number), size, { size: "type.compact" });
   return [
     ellipsePrimitive({ id: stableId(id, "disc"), role, frame: { x, y, width: size, height: size }, style: { fill, stroke: reverse ? PRIMARY : WHITE, lineWidth: token("line.hairline"), radius: token("radius.round") }, data: { ...data, marker: "number", number } }),
-    textPrimitive({ id: stableId(id, "numeral"), role: labelRole, frame: { x, y: y + (size - label.height) / 2, width: size, height: label.height }, text: String(number), style: { fontFamily: token("font.body"), fontSize: token("type.compact"), color: ink, bold: true, align: "center", valign: "top", wrap: false, lineHeight: label.lineHeight }, data: { ...data, marker: "number", number, textLayout: label } })
+    drawText(stableId(id, "numeral"), labelRole, { x, y: y + (size - label.height) / 2, width: size }, label, { color: ink, align: "center", data: { ...data, marker: "number", number } })
   ];
 }
 

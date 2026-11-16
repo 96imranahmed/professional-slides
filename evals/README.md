@@ -21,6 +21,47 @@ refused; and it counts the commands the run took. See
 node evals/point-change/run.mjs [--task <id>] [--agent claude]
 ```
 
+## Gallery layout regression
+
+`regression/site-gallery/` is every slide of the published gallery
+(shiphappens.xyz/slides, named in `published.json`) rebuilt as a typed page
+(`pages/*.json`), with the approved frame of every component on every page
+(`layout.json`) and the commit that approval was recorded at
+(`layout.meta.json`). `test_site_gallery.py` fails when a page no longer
+composes or a component has moved more than a pixel. A move is approved from a
+look, not from the numbers:
+
+```bash
+node evals/scripts/site_gallery.mjs                  # which pages moved (exit 1 on any)
+node evals/scripts/site_gallery.mjs --sheet [OUT]    # draw them: before | after | published
+node evals/scripts/site_gallery.mjs --approve        # record the layout as it is now
+```
+
+`--sheet` writes, to `OUT` (default `output/site-gallery/review/`, ignored by
+git), one sheet a moved page and an `index.png` of them all (`index-2.png`...
+past forty), with `review.json` holding the same in words. Each sheet shows the
+page as approved, as the runtime draws it now and, where the published image is
+on this machine (`output/site-gallery/reference-png/<type>__<form>.png`, kept
+out of the repository), that image; the moved components are outlined in pink
+and numbered, and under the pages every moved frame is listed with its delta
+(`#4 section 844,204 376x428 -> 848,168 372x500 (x +4, y -36, w -4, h +72)`).
+
+"Before" is the approved layout's own scene: the script checks the commit the
+baseline came from out into a temporary `git worktree`, compiles the gallery
+with that commit's runtime and pages, and removes the worktree. It tries the
+commit `layout.meta.json` names when the tree was clean at approval, then the
+last commit of `layout.json` (an approval made over uncommitted runtime work is
+committed with it), and uses the first whose frames match the approved ones;
+`review.json` says which (`before.commit`, `before.reproduces`), and a panel
+that does not match says so in its caption.
+
+`--approve` is refused while pages have moved and no sheet of exactly these
+moves has been written (the sheet's fingerprint of the moved pages' approved and
+current frames is kept in `output/site-gallery/last-sheet.json`); it prints the
+sheet it was approved from. `--approve --force` records without one. Rendering
+needs Playwright's Chromium and Pillow (`RUNTIME_NODE_MODULES`,
+`RUNTIME_PYTHON`).
+
 ## Support code
 
 `support/` holds the code only the suite runs, kept out of the shipped runtime

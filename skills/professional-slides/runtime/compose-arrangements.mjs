@@ -375,15 +375,11 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   // and hoisting the lead into a heading leaves the column starting mid
   // sentence - so those join back into one paragraph instead.
   const standsAlone = (text) => /^[A-Z0-9"“(]/.test(String(text).trim());
-  // A lone implication takes the exhibit's track: heading at the body's left
-  // margin, text reaching the same right edge as the last column above it.
-  // The 80-character measure cap is for sustained prose in a column; a close
-  // set under a full-width exhibit is a band, and a well-made page sets the
-  // band to the width of the thing it is read off - under a chart, the width
-  // of the chart; under a full-width table, the width of the page.
+  // A lone implication takes the exhibit's track, its heading at the body's
+  // left margin; its sentence keeps the reading measure every paragraph keeps
+  // (text-roles.mjs) and the rest of the track is air at its right.
   // Prose written in place of points (`paragraphs`) is set the same way: a column a paragraph.
   const written = slide.points ?? slide.paragraphs ?? [];
-  const loneBand = written.length === 1;
   // One style for the row: decided point by point, a sentence that begins in
   // lower case ("flydubai is ...") would run its lead inline while its
   // neighbour's lead stood as a heading, and one band would read as two
@@ -405,19 +401,16 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
     // means". A hairline under each of three sub-headings as well turns one
     // divided idea into four ruled boxes, and the reader reads the rules
     // before the words.
-    // One implication under a full-width exhibit takes the exhibit's width:
+    // One implication under a full-width exhibit takes the exhibit's track:
     // hugging its own measure and centring, it would float in the middle of
-    // the support region, related to the table above it by nothing. Set to
-    // the same track, its first word sits under the first column and its last
-    // under the last, which is how a well-made page closes an exhibit: the
-    // finding runs as a band the width of the chart it is read off, or the
-    // width of the page.
+    // the support region, related to the table above it by nothing. In the
+    // track its first word sits under the exhibit's left edge.
     // `boxed`: each point in a tinted panel, its lead the panel's heading - the third way the band under an exhibit is
     // set, beside a lead over its sentence and a lead run in before a colon (compose-points.mjs resolvePointsStyle).
     return { id: `${id}-col-${at}`, layout: "flow.column", size: { width: { fr: 1 }, height: boxed ? HUG : "fill" },
       ...(boxed ? { treatment: "tint" } : {}),
       ...(hoist ? { heading: entry.lead, headingRule: false } : {}),
-      items: [...(text ? [paragraph(`${id}-col-${at}-text`, text, entry.highlight, { ...lead, ...(loneBand ? { maxMeasure: false } : {}) })] : []),
+      items: [...(text ? [paragraph(`${id}-col-${at}-text`, text, entry.highlight, lead)] : []),
         // Dashed, as a point's bullets are beside an exhibit: the same device on every page, whatever the house's list marker.
         ...(pointBullets(entry) ? [dashed(pointsItem(pointBullets(entry), `${id}-col-${at}-list`, "open", fill, "bulleted"))] : [])] };
   });
@@ -585,23 +578,29 @@ export function builtInGrid(layout, slide, exhibits, id) {
     const hero = ["table", "rows", "compare"].includes(first.type) ? 3 : pair ? 1 : 2;
     const bridge = bridgeVariant(slide, id) ? ["implication"] : [];
     const row = layout === "exhibit-left" ? ["exhibit", ...bridge, "side"] : ["side", ...bridge, "exhibit"];
-    const widths = { exhibit: `${hero}fr`, side: `${hero === 3 ? 2 : 1}fr`, implication: `${CONNECTOR_WIDTH}px`, photo: "1fr" };
+    // The side column's share is offered at the house share, half again wider and a quarter narrower: commentary that
+    // breaks badly in the house column takes the wider one, and an exhibit whose steps need the width takes the narrower
+    // (layout-templates.mjs, alternatives). A pair of values already has half.
+    const sides = hero === 3 ? [2, 3, 1.5] : hero === 2 ? [1, 1.5, 0.75] : [1];
     const areas = [...row, ...(slide.photo ? ["photo"] : [])];
+    const tracks = (side) => areas.map((name) => ({ exhibit: `${hero}fr`, side: `${side}fr`, implication: `${CONNECTOR_WIDTH}px`, photo: "1fr" })[name]).join(" ");
     // A reading note sits over the side column, in a row of its own that the exhibit and the rest span.
     const lines = slide.callout ? [areas.map((name) => (name === "side" ? "callout" : name)).join(" "), areas.join(" ")] : [areas.join(" ")];
-    return resolveTemplate({ columns: areas.map((name) => widths[name]).join(" "), ...(slide.callout ? { rows: "auto 1fr" } : {}), areas: lines,
+    return resolveTemplate({ columns: sides.map(tracks), ...(slide.callout ? { rows: "auto 1fr" } : {}), areas: lines,
       place: { side: { ...commentary, heading: "commentary", ...(slide.pointsAlign === "middle" ? { align: "center" } : {}) } } }, null, id, { name: "row" });
   }
   // `arranged`: the exhibit and its commentary are two blocks the engine sets beside each other or one over the other,
   // whichever reads better at what they measure (tasteful-layout); the points are blocks of their own, so under a wide
   // exhibit they run across and beside it they stack.
   if (layout === "arranged") return resolveTemplate({ areas: ["exhibit side"], place: { side: { ...commentary, heading: "commentary" } } }, null, id, { name: "row", arrange: true });
-  if (layout === "hero-number") return resolveTemplate({ columns: "1fr 2fr", areas: ["side exhibit"], place: { side: { content: ["kpi", "points"], optional: true }, exhibit: { content: "exhibit", unit: false } } }, null, id, { name: "row" });
+  // The figure's column is a third of the page by preference; a statement under it that a third breaks badly takes
+  // two fifths or a half.
+  if (layout === "hero-number") return resolveTemplate({ columns: ["1fr 2fr", "2fr 3fr", "1fr 1fr"], areas: ["side exhibit"], place: { side: { content: ["kpi", "points"], optional: true }, exhibit: { content: "exhibit", unit: false } } }, null, id, { name: "row" });
   if (layout === "split-tone") return resolveTemplate({ areas: ["left right"], place: { left: { content: "exhibit", tone: "muted" }, right: "exhibit-2" } }, null, id, { name: "row" });
   // The measures in a column at the left, the exhibit the other two thirds.
-  if (layout === "metrics-beside") return resolveTemplate({ columns: "1fr 2fr", gap: "space.6", areas: ["metrics exhibit"], place: { metrics: { content: "metrics", metrics: "column" }, exhibit: { content: "exhibit", panel: false } } }, null, id, { name: "row" });
+  if (layout === "metrics-beside") return resolveTemplate({ columns: ["1fr 2fr", "2fr 3fr"], gap: "space.6", areas: ["metrics exhibit"], place: { metrics: { content: "metrics", metrics: "column" }, exhibit: { content: "exhibit", panel: false } } }, null, id, { name: "row" });
   // One subject, the argument beside it: the copy takes the left column (a toned panel when `pointsTone` says so), the picture the right, both full height.
-  if (layout === "picture-hero") return resolveTemplate({ columns: "1.2fr 1fr", areas: ["side picture"],
+  if (layout === "picture-hero") return resolveTemplate({ columns: ["1.2fr 1fr", "1.5fr 1fr", "1fr 1fr"], areas: ["side picture"],
     place: { side: { ...commentary, ...(slide.pointsHeading ? { heading: slide.pointsHeading } : {}), ...(slide.pointsAlign === "middle" ? { align: "center" } : {}) },
       picture: { content: slide.pictures?.length ? "picture" : "photo", gap: "space.3" } } }, null, id, { name: "row" });
   if (layout === "stack") {
@@ -712,7 +711,9 @@ export function templatePage(items, { id, slide, exhibits, baseDir, fill, points
   // The engine sets the page's major gap between the areas: they are sections (core.mjs TASTE, `space.major`).
   if (slide.grid.arrange) { items.push({ id: `${id}-${gridName}`, layout: "flow.best", size: SIZE, items: cells.map(({ cell: _cell, ...block }) => block) }); return; }
   // The page's areas are its major components: they stand a major gap apart unless the template names its own.
-  items.push({ id: `${id}-${gridName}`, layout: "grid", gridColumns: columns, gridRows: rows, gap: gap ?? "space.major", size: SIZE, items: cells });
+  // A template that offers alternative tracks carries them (`tracks`, the preference as `gridColumns` and `gridRows`): the
+  // grid is a choice between those grids, which the planner hands the engine (planner.mjs makeItem).
+  items.push({ id: `${id}-${gridName}`, layout: "grid", gridColumns: columns, gridRows: rows, ...(slide.grid.tracks ? { tracks: slide.grid.tracks } : {}), gap: gap ?? "space.major", size: SIZE, items: cells });
 }
 
 /**

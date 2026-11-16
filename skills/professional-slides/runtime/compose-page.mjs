@@ -248,7 +248,8 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
 }
 
 /** Whether an item whose id passes `match` is anywhere in the layout tree. */
-const placesItem = (items, match) => items.some((item) => item && (match(String(item.id ?? "")) || placesItem(item.items || [], match)));
+// A choice's options are each a way the page may be drawn, so a place any of them keeps is a place.
+const placesItem = (items, match) => items.some((item) => item && (match(String(item.id ?? "")) || placesItem([...(item.items || []), ...(item.options || [])], match)));
 
 /** The passes after the first three, with the standfirst read off first; returns the slide they produce and the slide they started from. */
 function analyticalPasses(slide, id, ctx) {

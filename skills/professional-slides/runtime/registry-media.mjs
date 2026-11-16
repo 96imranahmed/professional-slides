@@ -6,10 +6,11 @@
 // takeaways, statement and cover can carry, and the icon-trends and
 // logo-collage components with their sample media. The media primitives they
 // draw with are media.mjs's.
-import { rectPrimitive, ellipsePrimitive, primitive, stableId, textPrimitive, insetFrame, token, tokenValue, SLIDE } from "./core.mjs";
+import { rectPrimitive, ellipsePrimitive, primitive, stableId, insetFrame, token, tokenValue, SLIDE } from "./core.mjs";
+import { setText, drawText } from "./text-roles.mjs";
 import { iconMarker } from "./marks.mjs";
 import { sampleImage, MEDIA_SAMPLE, WORDMARK_RECORDS, mediaNode } from "./media.mjs";
-import { SECONDARY, MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS, LABEL, textStyle, boxStyle, component, INK, DISPLAY } from "./registry-shared.mjs";
+import { MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS, boxStyle, component, INK } from "./registry-shared.mjs";
 
 function defineImageFrame() {
   return component({ id: "image-frame", sizing: "fill", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small", "radius.round"], preferredSize: { width: 520, height: 300 }, sample: { alt: "(Insert image)" }, render: ({ id, frame, props }) => { if (props.dataUri) {
@@ -24,13 +25,8 @@ function defineImageFrame() {
         style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS),
         data: { alt: props.alt }
       }),
-      textPrimitive({
-        id: stableId(id, "alt"),
-        role: "image-alt",
-        frame: { x: frame.x + 24, y: frame.y + frame.height / 2 - 18, width: frame.width - 48, height: 36 },
-        text: props.alt,
-        style: textStyle(LABEL, SECONDARY, true, "center")
-      })
+      // An empty frame names the picture it waits for: a tag in its middle (furniture, text-roles.mjs), not content.
+      ((alt) => drawText(stableId(id, "alt"), "image-alt", { x: frame.x + 24, y: frame.y + (frame.height - alt.height) / 2, width: frame.width - 48 }, alt, { align: "center" }))(setText("tag", props.alt, Math.max(1, frame.width - 48), { bold: true }))
     ]
   }); } });
 }
@@ -52,7 +48,13 @@ function defineIcon() {
       const size = Math.min(frame.width, props.label ? frame.height * 0.62 : frame.height);
       const x = frame.x + (frame.width - size) / 2;
       const nodes = iconMarker({ id: stableId(id, "mark"), role: "icon", x, y: frame.y, size, icon: props.icon || props.symbol, tone: props.tone || "outline" });
-      if (props.label) nodes.push(textPrimitive({ id: stableId(id, "label"), role: "icon-label", frame: { x: frame.x, y: frame.y + size + 8, width: frame.width, height: frame.height - size - 8 }, text: props.label, style: textStyle(LABEL, INK, true, "center", "top") }));
+      // The icon's label is a word or two naming it, read as a tag under the glyph (furniture, text-roles.mjs), and
+      // refused where the frame is too low for it.
+      if (props.label) {
+        const label = setText("tag", props.label, frame.width, { bold: true });
+        if (label.height > frame.height - size - 8 + 0.5) throw new Error(`The icon's label "${props.label}" needs ${Math.ceil(label.height)}px under its icon and has ${Math.floor(frame.height - size - 8)}px; shorten it or give the icon more height`);
+        nodes.push(drawText(stableId(id, "label"), "icon-label", { x: frame.x, y: frame.y + size + 8, width: frame.width }, label, { color: INK, align: "center" }));
+      }
       return { nodes };
     }
   });
@@ -69,13 +71,8 @@ function defineLogo() {
     render: ({ id, frame, props }) => ({
       nodes: [
         rectPrimitive({ id: stableId(id, "backing"), role: "logo-backing", frame, style: boxStyle() }),
-        textPrimitive({
-          id: stableId(id, "text"),
-          role: "logo-text",
-          frame: insetFrame(frame, 12),
-          text: props.text,
-          style: { ...textStyle(token("type.heading"), INK, true, "center"), fontFamily: DISPLAY }
-        })
+        // A logo not yet drawn is its name, set as a lead in the display face in the middle of its backing.
+        ((name, box) => drawText(stableId(id, "text"), "logo-text", { x: box.x, y: box.y + (box.height - name.height) / 2, width: box.width }, name, { align: "center" }))(setText("lead", props.text, Math.max(1, frame.width - 24), { face: "font.display" }), insetFrame(frame, 12))
       ]
     })
   });
@@ -174,7 +171,7 @@ function withSourcedMedia(registry) {
     }
     if (crop) return { nodes: [
       ellipsePrimitive({ id: stableId(input.id, "frame"), role: "image-frame", frame, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, token("radius.round")), data: { alt: props.alt, circular: true } }),
-      textPrimitive({ id: stableId(input.id, "alt"), role: "image-alt", frame: insetFrame(frame, side * 0.15), text: props.alt, style: { ...textStyle(LABEL, SECONDARY, true, "center"), valign: "mid" } }),
+      ((box) => { const alt = setText("tag", props.alt, Math.max(1, box.width), { bold: true }); return drawText(stableId(input.id, "alt"), "image-alt", { x: box.x, y: box.y + (box.height - alt.height) / 2, width: box.width }, alt, { align: "center" }); })(insetFrame(frame, side * 0.15)),
     ] };
     return imageRender({ ...input, frame, props });
   };

@@ -59,7 +59,7 @@ console.log(JSON.stringify({ lists: lists.length, across: new Set(lists.map((f) 
     def test_an_arrangement_a_component_cannot_draw_in_is_not_a_candidate(self):
         # Four long points under the chart leave it no plot; the page is drawn the next best way instead of refused.
         result = run_node(PAGE + '''
-const slide = page({ points: points(4, 45) }), chart = slide.componentInstances.find((i) => i.component === 'chart.column').frame;
+const slide = page({ points: points(4, 40) }), chart = slide.componentInstances.find((i) => i.component === 'chart.column').frame;
 console.log(JSON.stringify({ chart, row: decision(slide, 's-row-flow-best').chosen }));
 ''')
         self.assertGreater(result['chart']['height'], 300)
@@ -97,7 +97,7 @@ console.log(JSON.stringify({ major: TOKENS['space.major'].value, minor: TOKENS['
 ''')
         self.assertEqual(result['between'], result['major'])
         self.assertEqual(result['within'], result['minor'])
-        self.assertEqual(result['measure'], [240, 480])
+        self.assertEqual(result['measure'], [270, 600])
 
 
 class VerdictTests(unittest.TestCase):

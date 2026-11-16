@@ -236,7 +236,7 @@ const compose = async (exhibit) => {
         result = run_node(PRELUDE + """
 const items = ['Scope', 'Research', 'Build', 'Review'].map((label) => ({ heading: label, label, details: ['Draft memo from research notes', 'Check figures'] }));
 const nodes = draw('chevron-process', { items }, 'midnight', { x: 60, y: 160, width: 1160, height: 420 }).nodes.filter((n) => n.role === 'process-detail-item');
-console.log(JSON.stringify(nodes.map((n) => ({ wrap: n.style.wrap, drawn: n.text === n.data.textLayout.text, room: n.frame.height === Math.max(28, n.data.textLayout.lines.length * 20) }))));
+console.log(JSON.stringify(nodes.map((n) => ({ wrap: n.style.wrap, drawn: n.text === n.data.textLayout.text, room: n.frame.height === n.data.textLayout.height && n.data.textLayout.height === n.data.textLayout.lines.length * n.data.textLayout.lineHeight }))));
 """)
         self.assertTrue(result)
         for item in result:

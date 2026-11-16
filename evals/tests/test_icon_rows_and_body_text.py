@@ -244,10 +244,13 @@ console.log(JSON.stringify({ hero: drawn({ tone: 'hero', variant: 'display' }), 
         # On a dark tile the words keep the tile's pale type, at the display sizes.
         self.assertEqual(result['dark']['label'][:2], ['type.heading', True])
         self.assertNotEqual(result['dark']['label'][2], 'color.ink')
-        # A tile in a strip is furniture-dense and keeps its caption sizes.
+        # A tile in a strip says what its figure counts, and that is the page's content too: its label and sub-line are
+        # notes at body size (text-roles.mjs), its change body text in bold; the figure keeps its own size.
         for name in ('tile', 'prominent'):
-            self.assertEqual(result[name]['label'][:2], ['type.compact', False], name)
-            self.assertEqual(result[name]['sublabel'][0], 'type.label', name)
+            self.assertEqual(result[name]['label'][:2], ['type.body', False], name)
+            self.assertEqual(result[name]['sublabel'][0], 'type.body', name)
+            self.assertEqual(result[name]['delta'], 'type.body', name)
+            self.assertGreater(result[name]['value'], result['body'], name)
 
     def test_every_way_a_lone_figure_is_set_says_what_it_measures_at_body_size_or_larger(self):
         # `kpi` is set stacked, stacked smaller, beside its explanation or boxed (compose-arrangements.mjs): whichever

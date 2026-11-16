@@ -37,12 +37,15 @@ const render=items=>REGISTRY.get('chevron-process').render({id:'probe',frame,pro
 const items=[{label:'Supply',details:['Eligible artifacts']},{label:'Use',details:['Accepted requests']}];
 const plain=render(items),dated=render(items.map((v,i)=>({...v,...(i===0?{heading:'September 2026'}:{})})));
 const role=(nodes,r)=>nodes.filter(n=>n.role===r);
-console.log(JSON.stringify({plainHeadings:role(plain,'process-heading'),datedHeadings:role(dated,'process-heading').map(n=>n.text),plainBands:role(plain,'process-band').map(n=>n.frame.y),datedBands:role(dated,'process-band').map(n=>n.frame.y),labels:role(plain,'process-label').map(n=>n.text)}));
+console.log(JSON.stringify({plainHeadings:role(plain,'process-heading'),datedHeadings:role(dated,'process-heading').map(n=>n.text),plainBands:role(plain,'process-band').map(n=>n.frame.y),datedBands:role(dated,'process-band').map(n=>n.frame.y),headingFoot:role(dated,'process-heading').map(n=>n.frame.y+n.frame.height),labels:role(plain,'process-label').map(n=>n.text)}));
 """)
         self.assertEqual(result['plainHeadings'], [])
         self.assertEqual(result['datedHeadings'], ['September 2026'])
         self.assertEqual(result['plainBands'], [0, 0])
-        self.assertEqual(result['datedBands'], [42, 42])
+        # The bands sit one gap under the heading as it was measured (a line of bold heading type), level across the row.
+        self.assertEqual(len(set(result['datedBands'])), 1)
+        self.assertGreater(result['datedBands'][0], result['headingFoot'][0])
+        self.assertLessEqual(result['datedBands'][0] - result['headingFoot'][0], 16)
         self.assertEqual(result['labels'], ['Supply', 'Use'])
 
     def test_runtime_registry_fixtures_and_token_provenance_compile(self):

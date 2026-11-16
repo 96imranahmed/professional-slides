@@ -83,7 +83,11 @@ into `DENSITY_PROFILES`), then:
 ```bash
 npm run check                                      # the suite, including the verdicts kept as tests (test_judgement.py)
 node evals/scripts/site_gallery.mjs                # which reproduced gallery pages the change moved
+node evals/scripts/site_gallery.mjs --sheet        # each moved page as approved, as now and as published
 node evals/scripts/site_gallery.mjs --approve      # after looking at them: record the layout as it is now
 ```
+
+`--sheet` writes one before | after sheet a moved page, and an index, to `output/site-gallery/review/`; `--approve`
+is refused until a sheet of the same moves has been written (see [the gallery suite](../README.md#gallery-layout-regression)).
 
 Rebuild a deck or two from the corpus and look at the pages before keeping the change.

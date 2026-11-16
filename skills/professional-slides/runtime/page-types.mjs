@@ -19,6 +19,7 @@ import { playerEntries, playerNames, plannedMark, planPlayerMarks } from "./play
 import { isTable, rowCells, finite, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { textWordList, proseParts } from "./text-contract.mjs";
 import { measureInsight } from "./registry-text.mjs";
+import { measureAt } from "./draw.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase } from "./text-layout.mjs";
@@ -416,11 +417,13 @@ export const WATERFALL_BELOW_CALLOUTS = 2;
 // heading size and runs to eight lines, measured here the way the renderer sets it.
 const RAIL_WIDTH = 373;
 export const railFits = (text) => { try { sideStatementLayout({ x: 0, y: 0, width: RAIL_WIDTH, height: 600 }, { text }); return true; } catch { return false; } };
-// The so-what bar runs the body's width and holds two lines: one implication,
-// measured the way the insight band sets it. A third line is an argument, and
-// an argument belongs beside the exhibit.
+// The so-what bar runs the body's width and holds one implication: as much as
+// two lines across the band's text width take, in the band's bold body type.
+// More is an argument, and an argument belongs beside the exhibit. The band
+// sets its sentence at the reading measure (text-roles.mjs), in as many lines
+// as that takes there: what it may hold is an amount, not the lines it breaks into.
 const BAR_WIDTH = 1160;
-export const barFits = (text) => (measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "primary" }).body?.lines?.length ?? 99) <= 2;
+export const barFits = (text) => { try { const band = measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "primary" }); return measureAt(text, band.width, { size: "type.body", bold: true }).lines.length <= 2; } catch { return false; } };
 // A chart at the right of a row needs half the body's height: two rows hold one.
 const BLOCK_CHART_ROWS = 2, BLOCK_POINTS_MAX = 4;
 
