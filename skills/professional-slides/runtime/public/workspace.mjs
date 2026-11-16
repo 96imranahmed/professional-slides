@@ -68,10 +68,10 @@ export const expanded = (work) => readPagesFileSync(work.file);
 /**
  * Write each page edit in `edits` (`{ <page id>: (page) => page }`) to the file that holds the page - the pages file, or
  * the part it was included from - leaving the includes as they are written. `deck`, where given, replaces the pages
- * file's deck. Returns the files written.
+ * file's deck, and `added` pages go at the end of the pages file's own pages. Returns the files written.
  */
-export async function rewritePages(work, edits, { deck } = {}) {
-  const whole = expanded(work), parts = partsOf(whole), owners = new Map(deck ? [[work.file, []]] : []);
+export async function rewritePages(work, edits, { deck, added = [] } = {}) {
+  const whole = expanded(work), parts = partsOf(whole), owners = new Map(deck || added.length ? [[work.file, []]] : []);
   for (const id of Object.keys(edits)) {
     if (!pageIn(whole, id)) throw new Error(`No page ${id} in ${work.file} or the parts it includes`);
     const owner = parts.has(id) ? path.join(path.dirname(work.file), parts.get(id)) : work.file;
@@ -82,6 +82,7 @@ export async function rewritePages(work, edits, { deck } = {}) {
     const written = await readJson(owner), doc = Array.isArray(written) ? { pages: written } : written;
     for (const list of ["pages", "appendix"]) if (Array.isArray(doc[list])) doc[list] = doc[list].map((page) => (page && ids.includes(String(page.id)) ? edits[String(page.id)](page) : page));
     if (deck && owner === work.file) doc.deck = deck;
+    if (added.length && owner === work.file) doc.pages = [...(doc.pages ?? []), ...added];
     await writeJsonWhole(owner, Array.isArray(written) ? doc.pages : doc);
   }
   return [...owners.keys()];
@@ -202,7 +203,12 @@ function compiledPages(doc, insights) {
 }
 export async function editWorkspace(work, patch) {
   if (!patch || !["content", "design"].includes(patch.scope) || !Array.isArray(patch.edits) || !patch.edits.length) throw new Error("Patch is { scope: content|design, edits: [{ page, value }] }; value replaces that complete page, or page='deck' replaces deck settings");
-  const next = structuredClone(work.doc);
+  // An edit is read and checked against the deck as it is built (parts spliced in, the appendix after the body), and
+  // written back to the file that holds each page (rewritePages): a page in a part or in the appendix is edited where
+  // it lives, and the includes stay as written.
+  const whole = expanded(work), next = structuredClone(whole);
+  const replaced = {}, added = [];
+  let deck = null;
   for (const edit of patch.edits) {
     if (!edit.value || typeof edit.value !== "object" || Array.isArray(edit.value)) throw new Error("Every edit needs an object value");
     if (edit.page === "deck") {
@@ -210,31 +216,33 @@ export async function editWorkspace(work, patch) {
         const allowed = new Set(["design", "palette", "typography", "chrome", "pageTemplate", "template", "fill", "tone", "variation", "tracker"]);
         for (const key of new Set([...Object.keys(next.deck), ...Object.keys(edit.value)])) if (!allowed.has(key) && JSON.stringify(next.deck[key]) !== JSON.stringify(edit.value[key])) throw new Error(`Design edit changes deck content: ${key}`);
       }
-      next.deck = edit.value;
+      next.deck = deck = edit.value;
     } else {
       if (edit.page === "new") {
-        if (patch.scope !== "content" || !edit.value.id || next.pages.some(p=>p.id===edit.value.id)) throw new Error("Adding a page requires content scope and a unique id");
+        if (patch.scope !== "content" || !edit.value.id || pageIn(next, edit.value.id)) throw new Error("Adding a page requires content scope and a unique id");
         const need = storylineNeed(work);
         if (need) return needed([need], { message: "No page is written before the user approves the storyline." });
-        next.pages.push(edit.value);
+        next.pages = [...(next.pages ?? []), edit.value];
+        added.push(edit.value);
         continue;
       }
-      const { page, index } = selectPage(next, String(edit.page));
+      const { page } = selectPage(next, String(edit.page));
       if (edit.value.id !== page.id) throw new Error("An edit must retain the page id");
       if (patch.scope === "design" && contentSignature(page) !== contentSignature(edit.value)) throw new Error(`Design edit changes content on ${page.id}`);
       if (page.sourceSlide && edit.value.sourceSlide !== page.sourceSlide) throw new Error("A revision edit must retain sourceSlide");
-      next.pages[index] = edit.value;
+      for (const list of ["pages", "appendix"]) if (Array.isArray(next[list])) next[list] = next[list].map((p) => (p === page ? edit.value : p));
+      replaced[String(page.id)] = edit.value;
     }
   }
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(next.deck?.id||""))throw new Error("Deck id must be a filename-safe identifier");
-  for (const page of next.pages) if (page.type === "reference" && page.nodes?.length) validateReference(page);
+  for (const page of pagesOf(next)) if (page.type === "reference" && page.nodes?.length) validateReference(page);
   // Partially authored work is allowed: an edit is refused for what it breaks, not for pages still waiting to be written
   // (an unfilled reference page of an imported PDF, a scaffolded page). A deck edit can break any page, so it is read
   // against the pages as they were.
   const insights = await readInsights(work.root, next.deck.id);
   const after = compiledPages(next, insights);
   const deckEdited = patch.edits.some((e) => e.page === "deck");
-  const before = deckEdited || patch.scope === "design" ? compiledPages(work.doc, insights) : null;
+  const before = deckEdited || patch.scope === "design" ? compiledPages(whole, insights) : null;
   const touched = new Set(patch.edits.filter((e) => e.page !== "deck").map((e) => String(e.value.id)));
   const broken = [...after.errors].filter(([id, list]) => touched.has(id) || (deckEdited && list.join() !== (before.errors.get(id) ?? []).join()));
   if (broken.length) return blocked("EDIT_INVALID", broken.flatMap(([, list]) => list).join("\n"));
@@ -243,7 +251,7 @@ export async function editWorkspace(work, patch) {
     const dropped = [...after.adjusted].filter(([id, notes]) => notes.join() !== (before.adjusted.get(id) ?? []).join());
     if (dropped.length) return blocked("DESIGN_DROPS_CONTENT", dropped.map(([id, notes]) => `${id}: ${notes.join("; ")}`).join("\n"));
   }
-  await writeJsonWhole(work.file, next);
+  await rewritePages(work, Object.fromEntries(Object.entries(replaced).map(([id, value]) => [id, () => value])), { ...(deck ? { deck } : {}), added });
   const advisories = [...after.adjusted].filter(([id]) => touched.has(id)).map(([id, notes]) => ({ code: "PAGE_ADJUSTED", id, severity: "advisory", repair: notes.join("; ") }));
   return { ...await inspectWorkspace(await openWorkspace(work.root)), ...(advisories.length ? { advisories } : {}) };
 }

@@ -232,5 +232,64 @@ console.log(JSON.stringify({ artifacts: built.artifacts ?? [], findings: built.f
             self.assertIn(blocker, result['findings'])
 
 
+class EditCommandTests(unittest.TestCase):
+    """Second review: the public edit command applied an index into the built deck's pages to the raw file's list."""
+
+    def test_edit_rewrites_a_root_page_a_part_page_and_an_appendix_page_where_each_lives(self):
+        result = run_node(WORKSPACE + '''
+const page = (id, title) => ({ ...judged(id, title), commentary: 'below' });
+const work = workspace({ pages: [{ include: 'part.json' }, page('root', 'A page in the pages file')], appendix: [page('extra', 'A page in the appendix')] },
+  { 'part.json': { pages: [page('inpart', 'A page in a part')] } });
+const retitle = (id, title) => ({ ...page(id, title) });
+fs.writeFileSync(path.join(work, 'patch.json'), JSON.stringify({ scope: 'content', edits: [
+  { page: 'root', value: retitle('root', 'A page in the pages file, edited') },
+  { page: 'inpart', value: retitle('inpart', 'A page in a part, edited') },
+  { page: 'extra', value: retitle('extra', 'A page in the appendix, edited') }] }));
+const edited = await execute(['edit', work, '--file', path.join(work, 'patch.json')]);
+const root = read(work, 'deck.pages.json'), part = read(work, 'part.json');
+console.log(JSON.stringify({ status: edited.status, error: edited.message, pages: root.pages.map((p) => p.include ?? p.title), appendix: root.appendix.map((p) => p.title), part: part.pages.map((p) => p.title) }));
+''')
+        self.assertNotIn(result['status'], ('error', 'blocked'), result.get('error'))
+        # The include stays where it was written, each page is edited in its own file, and nothing is duplicated.
+        self.assertEqual(result['pages'], ['part.json', 'A page in the pages file, edited'])
+        self.assertEqual(result['part'], ['A page in a part, edited'])
+        self.assertEqual(result['appendix'], ['A page in the appendix, edited'])
+
+
+class FullRingTests(unittest.TestCase):
+    """Second review: a 360-degree wedge was an SVG arc between coincident points, drawn as nothing."""
+
+    def test_a_full_revolution_wedge_is_drawn_as_a_whole_disc(self):
+        result = run_node('''
+import { wedgePath } from './skills/professional-slides/runtime/emit/html-shapes.mjs';
+const frame = { x: 0, y: 0, width: 100, height: 100 };
+console.log(JSON.stringify({ full: wedgePath(frame, -90, 270), most: wedgePath(frame, -90, 266.4) }));
+''')
+        # Two half-circle arcs, which a browser draws, rather than one arc whose ends coincide.
+        self.assertEqual(result['full'].count(' A '), 2)
+        self.assertNotIn('M 50 50', result['full'])
+        self.assertEqual(result['most'].count(' A '), 1)
+
+    @requires_chromium
+    def test_a_browser_fills_both_sides_of_a_hundred_percent_ring(self):
+        result = run_node('''
+import { createRequire } from 'node:module';
+import { wedgePath } from './skills/professional-slides/runtime/emit/html-shapes.mjs';
+const require = createRequire(import.meta.url);
+const { chromium } = require(require.resolve('playwright', { paths: [process.env.RUNTIME_NODE_MODULES] }));
+const browser = await chromium.launch(process.env.PLAYWRIGHT_BROWSER_PATH ? { executablePath: process.env.PLAYWRIGHT_BROWSER_PATH } : {});
+const page = await browser.newPage();
+const frame = { x: 0, y: 0, width: 100, height: 100 };
+const inside = await page.evaluate((d) => { const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d); svg.appendChild(p); document.body.appendChild(svg); const box = p.getBBox();
+  const at = (x, y) => { const point = svg.createSVGPoint(); point.x = x; point.y = y; return p.isPointInFill(point); };
+  return { width: box.width, left: at(20, 50), right: at(80, 50) }; }, wedgePath(frame, -90, 270));
+await browser.close();
+console.log(JSON.stringify(inside));
+''')
+        self.assertGreater(result['width'], 99)
+        self.assertTrue(result['left'] and result['right'])
+
+
 if __name__ == '__main__':
     unittest.main()

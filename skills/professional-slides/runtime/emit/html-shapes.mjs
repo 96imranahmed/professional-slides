@@ -22,6 +22,12 @@ export function wedgePath(frame, startAngle, endAngle) {
   const cx = frame.x + frame.width / 2;
   const cy = frame.y + frame.height / 2;
   const radius = Math.min(frame.width, frame.height) / 2;
+  // A whole revolution (a 100% ring) has its arc's ends on the same point, and an SVG arc between coincident points is
+  // drawn as nothing: it is two half circles instead, as PowerPoint's sampled outline draws it.
+  if (Math.abs(endAngle - startAngle) >= 360 - 1e-9) {
+    const top = polar(cx, cy, radius, startAngle), bottom = polar(cx, cy, radius, startAngle + 180);
+    return `M ${top.x} ${top.y} A ${radius} ${radius} 0 1 1 ${bottom.x} ${bottom.y} A ${radius} ${radius} 0 1 1 ${top.x} ${top.y} Z`;
+  }
   const start = polar(cx, cy, radius, endAngle);
   const end = polar(cx, cy, radius, startAngle);
   const large = endAngle - startAngle <= 180 ? 0 : 1;
