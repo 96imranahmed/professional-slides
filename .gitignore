@@ -50,3 +50,9 @@ author-log.jsonl
 .env
 .env.*
 *.compose-cache.json
+
+# A workspace's judge rounds, candidate sheets and recorded verdicts (public/judge.mjs), and its option sets
+**/judgement/
+**/candidates/
+# Published gallery images the regression pages were reproduced from: kept out of the repository (evals/regression/site-gallery)
+/evals/regression/site-gallery/reference/
