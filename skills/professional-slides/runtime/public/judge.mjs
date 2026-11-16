@@ -14,11 +14,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { readJson, writeJsonWhole, pythonBin } from "../cli.mjs";
-import { partsOf, readPagesFile } from "../pages-file.mjs";
+import { pagesOf, pageIn, readPagesFile } from "../pages-file.mjs";
 import { runProcess } from "../process.mjs";
 import { deckHtml } from "../emit/emit_html.mjs";
 import { renderHtml } from "../emit/render_html.mjs";
-import { compileWorkspace, complete, needed, runtime } from "./workspace.mjs";
+import { compileWorkspace, complete, needed, runtime, rewritePages } from "./workspace.mjs";
 
 // How many candidates of a decision are shown, and how many choices a page takes before it is left alone.
 const SHOWN = 3, ROUNDS = 3;
@@ -36,11 +36,8 @@ const pageOf = (slide) => String(slide.sourceSlideId ?? slide.id);
 /** A page's first decision still open: one the engine made between two or more drawable candidates that no judge has settled. */
 const openDecision = (slide) => (slide.decisions || []).find((decision) => !decision.held && decision.candidates.length > 1);
 const drawn = (slide) => JSON.stringify(slide.nodes.map((node) => [node.type, node.role, node.frame, node.text, node.style?.align]));
-// The pages as the deck is built from them - every part a `{ include }` names spliced in, the appendix after the body -
-// and not the pages file as written: a page in a part, or in the appendix, is compiled and asked about like any other,
-// and a lookup in the raw file's `pages` alone found nothing for it and stopped the judge.
-const pagesOf = (doc) => [...(doc.pages ?? []), ...(doc.appendix ?? [])];
-const pageIn = (doc, id) => pagesOf(doc).find((page) => page && page.include === undefined && String(page.id) === String(id));
+// Pages are read as the deck is built from them (pages-file.mjs `pagesOf`, `pageIn`): a page in a part, or in the
+// appendix, is compiled and asked about like any other.
 
 /** `judge WORK --choices FILE`: record a judge's choices - `{ <page id>: { <decision id>: <candidate label> } }` - on their pages. */
 export async function recordChoices(work, file) {
@@ -48,26 +45,15 @@ export async function recordChoices(work, file) {
   const source = await readPagesFile(work.file);
   const unknown = Object.keys(chosen).filter((id) => !pageIn(source, id));
   if (unknown.length) throw new Error(`No page ${unknown.join(", ")} in ${work.file} or the parts it includes`);
-  // A choice is written on its page in the file that holds it: the pages file, or the part the page was included from.
-  // The includes stay as they are written, so the parts a worker owns stay theirs and the pages file is not flattened.
-  const parts = partsOf(source), owners = new Map();
-  for (const id of Object.keys(chosen)) {
-    const owner = parts.has(id) ? path.join(path.dirname(work.file), parts.get(id)) : work.file;
-    owners.set(owner, [...(owners.get(owner) ?? []), id]);
-  }
-  for (const [owner, ids] of owners) {
-    // A part is { pages } or the bare list; the pages file holds the body's pages and the appendix.
-    const written = await readJson(owner);
-    const doc = Array.isArray(written) ? { pages: written } : written;
-    for (const id of ids) { const page = pageIn(doc, id); page.choices = { ...page.choices, ...chosen[id] }; }
-    await writeJsonWhole(owner, Array.isArray(written) ? doc.pages : doc);
-  }
+  // A choice is written on its page in the file that holds it - the pages file, or the part the page was included from -
+  // so the includes stay as written and the parts a worker owns stay theirs.
+  const owners = await rewritePages(work, Object.fromEntries(Object.entries(chosen).map(([id, choice]) => [id, (page) => ({ ...page, choices: { ...page.choices, ...choice } })])));
   // Each choice is a verdict: the candidate preferred, and the measures of every candidate it was preferred over. They are
   // what the engine's weights are checked and fitted against (evals/taste).
   const round = await readJson(path.join(work.root, "judgement", "round.json"), { optional: true }) ?? [];
   const verdicts = round.filter((asked) => chosen[asked.page]?.[asked.decision]).map((asked) => JSON.stringify({ ...asked, chosen: chosen[asked.page][asked.decision] }));
   if (verdicts.length) await fs.appendFile(path.join(work.root, "judgement", "verdicts.jsonl"), `${verdicts.join("\n")}\n`);
-  return complete({ artifacts: [...owners.keys()], message: `Recorded on ${Object.keys(chosen).join(", ")}. Run judge again: a choice can open another inside it. When none is open, build.` });
+  return complete({ artifacts: owners, message: `Recorded on ${Object.keys(chosen).join(", ")}. Run judge again: a choice can open another inside it. When none is open, build.` });
 }
 
 /** `judge WORK --out OUT`: draw each page's open decision as its candidates and ask which stands. */
