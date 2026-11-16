@@ -17,7 +17,7 @@ assert.equal(node.data.dataUri,props.dataUri);
 assert.equal(node.data.circular,false);
 assert.equal(node.frame.width,400);
 const html=renderSlideHtml(slide);
-assert.ok(html.includes('preserveAspectRatio="none"'));
+assert.ok(html.includes('object-fit:fill'));
 assert.ok(!html.includes('<clipPath'));
 assert.throws(()=>render({...props,authorization:''}),/authorization/);
 assert.throws(()=>render({...props,dataUri:'https://example.com/image.png'}),/embedded/);

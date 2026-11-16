@@ -11,6 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { PAGE_TYPES } from "../page-types.mjs";
 import { writeJsonWhole } from "../cli.mjs";
+import { pagesOf, readPagesFileSync } from "../pages-file.mjs";
 
 export const ROLES = Object.freeze(["opening", "setup", "finding", "closing", "appendix"]);
 const DENSITIES = ["live-pitch", "executive", "pre-read"];
@@ -211,7 +212,7 @@ export function approvalDetail(storyline) {
 /**
  * Pages the storyline plans too short to fill a page: a chart of three members or fewer in one series, set across the
  * page. Said at the storyline, where planning its commentary beside it costs nothing; the A350F deck met two dozen of them
- * as empty bands (SCENE_VOID) after its pages were written.
+ * as empty bands after its pages were written.
  */
 export function shortPages(storyline) {
   return storylinePages(storyline).filter((page) => isChart(page.type) && Number.isInteger(page.members) && page.members <= 3 && (page.series ?? 1) <= 1)
@@ -258,7 +259,11 @@ export function uniformWords(storyline) {
 }
 
 /** The pages file's pages, body and appendix. */
-const writtenPages = (doc) => [...(doc.pages || []), ...(doc.appendix || [])];
+// The pages as the deck is built from them, parts spliced in: a page written in a part is a written page.
+const writtenPages = (doc) => pagesOf(doc);
+// A part that cannot be read is the compile's to report, with its file and entry; the storyline's own messages then
+// fall back to the pages file as written rather than failing before the author sees them.
+const builtDoc = (work) => { try { return readPagesFileSync(work.file); } catch { return work.doc; } };
 
 /** What a new argument still needs before pages: a storyline, its shape, the user's approval of this version. Null when held. */
 export function storylineNeed(work) {
@@ -268,9 +273,9 @@ export function storylineNeed(work) {
     message: "Write the `storyline` block in the pages file - question, answer, reader, sections and their pages, one alternative length - then run `storyline WORK` and show the user its message. No page is written before they approve it." };
   const problems = storylineProblems(storyline);
   if (problems.length) return { kind: "storyline", target: work.file, problems, message: `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}` };
-  if (!storyline.approval) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck, writtenPages(work.doc)),
+  if (!storyline.approval) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck, writtenPages(builtDoc(work))),
     ask: "Show the user this message and end your turn. Record their reply with `storyline WORK --approve \"<their words>\"`. A request to make a deck is not approval." };
-  if (storyline.approval.hash !== storylineHash(storyline)) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck, writtenPages(work.doc)),
+  if (storyline.approval.hash !== storylineHash(storyline)) return { kind: "storyline-approval", message: approvalMessage(storyline, work.doc.deck, writtenPages(builtDoc(work))),
     ask: "The storyline changed after the user approved it: show them this version and record their reply with `--approve`." };
   return null;
 }
@@ -278,7 +283,7 @@ export function storylineNeed(work) {
 /** The body pages that differ from the approved storyline: added, dropped, retitled. */
 export function storylineDrift(work) {
   const approved = storylinePages(work.doc.storyline);
-  const written = writtenPages(work.doc).filter((page) => !(page.kind && STRUCTURAL.has(page.kind)));
+  const written = writtenPages(builtDoc(work)).filter((page) => !(page.kind && STRUCTURAL.has(page.kind)));
   const ids = new Set(approved.map((p) => p.id)), have = new Set(written.map((p) => String(p.id)));
   const titles = new Map(approved.map((p) => [p.id, p.title]));
   return { missing: approved.filter((p) => !have.has(p.id)).map((p) => p.id), added: written.filter((p) => !ids.has(String(p.id))).map((p) => String(p.id)),
@@ -315,7 +320,7 @@ export async function showStoryline(work, results) {
   if (problems.length) return results.blocked("STORYLINE_INVALID", `The storyline cannot be shown yet:\n- ${problems.join("\n- ")}`);
   const detail = path.join(path.dirname(work.file), "storyline.md");
   await fs.writeFile(detail, approvalDetail(work.doc.storyline));
-  const message = `${approvalMessage(work.doc.storyline, work.doc.deck, writtenPages(work.doc))}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
+  const message = `${approvalMessage(work.doc.storyline, work.doc.deck, writtenPages(builtDoc(work)))}\n\nEach page's comparison, candidate charts, data and words: ${detail}`;
   const advisories = [...shortPages(work.doc.storyline), ...uniformWords(work.doc.storyline), ...fewPictures(work.doc.storyline, work.doc.deck)];
   const approved = work.doc.storyline.approval?.hash === storylineHash(work.doc.storyline);
   return approved ? results.complete({ message: "Approved; this is the version the user approved.", storyline: message, artifacts: [detail], ...(advisories.length ? { advisories } : {}) })

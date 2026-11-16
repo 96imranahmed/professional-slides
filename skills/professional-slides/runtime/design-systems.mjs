@@ -11,7 +11,8 @@
 // Everything resolves to things the pipeline already reads: a palette object
 // (colour, `style.*`, `font.*` and `type.*` tokens), `chrome`, `tracker`, the
 // cover layout, and two composition choices (`takeaway`, `commentary`).
-import { contrastRatio, mix } from "./color.mjs";
+import { channels, contrastRatio, mix } from "./color.mjs";
+import { PALETTES } from "./palettes.mjs";
 
 export const DESIGN_SYSTEMS = Object.freeze({
   consulting: {
@@ -109,26 +110,76 @@ export function readable(color, ground, ratio = 4.5) {
   return out;
 }
 
+// The colours a subject may name: its structural colour and its emphasis, then the three families a brand's pages are
+// dressed in - the secondary type, the light ground its panels and bands sit on, and its hairlines.
+export const IDENTITY_KEYS = Object.freeze({
+  primary: "the brand's structural colour: bands, the primary marks",
+  accent: "its emphasis colour: highlighted words and marks, the first chart series",
+  muted: "its secondary-text colour: sub-lines, units, captions",
+  tint: "its light ground: tinted panels, table label columns, callouts",
+  rule: "its hairline colour: rules and gridlines",
+});
+
+const FAMILY_LEVELS = Object.freeze({ tint: 30, rule: 40, step: 18 }), MUTED_SHARE = 0.35;
+const luma = (color) => channels(color).reduce((total, channel, i) => total + channel * [0.299, 0.587, 0.114][i], 0);
+/** A colour laid over the canvas just far enough to sit `levels` grey levels (luma, 0-255) from it. */
+const laid = (color, canvas, levels) => { const gap = Math.abs(luma(canvas) - luma(color)); return gap <= levels ? color : mix(color, canvas, 1 - levels / gap); };
+/**
+ * The families a brand did not name, from the colours it did: `{ tint, rule, muted }`.
+ *
+ * A surface is the brand's colour laid over the canvas as lightly as leaves it
+ * a set number of grey levels (0-255, the luma a projector shows) under the
+ * page (`laid`), so a navy and a bright blue give surfaces of one weight, each
+ * in its own hue: the tint from the emphasis colour at the weight every
+ * palette's filled surface carries (palettes.mjs surfaceTint, about 30 levels:
+ * lighter vanishes on a projector), the hairline from the primary at the weight
+ * of the house's gridline, a step heavier so it still shows across a tinted
+ * panel. The secondary type is the page's ink at about two thirds strength, as
+ * the palettes' own secondary greys stand to their inks, darkened where needed
+ * to read at 4.5:1 on the tint, the darkest ground it is set on.
+ */
+function brandFamilies({ emphasis, primary, ink, canvas }) {
+  const tint = laid(emphasis, canvas, FAMILY_LEVELS.tint);
+  return { tint, rule: laid(primary, canvas, FAMILY_LEVELS.rule), muted: (ground) => readable(mix(ink, canvas, MUTED_SHARE), ground, 4.5) };
+}
+
 /**
  * The subject's own colours - a franchise's house colours, a brand's, a
  * country's flag - resolved onto the palette roles. The structural primary and
  * the accent are darkened until they read as text on the canvas; the raw
  * accent keeps its brightness as a chart series, where it is a mark, not type.
+ *
+ * The brand then dresses the whole page, not only its bands. `tint`, `muted`
+ * and `rule` set the tinted surfaces, the secondary type and the hairlines; a
+ * family the subject does not name is derived from the colours it does
+ * (brandFamilies). Left to the base palette, those families stayed its greys
+ * and its yellow callout under any brand.
  */
-export function identityColors(identity, canvas = "#FFFFFF") {
+export function identityColors(identity, canvas = "#FFFFFF", ink = "#1F1F1F") {
   if (!identity) return {};
   if (typeof identity !== "object" || !hex(identity.primary)) throw new Error("identity.primary must be a #RRGGBB colour taken from the subject");
-  if (identity.accent !== undefined && !hex(identity.accent)) throw new Error("identity.accent must be a #RRGGBB colour");
+  for (const [name, value] of Object.entries(identity)) {
+    if (!Object.hasOwn(IDENTITY_KEYS, name)) throw new Error(`identity.${name} is not a colour \`identity\` takes; it takes ${Object.keys(IDENTITY_KEYS).join(", ")}, and any single token is set in \`palette.colors\``);
+    if (value !== undefined && !hex(value)) throw new Error(`identity.${name} must be a #RRGGBB colour`);
+  }
   const primary = readable(identity.primary, canvas, 4.5);
   const rawAccent = identity.accent ?? mix(identity.primary, "#FFFFFF", 0.35);
-  // Emphasis is the subject's own colour. A highlighted bar or point takes `color.accent`, the primary made readable, among
-  // marks in series 1, so series 1 is the subject's second colour - its accent, or the primary lifted - then a neutral warmed
-  // by the brand, the primary paled, and the dark neutral last: with the dark neutral first, every plain bar in a subject's
-  // deck was near-black (palettes.mjs leadWithColour), and with the brand as series 1 every rival bar took the subject's colour.
+  // Emphasis is the subject's own colour: its accent where it names one, made readable as the primary is, else the primary.
+  // A highlighted bar or point takes it (palettes.mjs subjectOf) and its peers go quiet around it (peerOf), so series 1 can
+  // be the raw accent too - then a neutral warmed by the brand, the primary paled, and the dark neutral last: with the dark
+  // neutral first, every plain bar in a subject's deck was near-black (palettes.mjs leadWithColour).
+  const accent = identity.accent ? readable(identity.accent, canvas, 4.5) : primary;
   const base = mix("#3A3A3A", identity.primary, 0.08);
+  const derived = brandFamilies({ emphasis: accent, primary, ink, canvas });
+  const tint = identity.tint ?? derived.tint, rule = identity.rule ?? derived.rule, muted = identity.muted ?? derived.muted(tint);
+  // Two weights of ground, never one. The quiet ground (a zebra band, a label column) is the brand's tint; the ground that
+  // marks something out (a highlighted row, a callout, a figure's panel) is the accent laid a clear step deeper. Set to one
+  // colour, a highlighted row beside a zebra band read as two highlighted rows.
+  const marked = laid(accent, canvas, Math.abs(luma(canvas) - luma(tint)) + FAMILY_LEVELS.step);
   return {
-    "color.componentPrimary": primary, "color.componentPrimaryTint": mix(primary, canvas, 0.88),
-    "color.accent": primary, "color.accentTint": mix(identity.primary, canvas, 0.88),
+    "color.componentPrimary": primary, "color.componentPrimaryTint": marked,
+    "color.accent": accent, "color.accentTint": marked, "color.surfaceTint": tint, "color.surfaceMuted": tint, "color.calloutTint": marked,
+    "color.textSecondary": muted, "color.chartUnit": muted, "color.rule": rule, "color.chartGrid": rule,
     "color.chartSeries1": rawAccent, "color.chartSeries2": mix(base, "#FFFFFF", 0.45), "color.chartSeries3": mix(identity.primary, "#FFFFFF", 0.7),
     "color.chartSeries4": "#C9C9C9", "color.chartSeries5": "#8A8A8A", "color.chartSeries6": base
   };
@@ -261,7 +312,9 @@ export function applyDesign(spec) {
   // A system that fixes a style (the journal's zebra rows, the editorial dash)
   // keeps it; the draw fills only what the system leaves open.
   const varied = drawn ? Object.fromEntries(["style.listMarker", "style.tableRows"].filter((key) => !(key in system.colors)).map((key) => [key, drawn[key]])) : {};
-  const colors = { ...surfaceTokens(name, spec.surfaces ?? "reference"), ...system.colors, ...varied, ...styleTokens, ...identityColors(spec.identity, canvas), ...(own?.colors || {}) };
+  // The ink the page will be set in: the author's, the system's, or the base palette's, in the order the tokens resolve.
+  const ink = own?.colors?.["color.ink"] ?? system.colors["color.ink"] ?? PALETTES[base]?.colors["color.ink"];
+  const colors = { ...surfaceTokens(name, spec.surfaces ?? "reference"), ...system.colors, ...varied, ...styleTokens, ...identityColors(spec.identity, canvas, ink), ...(own?.colors || {}) };
   const out = { ...spec, palette: { base, id: own?.id ?? `${name}-${spec.id ?? "deck"}`, label: own?.label ?? `${system.label}${spec.identity ? " (subject identity)" : ""}`, colors } };
   if (system.chrome && !spec.chrome) out.chrome = system.chrome;
   if (spec.tracker === undefined && drawn) out.tracker = drawn.tracker;

@@ -51,7 +51,7 @@ def shipped(rel: PurePosixPath) -> bool:
     if area == 'references':
         return rel.suffix in {'.md', '.json'}
     if area == 'runtime':
-        return rel.suffix in {'.mjs', '.py', '.json', '.md'}
+        return rel.suffix in {'.mjs', '.py', '.json', '.md', '.wasm'} or ('vendor' in rel.parts and rel.name.startswith('LICENSE'))
     if area == 'examples':
         if inner.parts[0] == 'assets':
             return rel.suffix in IMAGES

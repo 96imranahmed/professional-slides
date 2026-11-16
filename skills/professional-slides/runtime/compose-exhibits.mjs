@@ -161,13 +161,13 @@ export function exhibitItem(exIn, id, baseDir, size = SIZE) {
   if (exIn && typeof exIn.caption === "string" && exIn.caption.trim()) {
     const { caption, captionHeight, captionHighlight, ...rest } = exIn;
     const panel = exhibitItem(rest, id, baseDir, { width: { fr: 1 }, height: "fill" });
-    // The caption is the panel's finding in compact type, left-aligned under
-    // it at the panel's width, with no surface: set as a centred bold box it
+    // The caption is the panel's finding in body type, left-aligned under
+    // it at its reading measure, with no surface: set as a centred bold box it
     // is the loudest thing on the page after the title. The statement box is
     // the page's takeaway alone. Peers share one caption height, so the plots
     // above them keep one baseline.
     return { id: `${id}-captioned`, layout: "flow.column", gap: "space.3", size,
-      items: [panel, { id: `${id}-caption`, component: "paragraph", props: { text: caption.trim(), variant: "caption", maxMeasure: false, ...(captionHighlight ? { highlight: captionHighlight } : {}) },
+      items: [panel, { id: `${id}-caption`, component: "paragraph", props: { text: caption.trim(), variant: "caption", ...(captionHighlight ? { highlight: captionHighlight } : {}) },
         size: captionHeight ? { width: { fr: 1 }, height: captionHeight } : HUG }] };
   }
   const typeStep = exIn?._typeStep === true && size.height === "fill";

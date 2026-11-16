@@ -114,14 +114,14 @@ function defineConnector() {
 
 function defineContentRail() {
   return component({
-    id: "content-rail",
+    id: "content-rail", sizing: "fill",
     category: "section",
     role: "rail",
     tokens: [
       "color.surface",
       "color.surfaceMuted",
       "color.rule",
-      "type.compact",
+      "type.body",
       "space.1",
       "space.3",
       "radius.none",

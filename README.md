@@ -202,6 +202,8 @@ Outputs include `brand.house.json`, editable `brand-template.pptx` and `brand-st
 
 Run `npx professional-slides --help` for the current command list and `<command> --help` for exact flags. All commands support `--json`; stdout then contains one structured result. The agent can also run the persistent bundled CLI directly, so ordinary work does not need repeated npm downloads.
 
+`build WORK --out OUT --format html` writes the deck as one self-contained HTML page from the same composed scene the PowerPoint is written from, photographs each slide in a headless browser and runs the same page checks on those images. It needs no PowerPoint or LibreOffice (the photographs need Playwright's Chromium; without it the page is still written and the result says the pages were not photographed). `--format both` writes the HTML and the PowerPoint side by side; building the PowerPoint later from the same workspace emits the same pages.
+
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `complete` | 0 | This command completed |
@@ -235,6 +237,8 @@ npm run package:plugin
 npm pack --pack-destination /tmp
 npm run package:submission
 ```
+
+The layout engine is [Taffy](https://github.com/DioxusLabs/taffy), a CSS grid and flexbox engine, vendored as the `taffy-layout` 4.0.0 WebAssembly build under `skills/professional-slides/runtime/vendor/taffy-layout` (MIT; version and checksums in its `VERSION.json`), so neither install path needs `npm install`. Where a page leaves its arrangement to the engine, every candidate is laid out and scored, and `judge <work>` puts each such choice to the calling agent as a rendered sheet of its best candidates; its choices are recorded in the pages file and held by later builds.
 
 npm and plugin distributions share [distribution.json](distribution.json), versioned manifests and the same runtime. The npm tarball contains runtime files, policies, instructions and assets; evaluation tooling, private workspaces and developer dependencies are excluded. The public submission ZIP remains a separate validated artifact; building it does not publish to npm or a plugin directory.
 

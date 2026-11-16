@@ -3,9 +3,9 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { readJson, writeJsonWhole, pythonBin } from "../cli.mjs";
-import { runProcess, lastJson } from "../process.mjs";
+import { runProcess } from "../process.mjs";
 import { authorDeck, compileDeck, readInsights, loggedSources, openComposeCache } from "../author-deck.mjs";
-import { readPagesFile, compiledFrom } from "../pages-file.mjs";
+import { readPagesFile, readPagesFileSync, compiledFrom, pagesOf, pageIn, partsOf } from "../pages-file.mjs";
 import { buildDeck } from "../build-deck.mjs";
 import { REFERENCE_SCHEMA, validateReference } from "../reference-page.mjs";
 import { readPreferences, deckKeys, applyToDeck, reuseLine, askLine } from "../preferences.mjs";
@@ -59,10 +59,42 @@ export async function openWorkspace(dir) {
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(doc.deck?.id||""))throw new Error("Deck id must be a filename-safe identifier");
   return { root, file, project, doc };
 }
+/**
+ * The workspace's pages as the deck is built from them: the pages file with every part its includes name spliced in.
+ * The workspace's own `doc` is the file as written, which is what edits write back to; reading a page goes through this.
+ */
+export const expanded = (work) => readPagesFileSync(work.file);
+
+/**
+ * Write each page edit in `edits` (`{ <page id>: (page) => page }`) to the file that holds the page - the pages file, or
+ * the part it was included from - leaving the includes as they are written. `deck`, where given, replaces the pages
+ * file's deck, and `added` pages go at the end of the pages file's own pages. Returns the files written.
+ */
+export async function rewritePages(work, edits, { deck, added = [] } = {}) {
+  const whole = expanded(work), parts = partsOf(whole), owners = new Map(deck || added.length ? [[work.file, []]] : []);
+  for (const id of Object.keys(edits)) {
+    if (!pageIn(whole, id)) throw new Error(`No page ${id} in ${work.file} or the parts it includes`);
+    const owner = parts.has(id) ? path.join(path.dirname(work.file), parts.get(id)) : work.file;
+    owners.set(owner, [...(owners.get(owner) ?? []), id]);
+  }
+  for (const [owner, ids] of owners) {
+    // A part is { pages } or the bare list; the pages file holds the body's pages, the appendix and the deck.
+    const written = await readJson(owner), doc = Array.isArray(written) ? { pages: written } : written;
+    for (const list of ["pages", "appendix"]) if (Array.isArray(doc[list])) doc[list] = doc[list].map((page) => (page && ids.includes(String(page.id)) ? edits[String(page.id)](page) : page));
+    if (deck && owner === work.file) doc.deck = deck;
+    if (added.length && owner === work.file) doc.pages = [...(doc.pages ?? []), ...added];
+    await writeJsonWhole(owner, Array.isArray(written) ? doc.pages : doc);
+  }
+  return [...owners.keys()];
+}
+
 export async function fingerprint(work) {
   const files = new Set([work.file]);
   for (const v of [work.doc.deck.inventory, work.doc.deck.template]) if (v) files.add(path.resolve(work.root, v));
-  for(const page of work.doc.pages)for(const v of [page.reference,...(page.nodes||[]).filter(n=>n.kind==="image").map(n=>n.src)])if(v)files.add(path.resolve(work.root,v));
+  // Every file the pages were read from counts - a part edited is the deck edited - and every source a page names.
+  const whole = expanded(work);
+  for (const file of Object.keys(compiledFrom(whole)?.files ?? {})) files.add(path.resolve(path.dirname(work.file), file));
+  for(const page of pagesOf(whole))for(const v of [page.reference,...(page.nodes||[]).filter(n=>n.kind==="image").map(n=>n.src)])if(v)files.add(path.resolve(work.root,v));
   if (work.doc.deck.inventory) {
     const inv = await readJson(path.resolve(work.root, work.doc.deck.inventory));
     if (inv.source?.copy) files.add(path.resolve(work.root, inv.source.copy));
@@ -84,14 +116,15 @@ export async function runtimeFingerprint() {
   await walk(runtime);
   return digest(await Promise.all(files.sort().map(async f=>[path.relative(runtime,f),digest(await fs.readFile(f))])));
 }
+/** A page by its id or its place (1-based) among all the deck's pages - the body's, then the appendix's, parts spliced in. */
 export function selectPage(doc, selector) {
-  const list = doc.pages;
-  let index = list.findIndex(p => p.id === selector);
+  const list = pagesOf(doc);
+  let index = list.findIndex(p => String(p.id) === String(selector));
   if (index < 0 && /^\d+$/.test(String(selector))) index = Number(selector) - 1;
   if (index < 0 || index >= list.length) throw new Error(`Unknown slide ${selector}`);
   return { page: list[index], index };
 }
-export function authoringInputs(work, selected = work.doc.pages) {
+export function authoringInputs(work, selected = pagesOf(expanded(work))) {
   return selected.flatMap(page => {
     if (page.type === "reference" && !page.nodes?.length) return [{ kind: "reference-page", page: page.id, source: path.resolve(work.root, page.reference), schema: REFERENCE_SCHEMA, target: work.file }];
     if (page.carry) return [];
@@ -100,7 +133,7 @@ export function authoringInputs(work, selected = work.doc.pages) {
   });
 }
 export async function inspectWorkspace(work, selector) {
-  const selected = selector ? [selectPage(work.doc, selector).page] : work.doc.pages;
+  const whole = expanded(work), selected = selector ? [selectPage(whole, selector).page] : pagesOf(whole);
   const need = storylineNeed(work);
   const requiredInputs = [...(need ? [need] : []), ...authoringInputs(work, selected)];
   return complete({ status: requiredInputs.length ? "needs-input" : "complete", workspace: work.root, pagesFile: work.file,
@@ -170,7 +203,12 @@ function compiledPages(doc, insights) {
 }
 export async function editWorkspace(work, patch) {
   if (!patch || !["content", "design"].includes(patch.scope) || !Array.isArray(patch.edits) || !patch.edits.length) throw new Error("Patch is { scope: content|design, edits: [{ page, value }] }; value replaces that complete page, or page='deck' replaces deck settings");
-  const next = structuredClone(work.doc);
+  // An edit is read and checked against the deck as it is built (parts spliced in, the appendix after the body), and
+  // written back to the file that holds each page (rewritePages): a page in a part or in the appendix is edited where
+  // it lives, and the includes stay as written.
+  const whole = expanded(work), next = structuredClone(whole);
+  const replaced = {}, added = [];
+  let deck = null;
   for (const edit of patch.edits) {
     if (!edit.value || typeof edit.value !== "object" || Array.isArray(edit.value)) throw new Error("Every edit needs an object value");
     if (edit.page === "deck") {
@@ -178,31 +216,33 @@ export async function editWorkspace(work, patch) {
         const allowed = new Set(["design", "palette", "typography", "chrome", "pageTemplate", "template", "fill", "tone", "variation", "tracker"]);
         for (const key of new Set([...Object.keys(next.deck), ...Object.keys(edit.value)])) if (!allowed.has(key) && JSON.stringify(next.deck[key]) !== JSON.stringify(edit.value[key])) throw new Error(`Design edit changes deck content: ${key}`);
       }
-      next.deck = edit.value;
+      next.deck = deck = edit.value;
     } else {
       if (edit.page === "new") {
-        if (patch.scope !== "content" || !edit.value.id || next.pages.some(p=>p.id===edit.value.id)) throw new Error("Adding a page requires content scope and a unique id");
+        if (patch.scope !== "content" || !edit.value.id || pageIn(next, edit.value.id)) throw new Error("Adding a page requires content scope and a unique id");
         const need = storylineNeed(work);
         if (need) return needed([need], { message: "No page is written before the user approves the storyline." });
-        next.pages.push(edit.value);
+        next.pages = [...(next.pages ?? []), edit.value];
+        added.push(edit.value);
         continue;
       }
-      const { page, index } = selectPage(next, String(edit.page));
+      const { page } = selectPage(next, String(edit.page));
       if (edit.value.id !== page.id) throw new Error("An edit must retain the page id");
       if (patch.scope === "design" && contentSignature(page) !== contentSignature(edit.value)) throw new Error(`Design edit changes content on ${page.id}`);
       if (page.sourceSlide && edit.value.sourceSlide !== page.sourceSlide) throw new Error("A revision edit must retain sourceSlide");
-      next.pages[index] = edit.value;
+      for (const list of ["pages", "appendix"]) if (Array.isArray(next[list])) next[list] = next[list].map((p) => (p === page ? edit.value : p));
+      replaced[String(page.id)] = edit.value;
     }
   }
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(next.deck?.id||""))throw new Error("Deck id must be a filename-safe identifier");
-  for (const page of next.pages) if (page.type === "reference" && page.nodes?.length) validateReference(page);
+  for (const page of pagesOf(next)) if (page.type === "reference" && page.nodes?.length) validateReference(page);
   // Partially authored work is allowed: an edit is refused for what it breaks, not for pages still waiting to be written
   // (an unfilled reference page of an imported PDF, a scaffolded page). A deck edit can break any page, so it is read
   // against the pages as they were.
   const insights = await readInsights(work.root, next.deck.id);
   const after = compiledPages(next, insights);
   const deckEdited = patch.edits.some((e) => e.page === "deck");
-  const before = deckEdited || patch.scope === "design" ? compiledPages(work.doc, insights) : null;
+  const before = deckEdited || patch.scope === "design" ? compiledPages(whole, insights) : null;
   const touched = new Set(patch.edits.filter((e) => e.page !== "deck").map((e) => String(e.value.id)));
   const broken = [...after.errors].filter(([id, list]) => touched.has(id) || (deckEdited && list.join() !== (before.errors.get(id) ?? []).join()));
   if (broken.length) return blocked("EDIT_INVALID", broken.flatMap(([, list]) => list).join("\n"));
@@ -211,14 +251,13 @@ export async function editWorkspace(work, patch) {
     const dropped = [...after.adjusted].filter(([id, notes]) => notes.join() !== (before.adjusted.get(id) ?? []).join());
     if (dropped.length) return blocked("DESIGN_DROPS_CONTENT", dropped.map(([id, notes]) => `${id}: ${notes.join("; ")}`).join("\n"));
   }
-  await writeJsonWhole(work.file, next);
+  await rewritePages(work, Object.fromEntries(Object.entries(replaced).map(([id, value]) => [id, () => value])), { ...(deck ? { deck } : {}), added });
   const advisories = [...after.adjusted].filter(([id]) => touched.has(id)).map(([id, notes]) => ({ code: "PAGE_ADJUSTED", id, severity: "advisory", repair: notes.join("; ") }));
   return { ...await inspectWorkspace(await openWorkspace(work.root)), ...(advisories.length ? { advisories } : {}) };
 }
-// Findings the compile measures on one page's layout, before any render. The build stops on them instead of rendering
-// a deck it will redo: the A350F deck's three half-empty pages were measured on the scene (SCENE_VOID), rendered anyway
-// and reported as complete; a design edit that set a page's points aside (PAGE_ADJUSTED) dropped them without a word.
-const STOP_BEFORE_RENDER = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
+// Findings the compile raises on one page before any render, which the build stops on instead of rendering a deck it
+// will redo: a design edit that set a page's points aside (PAGE_ADJUSTED) dropped them without a word.
+const STOP_BEFORE_RENDER = new Set(["PAGE_ADJUSTED"]);
 
 /**
  * The advisories in the order they matter: what the user must hear (a title changed since they approved it), what may be
@@ -255,7 +294,7 @@ function argumentHeld(work) {
  * The pages file is read as `author-deck` reads it - its parts spliced in, the research's sources registry where it has
  * none of its own, the compose cache beside it; `doc` compiles a document that is not on disk (an option).
  */
-async function compileWorkspace(work, { python: py = pythonBin(), doc = null } = {}) {
+export async function compileWorkspace(work, { python: py = pythonBin(), doc = null } = {}) {
   const source = doc ?? await readPagesFile(work.file);
   const argument = argumentHeld({ ...work, doc: source });
   if (argument.held) return argument;
@@ -294,7 +333,7 @@ export function renderedSlide(out, scene, pageId) {
  * Build the PowerPoint and render it. `doc` and `authored` build an option already compiled (candidates.mjs); `only`
  * emits and renders those pages alone; `specPath` keeps an option's compiled deck out of the workspace's own.
  */
-export async function buildWorkspace(work, out, { python: py = pythonBin(), doc = null, authored: given = null, only = null, specPath = null, fetch = true } = {}) {
+export async function buildWorkspace(work, out, { python: py = pythonBin(), doc = null, authored: given = null, only = null, specPath = null, fetch = true, formats = ["pptx"] } = {}) {
   const compiled = given ? { authored: given, advisories: given.advisories, source: doc } : await compileWorkspace(work, { python: py, doc });
   if (compiled.held) return compiled.held;
   const { authored, advisories } = compiled;
@@ -303,12 +342,19 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
   // deck.json from older pages is refused (DECK_OLDER_THAN_PAGES).
   await writeJsonWhole(spec, { ...authored.spec, ...(doc ? {} : { compiledFrom: compiledFrom(compiled.source) }) });
   // `fetch: false` (`--no-fetch`) looks nothing up: no logo, photograph, flag or place leaves the machine's own files.
-  await buildDeck(spec, path.resolve(out), { python: py, render: true, fetchLogos: fetch, source: { spec: authored.spec, baseDir: work.root }, ...(only ? { only } : {}) });
+  await buildDeck(spec, path.resolve(out), { python: py, render: true, fetchLogos: fetch, source: { spec: authored.spec, baseDir: work.root }, formats, ...(only ? { only } : {}) });
   const result = await readJson(path.join(path.resolve(out), "build-result.json"));
   const status = result.status === "built" ? "complete" : "blocked";
+  // An HTML build delivers the page and its photographs; it has no saved PowerPoint to read back.
+  if (!result.pptxPath && result.htmlPath) return complete({ status: result.status === "built-unrendered" && !(result.blockers || []).length ? "complete" : status, sourceHash: await fingerprint(work),
+    artifacts: [result.htmlPath, ...(result.html?.render?.renders ?? [])], findings: result.blockers || [], advisories,
+    ...(result.html?.renderSkipped ? { message: result.html.renderSkipped } : {}),
+    checks: { mechanical: (result.blockers || []).length ? "failed" : "passed", rendering: result.html?.render ? "ran" : "missing", visual: "pending" }, result: path.join(path.resolve(out), "build-result.json") });
   if (!result.pptxPath) return complete({ status: "blocked", findings: result.blockers || [], advisories, result: path.join(path.resolve(out), "build-result.json") });
-  // What this build wrote, not every file the folder holds: the deck, its PDF and the page images.
-  const files = [result.pptxPath, result.render?.pdf, ...(result.render?.renders ?? [])].filter(Boolean);
+  // What this build wrote, not every file the folder holds: the deck, its PDF and the page images - the HTML output's
+  // photographs too where both were built, as an HTML build returns them: they are what its gates read, and a caller
+  // given only the PowerPoint's images could not look at the HTML it is handed.
+  const files = [result.pptxPath, result.htmlPath, result.render?.pdf, ...(result.render?.renders ?? []), ...(result.html?.render?.renders ?? [])].filter(Boolean);
   const scene=await readJson(path.join(path.resolve(out),"scene.json"));
   const readback=await readJson(path.join(path.resolve(out),"readback.json"),{optional:true});
   const editability={schema:"professional-slides.editability/v1",scope:"composed pages",basis:"scene with saved-PPTX readback",
@@ -320,7 +366,8 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
   await writeJsonWhole(editabilityFile,editability);
   files.push(editabilityFile);
   const comparisons=[];
-  for(const page of work.doc.pages.filter(p=>p.type==="reference")){
+  const built = pagesOf(expanded(work));
+  for(const page of built.filter(p=>p.type==="reference")){
     const render=renderedSlide(out,scene,page.id);
     if(render&&await fs.access(render).then(()=>true,()=>false))comparisons.push({label:page.id,note:"Source and editable PowerPoint",images:[{path:path.resolve(work.root,page.reference)},{path:render}]});
   }
@@ -330,9 +377,12 @@ export async function buildWorkspace(work, out, { python: py = pythonBin(), doc 
     await runProcess(py,[path.join(runtime,"emit/contact_sheet.py"),layout]);
     files.push(image);
   }
-  const uncertainties = work.doc.pages.flatMap(p => (p.uncertainties || []).map(message => ({ page: p.id, message })));
+  const uncertainties = built.flatMap(p => (p.uncertainties || []).map(message => ({ page: p.id, message })));
+  // The findings are the build's blockers, the HTML output's gates among them where it was built (build-deck.mjs
+  // buildOutcome); a browser that could not photograph the HTML is said, as an HTML build says it.
+  const message = [status === "blocked" ? `The files were written for review, not for delivery: the build is blocked on ${(result.blockers || []).length} finding${(result.blockers || []).length === 1 ? "" : "s"}; fix them and build again.` : null, result.html?.renderSkipped].filter(Boolean).join(" ");
   return complete({ status, sourceHash: await fingerprint(work), artifacts: files, findings: result.blockers || [], advisories,
-    ...(status === "blocked" ? { message: `The files were written for review, not for delivery: the build is blocked on ${(result.blockers || []).length} finding${(result.blockers || []).length === 1 ? "" : "s"}; fix them and build again.` } : {}),
+    ...(message ? { message } : {}),
     checks: { mechanical: status === "complete" ? "passed" : "failed", rendering: result.status === "built-unrendered" ? "missing" : "ran", visual: "pending" },
     editability, uncertainties, result: path.join(path.resolve(out), "build-result.json") });
 }

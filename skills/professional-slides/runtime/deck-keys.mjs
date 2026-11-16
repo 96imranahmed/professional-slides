@@ -14,6 +14,11 @@
 // stays with the stage that reads it, which still checks it.
 import { MARK_KINDS, playerProblems } from "./players.mjs";
 import { assetsDeclarationErrors } from "./asset-needs.mjs";
+import { TOKENS } from "./core.mjs";
+import { PALETTES, overridableTokens } from "./palettes.mjs";
+import { IDENTITY_KEYS, identityColors } from "./design-systems.mjs";
+
+const PALETTE_TOKENS = overridableTokens(TOKENS);
 
 // The kinds a value is read as: what `accepts` names, checked shallowly.
 const KINDS = Object.freeze({
@@ -52,8 +57,14 @@ const DECK_KEYS = Object.freeze({
   // the design
   design: key("string (a design system)", ["string"], "the design system: the frame of every page"),
   variation: key("string | number", ["string", "number"], "the seed of what the design leaves open; a new deck takes a fresh one (variation.mjs)"),
-  palette: key("string | { base, colors }", ["string", "object"], "a named palette, or colour and style tokens laid over one"),
-  identity: key("{ primary, accent }", ["object"], "the subject's own colours, as #RRGGBB"),
+  // The token names are listed here because nothing else an author reads lists them: a brand's deck was set by sixteen
+  // overrides whose names were learned from the runtime's source. A name outside the list is refused where the palette
+  // resolves (palettes.mjs resolvePalette), with the list.
+  palette: key("string | { base, colors }", ["string", "object"],
+    `a named palette (${Object.keys(PALETTES).join(", ")}), or { base, colors } - single tokens laid over one, for what \`identity\` does not reach. \`colors\` takes ${PALETTE_TOKENS.filter((name) => name.startsWith("color.")).join(", ")} (each #RRGGBB), and the style, font, type, line and layout tokens: ${PALETTE_TOKENS.filter((name) => !name.startsWith("color.")).join(", ")}`),
+  identity: key(`{ ${Object.keys(IDENTITY_KEYS).join(", ")} }`, ["object"],
+    `the subject's own colours, as #RRGGBB, which dress every page: ${Object.entries(IDENTITY_KEYS).map(([name, about]) => `\`${name}\` - ${about}`).join("; ")}. Only \`primary\` is required; a colour not given is derived from the ones that are (the tint from the accent, the secondary type from the ink, the hairline from the primary)`,
+    (value) => { try { identityColors(value); return null; } catch (error) { return `is not in the form the palette reads: ${error.message}`; } }),
   typography: key("object", ["object"], "the deck's typefaces"),
   chrome: key("{ left, right, titleTop, bodyTop, footerTop }", ["object"], "the page margins and the title band's place, in pixels"),
   pageTemplate: key("string | object", ["string", "object"], "the page furniture: footer, page number, logo slot"),
@@ -64,6 +75,7 @@ const DECK_KEYS = Object.freeze({
   fill: key("string", ["string"], "how full a page reads, where it is not left to follow `density`"),
   template: key("string (a path ending .json)", ["string"], "a house profile written by import-template.py from a template deck - its palette, typography, chrome and density become the deck's defaults. Not a storyline template: record that in `brief`",
     (value) => (/\.json$/i.test(value) ? null : "names a house profile `.json` beside the pages file (run runtime/import-template.py on the template .pptx first); to record which storyline template or decision architecture the deck follows, use `brief`")),
+  layouts: key("{ <name>: { columns, rows, areas } }", ["object"], "the house's own page grids, written as CSS grid writes one - `columns: \"2fr 1fr 1fr\"`, `rows: \"1fr 1fr\"`, `areas: [\"hero a\", \"hero b\"]` - for a page to take by name (`grid: \"<name>\"`): its content sits in the areas of those names, and on a dashboard each exhibit names its area"),
   // the front matter and the navigation
   cover: key("{ title, subtitle, date, logo, image, layout, tone, notes }", ["object"], "the cover page"),
   logo: key("string", ["string"], "the wordmark the cover prints"),

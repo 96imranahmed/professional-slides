@@ -32,7 +32,7 @@ function assertAligned(charts) {
 export function registerChartGroup(registry) {
   const SUPPORTED = [...registry.keys()].filter(id => id.startsWith("chart."));
   registry.set("chart-group", {
-    id: "chart-group", version: "2.0.0", category: "data", role: "chart-group",
+    id: "chart-group", sizing: "fill", version: "2.0.0", category: "data", role: "chart-group",
     tokens: [...new Set(["color.rule", "line.hairline", ...LEGEND_TOKENS, ...SUPPORTED.flatMap(id => registry.get(id).tokens), ...registry.get("chart-title").tokens])],
     preferredSize: { width: 1160, height: 460 },
     guidance: CHART_GUIDANCE["chart-group"],

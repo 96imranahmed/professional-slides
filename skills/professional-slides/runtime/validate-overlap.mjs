@@ -13,7 +13,7 @@ export const OVERLAP_CODES = Object.freeze({
   DESCENDER_ON_RULE: "a display-face numeral's old-style descender set on a rule under it",
   SCATTER_UNKEYED: "a scatter coloured by series with no key and no named ends",
   TEXT_ON_TEXT: "two labels whose ink overlaps",
-  TEXT_OFF_GROUND: "text set in its own component's filled panel, tile or cell that runs past the fill's foot",
+  TEXT_OFF_GROUND: "text set in its own component's filled panel, tile or cell that runs past the fill's foot or its side",
   MAP_LABEL_ASTRAY: "a map marker's label set nearer another marker than its own, with no leader to its own",
 });
 
@@ -164,6 +164,14 @@ export function sceneCollisions(slide) {
       .sort((a, b) => a.frame.width * a.frame.height - b.frame.width * b.frame.height)[0];
     const over = ground ? ink.y + ink.height - (ground.frame.y + ground.frame.height) : 0;
     if (over > TEXT_CLEAR) findings.push({ code: "TEXT_OFF_GROUND", slide: slide.id, text: text.id, ground: ground.id, roles: [text.role, ground.role], over: Math.round(over) });
+    // The same text can run past the fill's SIDE, where its lines were wrapped for a wider box than the frame it is drawn
+    // in: a layer stack measured every layer's text at the widest layer's width, and in the narrower layers the ends of
+    // the lines ("...the sky stays stub") were white type on the white page beside the band. Nothing read it: the foot
+    // test above takes the text to be laid out in the fill's width, and the contrast gates read the type inside its
+    // frame (scene_gates.py _text_box holds the ink to the frame), where it is on its band and legible. The frame fits
+    // across the ground, so ink past the ground's side is ink past the frame the component gave it.
+    const aside = ground ? Math.max(ink.x + ink.width - (ground.frame.x + ground.frame.width), ground.frame.x - ink.x) : 0;
+    if (aside > TEXT_CLEAR && over <= TEXT_CLEAR) findings.push({ code: "TEXT_OFF_GROUND", slide: slide.id, text: text.id, ground: ground.id, roles: [text.role, ground.role], aside: Math.round(aside) });
   }
   for (const numeral of nodes.filter((n) => n.type === "text" && n.style?.valign === "bottom" && n.style?.fontFamily?.tokenId === "font.display" && OLD_STYLE_DESCENDERS.test(String(n.text ?? "")))) {
     const size = Number(numeral.style?.fontSize?.value ?? 0) * 96 / 72, bottom = numeral.frame.y + numeral.frame.height;
@@ -235,7 +243,7 @@ const OVERLAP_REPAIR = Object.freeze({
   DESCENDER_ON_RULE: "Set the numeral in lining figures (the body face) or lift it off the rule by its descent.",
   SCATTER_UNKEYED: "Keep the scatter's legend, or connect each series (connect: true) so its name sits at its end.",
   TEXT_ON_TEXT: "Set one label clear of the other: fewer or shorter callouts on that part of the chart, a callout moved to the category its point leaves open, a shorter category name, or a wider slot.",
-  TEXT_OFF_GROUND: "Fit the text to the fill it is printed on: shorten it to the lines its panel, tile or cell holds, or give that block more height - fewer rows or items on the page.",
+  TEXT_OFF_GROUND: "Fit the text to the fill it is printed on: shorten it to the lines its panel, tile or cell holds, or give that block more height - fewer rows or items on the page; where its lines run past the fill's side, give the block more width or shorten the text.",
   MAP_LABEL_ASTRAY: "Set each marker's name beside its own marker: fewer markers in the cluster, a wider `crop` or a region map that spreads them, shorter names - or move the cluster's values into a ranked bar or a callout list beside the map.",
 });
 

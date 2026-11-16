@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-// spec → plan → scene → editable PPTX → renders → readback → page gates.
+// spec → plan → scene → editable PPTX and HTML → renders → readback → page gates.
+//
+// The scene is the one source every output is written from. `formats` names the outputs: "pptx" (python-pptx, rendered
+// by local Office), "html" (emit/emit_html.mjs, photographed by a headless browser), or both side by side. Each output
+// is held to the same page gates on its own renders; neither is converted from the other, so a deck built as HTML
+// today and as PowerPoint tomorrow is the same pages.
 //
 //   node runtime/build-deck.mjs spec.json out/ [--preflight] [--no-render] [--python python3]
 //
@@ -47,6 +52,8 @@ import { auditExportText } from "./text-contract.mjs";
 import { deriveContent } from "./derive-content.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE, REVISION_CODES, assemblyOrder, carriedCount, carriedSaid, sourceDeckPath } from "./revision.mjs";
+import { deckHtml } from "./emit/emit_html.mjs";
+import { renderHtml } from "./emit/render_html.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -110,9 +117,20 @@ export function withFindings(report, findings) {
  * The deck is still composed whole, so each page keeps its place, its tracker
  * and its number.
  */
-export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null } = {}) {
+const FORMATS = Object.freeze(["pptx", "html"]);
+
+export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null, formats = ["pptx"] } = {}) {
+  const unknown = formats.filter((format) => !FORMATS.includes(format));
+  if (unknown.length || !formats.length) throw new UsageError(`A build writes ${FORMATS.join(" or ")}${unknown.length ? `, not ${unknown.join(", ")}` : ""}`);
+  const pptx = formats.includes("pptx"), html = formats.includes("html");
   const started = Date.now();
   const spec = source ? structuredClone(source.spec) : await readJson(specPath);
+  // Carried slides are the source deck's own PowerPoint parts, set into the assembled PowerPoint as they are; the HTML
+  // output draws only the composed pages. Beside carried slides it would be part of the deck standing for all of it -
+  // with `both` it was written, without a word, short of every carried slide - so any request that includes HTML is
+  // refused here, before anything is fetched or written.
+  const carried = carriedCount(spec);
+  if (carried && html) throw new UsageError(`This revision carries ${carried} slide${carried === 1 ? "" : "s"} from the PowerPoint the user supplied, which HTML cannot draw: an HTML output would leave ${carried === 1 ? "it" : "them"} out and still read as the deck. Build it with --format pptx`);
   const stem = deckStem(spec);
   const baseDir = source?.baseDir ?? path.dirname(path.resolve(specPath));
   // A deck.json stands for its pages as they were when it was compiled. One whose pages file or parts changed since is
@@ -161,15 +179,43 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // A revision that carries slides composes only the pages it gave a type: those are emitted and gated as a deck of their
   // own, and the deck the user receives is assembled from the source deck around them. A revision that composes no page
   // at all - text edits on carried slides, a slide dropped - has nothing to emit or gate, and is assembled alone.
-  const carries = carriedCount(spec) > 0, composes = deck.slides.length > 0;
+  const carries = carried > 0, composes = deck.slides.length > 0;
   if (composes) {
-    const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, stem, directory, py, result, deck, scenePath, composedOnly: carries });
+    const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, stem, directory, py, result, deck, scenePath, composedOnly: carries, pptx });
     if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
-    await readBackAndRender({ render, spec, directory, py, result, deck, scenePath, gates, pptxPath, emitted, design });
+    // The two outputs read the scene and nothing of each other's, so they are written, rendered and gated side by side.
+    await together(
+      pptx ? readBackAndRender({ render, spec, directory, py, result, deck, scenePath, gates, pptxPath, emitted, design }) : null,
+      html ? emitAndRenderHtml({ render, spec, stem, directory, py, timed, result, deck, scenePath, gates, design }) : null);
   } else if (preflight) { result.preflight = { passed: true, findings: [] }; result.status = "preflight-passed"; return finish(result, directory, started); }
+  // A revision that carries slides is assembled as PowerPoint (an HTML output was refused above).
   if (carries && !only) await assembleRevision({ spec, stem, baseDir, directory, py, result, deck, render });
-  Object.assign(result, buildOutcome(result, { render }));
+  Object.assign(result, buildOutcome(result, { render, pptx }));
   return finish(result, directory, started);
+}
+
+/**
+ * The HTML output: the scene written as one page (emit/emit_html.mjs), every
+ * slide photographed in a headless browser, and the page gates run on those
+ * photographs - the checks the PowerPoint's renders get, on this output's own.
+ * `result.html` holds the file, the renders and the gates.
+ */
+async function emitAndRenderHtml({ render, spec, stem, directory, py, timed, result, deck, scenePath, gates, design }) {
+  const htmlPath = path.join(directory, `${stem}.html`);
+  await timed("htmlEmitMs", () => fs.writeFile(htmlPath, deckHtml(deck, { title: spec.title ?? deck.id })));
+  result.html = { path: htmlPath, slides: deck.slides.length };
+  result.htmlPath = htmlPath;
+  if (!render) return;
+  const renderDirectory = path.join(directory, "rendered-html");
+  const rendered = await timed("htmlRenderMs", () => renderHtml(deckHtml(deck, { actual: true }), renderDirectory));
+  if (rendered.skipped) { result.html.renderSkipped = rendered.skipped; return; }
+  result.html.render = rendered;
+  const content = deriveContent(spec, deck), kept = result.partial ? new Set(result.partial.map(String)) : null;
+  result.html.textCoverage = auditExportText(kept ? { ...content, pages: content.pages.filter((page) => kept.has(String(page.id))) } : content, deck, await readReport(rendered.pageText));
+  const gateReport = path.join(directory, "gates-html.json");
+  const gated = await py("htmlGatesMs", [gates, scenePath, renderDirectory, "--report", gateReport], { expect: [0, 2] });
+  result.html.gates = withFindings({ ...(await readReport(gateReport)), report: gateReport, passed: gated.code === 0 }, design);
+  delete result.html.gates.judgementsNeeded;
 }
 
 /**
@@ -245,7 +291,7 @@ async function composeScene({ spec, baseDir, directory, timings, result }) {
 }
 
 /** The scene's page gates beside the emitter, then the scene's design findings folded into the preflight report. */
-async function preflightScene({ preflight, stem, directory, py, result, deck, scenePath, composedOnly = false }) {
+async function preflightScene({ preflight, stem, directory, py, result, deck, scenePath, composedOnly = false, pptx = true }) {
   // The page gates need only the scene, so they run beside the emitter, which needs only the scene too.
   const gates = path.join(runtime, "gates", "page_gates.py");
   const preflightReport = path.join(directory, "preflight-gates.json");
@@ -253,7 +299,7 @@ async function preflightScene({ preflight, stem, directory, py, result, deck, sc
   const pptxPath = path.join(directory, composedOnly ? `${stem}.composed.pptx` : `${stem}.pptx`);
   const [pre, emitted] = await together(
     py("preflightMs", [gates, scenePath, "--report", preflightReport], { expect: [0, 2] }),
-    preflight ? null : py("emitMs", [path.join(runtime, "emit", "emit_pptx.py"), scenePath, pptxPath]));
+    preflight || !pptx ? null : py("emitMs", [path.join(runtime, "emit", "emit_pptx.py"), scenePath, pptxPath]));
   result.preflight = { ...(await readReport(preflightReport)), report: preflightReport, passed: pre.code === 0 };
   delete result.preflight.judgementsNeeded;
   // The scene's design checks (validate-overlap.mjs): a label a line runs
@@ -323,7 +369,7 @@ export const BUILD_CODES = Object.freeze({
  * beside the status, never in it. Every blocker is listed with its source, and
  * only a blocker makes the build exit 2.
  */
-export function buildOutcome(result, { render = true } = {}) {
+export function buildOutcome(result, { render = true, pptx = true } = {}) {
   const blockers = [], seen = new Set(), causes = new Map();
   const add = (source, f) => {
     // One empty band is one blocker, however many instruments measured it
@@ -331,7 +377,8 @@ export function buildOutcome(result, { render = true } = {}) {
     // the same band, and listed apiece they read as that many defects. The
     // blocker keeps every code that reported it, and where the band came from.
     if (f.cause && causes.has(f.cause)) { const first = causes.get(f.cause); if (!first.codes.includes(f.code)) first.codes.push(f.code); if (f.origin && !first.origin) first.origin = f.origin; return; }
-    const key = `${source}|${f.code}|${f.slide ?? f.id ?? ""}|${JSON.stringify(f.measured ?? f.text ?? f.shape ?? "")}`;
+    // An output's own gates repeat what the scene's gates found: a finding both outputs report is listed once.
+    const key = `${source.replace(/ \(html\)$/, "")}|${f.code}|${f.slide ?? f.id ?? ""}|${JSON.stringify(f.measured ?? f.text ?? f.shape ?? "")}`;
     if (seen.has(key)) return;
     seen.add(key);
     const blocker = { source, code: f.code, ...(f.slide != null ? { slide: f.slide } : {}), ...(f.id ? { id: f.id } : {}), ...(f.text || f.shape ? { text: f.text ?? f.shape } : {}), ...(f.repair ? { repair: f.repair } : {}),
@@ -340,15 +387,14 @@ export function buildOutcome(result, { render = true } = {}) {
     blockers.push(blocker);
   };
   const blocking = isBlocking;
-  // The half-empty habit is counted on the render once there is one
-  // (page_gates.py gate_deck_empty_pages): the scene's count before the render
-  // is the same habit, and is not a second blocker beside the render's.
-  const superseded = (f) => render && result.gates && f.code === "DECK_SCENE_VOID";
-  if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking).filter((f) => !superseded(f))) add("page gates", f);
+  if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking)) add("page gates", f);
   if (result.gates && result.gates.passed === false) for (const f of (result.gates.findings || []).filter(blocking)) add("page gates", f);
+  // The HTML output's own renders, held to the same gates; a band both outputs show is one blocker (its `cause`).
+  if (result.html?.gates?.passed === false) for (const f of (result.html.gates.findings || []).filter(blocking)) add("page gates (html)", f);
+  if (result.html?.textCoverage?.accepted === false) for (const f of (result.html.textCoverage.findings || []).filter(blocking)) add("rendered text (html)", f);
   // A revision that composed no page emitted no file of its own to read back: its deck is the assembled one, proven against the source.
   const assembledOnly = Boolean(result.revision) && !result.revision.composed;
-  if (result.readback?.accepted !== true && !assembledOnly) {
+  if (pptx && result.readback?.accepted !== true && !assembledOnly) {
     for (const f of result.readback?.findings || []) add("readback", f);
     if (!(result.readback?.findings || []).length) add("readback", { code: registered(BUILD_CODES, "READBACK_MISSING") });
   }
@@ -360,9 +406,11 @@ export function buildOutcome(result, { render = true } = {}) {
   // The scene's gates run twice, before the render and after it, so a code
   // counts as often as either run saw it, not the sum.
   const counts = (report) => (report?.findings || []).filter((f) => !blocking(f)).reduce((m, f) => ({ ...m, [f.code]: (m[f.code] || 0) + 1 }), {});
-  const before = counts(result.preflight), after = counts(result.gates);
+  const before = counts(result.preflight), after = counts(result.gates ?? result.html?.gates);
   const advisories = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])].sort().map((code) => [code, Math.max(before[code] || 0, after[code] || 0)]));
-  const status = blockers.length ? "built-with-blockers" : render && (result.gates || (assembledOnly && result.revision.render)) ? "built" : "built-unrendered";
+  // Rendered means every output asked for was drawn and gated: the PowerPoint by Office, the HTML by the browser.
+  const drawn = (pptx ? Boolean(result.gates || (assembledOnly && result.revision.render)) : true) && (result.html ? Boolean(result.html.gates) : true);
+  const status = blockers.length ? "built-with-blockers" : render && drawn ? "built" : "built-unrendered";
   return { status, blockers, advisories };
 }
 
@@ -376,7 +424,7 @@ const readReport = async (file) => (await readJson(file, { optional: true })) ??
 export const BUILD_REPORTS = Object.freeze([
   "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
   "readback.json", "gates.json", "build-result.json", "rendered-text-coverage.json",
-  "assembly.json", ASSEMBLED_SCENE,
+  "assembly.json", ASSEMBLED_SCENE, "gates-html.json",
 ]);
 
 async function clearReports(directory) {
@@ -391,18 +439,21 @@ async function finish(result, directory, started) {
   return result;
 }
 
-const USAGE = "Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]";
+const USAGE = "Usage: build-deck.mjs spec.json output-directory [--format pptx|html|both] [--preflight] [--no-render] [--no-fetch]";
+
+/** `--format`: one output or both ("both", or the names joined by a comma). */
+export const formatsOf = (value) => (value === undefined ? ["pptx"] : value === "both" ? [...FORMATS] : String(value).split(",").map((name) => name.trim()).filter(Boolean));
 
 async function main(argv) {
   const { values, positionals } = parseCli(argv, { preflight: { type: "boolean" }, "no-render": { type: "boolean" }, "no-fetch": { type: "boolean" },
-    python: { type: "string", valueName: "an executable" } }, { usage: USAGE });
+    python: { type: "string", valueName: "an executable" }, format: { type: "string", valueName: "pptx, html or both" } }, { usage: USAGE });
   if (positionals.length < 2) throw new UsageError(USAGE);
   const [specPath, outDirectory] = positionals.map((p) => path.resolve(p));
-  const result = await buildDeck(specPath, outDirectory, { preflight: values.preflight, render: !values["no-render"], fetchLogos: !values["no-fetch"], python: values.python });
+  const result = await buildDeck(specPath, outDirectory, { preflight: values.preflight, render: !values["no-render"], fetchLogos: !values["no-fetch"], python: values.python, formats: formatsOf(values.format) });
   // Blockers by name, advisories by count: the line says what stops the
   // build and, separately, what the review will read.
   const blockers = result.blockers?.length ? { count: result.blockers.length, byCode: result.blockers.reduce((m, b) => ({ ...m, [b.code]: (m[b.code] || 0) + 1 }), {}), first: result.blockers.slice(0, 8).map((b) => `${b.code}${b.id ?? b.slide ? ` [${b.id ?? b.slide}]` : ""} (${b.source})${b.text ? ` "${String(b.text).slice(0, 40)}"` : ""}`) } : undefined;
-  console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, pptx: result.pptxPath, montage: result.montagePath, ...(result.renderSkipped ? { renderSkipped: result.renderSkipped } : {}), gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
+  console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, pptx: result.pptxPath, ...(result.htmlPath ? { html: result.htmlPath } : {}), montage: result.montagePath, ...(result.renderSkipped ? { renderSkipped: result.renderSkipped } : {}), gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
   if (result.renderSkipped) console.error(result.renderSkipped);
   return ["built", "built-unrendered", "preflight-passed"].includes(result.status) ? EXIT.ok : EXIT.refused;
 }

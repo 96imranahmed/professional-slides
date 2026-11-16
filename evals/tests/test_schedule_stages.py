@@ -59,7 +59,6 @@ def slide(kind, count, layout):
 
 COMPOSE = '''
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
-import { sceneGateFindings } from './skills/professional-slides/runtime/author-deck.mjs';
 import { stagesLayout } from './skills/professional-slides/runtime/schedule-stages.mjs';
 import { planRole } from './skills/professional-slides/runtime/derive-content.mjs';
 import { textWords } from './skills/professional-slides/runtime/text-contract.mjs';
@@ -75,12 +74,10 @@ function measure(page) {
   const own = scene.nodes.filter((n) => n.data?.componentInstance === `${prefix}-exhibit` && n.frame);
   const frame = scene.componentInstances.find((c) => c.id === `${page.id}-exhibit`).frame;
   const after = scene.componentInstances.find((c) => [`${page.id}-below`, `${page.id}-sowhat`].includes(c.id))?.frame ?? null;
-  const gates = sceneGateFindings(deck, undefined, spec);
-  const voids = [...gates.findings, ...gates.advisories].filter((f) => /VOID|DEAD_BAND/.test(f.code)).map((f) => ({ code: f.code, severity: f.severity, kind: f.measured?.kind, band: f.measured?.band }));
   const roles = own.filter((n) => n.type === 'text').reduce((m, n) => ({ ...m, [n.role]: (m[n.role] || 0) + 1 }), {});
   const texts = own.filter((n) => /-text$/.test(n.role));
   return { words: bodyWords(scene), roles, frame, inkBottom: Math.max(...own.map((n) => n.frame.y + (n.frame.height || 0))), after,
-    rows: new Set(texts.map((n) => Math.round(n.frame.y))).size, columns: new Set(texts.map((n) => Math.round(n.frame.x))).size, voids,
+    rows: new Set(texts.map((n) => Math.round(n.frame.y))).size, columns: new Set(texts.map((n) => Math.round(n.frame.x))).size,
     inside: own.every((n) => n.frame.x >= frame.x - 1 && n.frame.x + (n.frame.width || 0) <= frame.x + frame.width + 1 && n.frame.y + (n.frame.height || 0) <= frame.y + frame.height + 1) };
 }
 '''
@@ -119,25 +116,13 @@ class StageTests(unittest.TestCase):
             with self.subTest(page=name):
                 self.assertLessEqual(page["frame"]["y"] + page["frame"]["height"] - page["inkBottom"], 10)
                 self.assertLessEqual(page["after"]["y"] - (page["frame"]["y"] + page["frame"]["height"]), 17)
-                self.assertNotIn("internal", [v["kind"] for v in page["voids"]])
-
-    def test_a_page_with_stages_and_commentary_carries_no_void(self):
-        for kind in ("roadmap", "timeline"):
-            for count in (5, 7):
-                for layout in ("top", "left"):
-                    with self.subTest(page=f"{kind}-{count}-{layout}"):
-                        self.assertEqual(self.pages[f"{kind}-{count}-{layout}"]["voids"], [])
-            # Seven stages hold a page on their own, over a closing bar.
-            self.assertEqual(self.pages[f"{kind}-7-full"]["voids"], [])
 
     def test_nothing_is_stretched_to_cover_a_thin_page(self):
         # Three stages and a closing line are a third of a page: the group
-        # stays at its size at the top and the page is reported short at its
-        # foot, not padded out.
+        # stays at its size at the top, not padded out.
         for kind in ("roadmap", "timeline"):
             page = self.pages[f"{kind}-3-full"]
             self.assertLess(page["frame"]["height"], 300)
-            self.assertEqual([(v["kind"], v["severity"]) for v in page["voids"]], [("dead", "advisory")])
 
     def test_the_frame_decides_between_columns_and_rows(self):
         # Beside the commentary the frame is tall: rows. Over three columns of
@@ -155,13 +140,15 @@ const items = {json.dumps(items)};
 const layout = (frame, props, roadmap) => {{ try {{ const L = stagesLayout(frame, props, {{ roadmap }}); return {{ orientation: L.orientation, stacked: L.stacked ?? false, natural: L.natural, ceiling: L.ceiling, height: L.height }}; }} catch (error) {{ return {{ error: error.message }}; }} }};
 const wide = {{ x: 0, y: 0, width: 1160 }};
 console.log(JSON.stringify({{
-  unbounded: layout(wide, {{ items }}, false), shallow: layout({{ ...wide, height: 250 }}, {{ items }}, false), tall: layout({{ ...wide, height: 528 }}, {{ items }}, false),
+  unbounded: layout(wide, {{ items }}, false), shallow: layout({{ ...wide, height: 210 }}, {{ items }}, false), tall: layout({{ ...wide, height: 528 }}, {{ items }}, false),
   roomy: layout({{ ...wide, height: 528 }}, {{ items }}, true), tight: layout({{ ...wide, height: 300 }}, {{ items }}, true),
   across: layout({{ ...wide, height: 528 }}, {{ items, orientation: 'across' }}, false), down: layout({{ ...wide, height: 528 }}, {{ items, orientation: 'down' }}, false),
   wrong: layout(wide, {{ items, orientation: 'sideways' }}, false), unlabelled: layout(wide, {{ items: [{{ date: '2027' }}] }}, false) }}));
 ''')
         self.assertEqual(result["unbounded"]["orientation"], "across")  # a height not yet known: the columns
-        self.assertEqual(result["shallow"]["orientation"], "across")    # no height for rows
+        # No height for rows: a timeline's rows set each label beside its detail (the detail at its reading measure), so
+        # five of them need about 216px across the page's width; 210px is too little and takes the columns.
+        self.assertEqual(result["shallow"]["orientation"], "across")
         self.assertEqual(result["tall"]["orientation"], "down")
         self.assertEqual(result["across"]["orientation"], "across")
         self.assertEqual(result["down"]["orientation"], "down")

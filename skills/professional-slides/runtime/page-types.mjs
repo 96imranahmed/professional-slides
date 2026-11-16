@@ -19,12 +19,14 @@ import { playerEntries, playerNames, plannedMark, planPlayerMarks } from "./play
 import { isTable, rowCells, finite, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { textWordList, proseParts } from "./text-contract.mjs";
 import { measureInsight } from "./registry-text.mjs";
+import { measureAt } from "./draw.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase } from "./text-layout.mjs";
 import { validateReference, REFERENCE_SCHEMA } from "./reference-page.mjs";
 import { sourceDate } from "./sources-registry.mjs";
 import { halvesProblems } from "./compose-layouts.mjs";
+import { resolveTemplate, templateOf, tracksOf, areasOf } from "./layout-templates.mjs";
 import { checkPictures } from "./compose-pictures.mjs";
 import { planFlags } from "./flags.mjs";
 import { planPictureKinds } from "./compose-pictures.mjs";
@@ -43,11 +45,13 @@ export const COMMENTARY = Object.freeze({
   beside: "a commentary column to the right of the exhibit",
   "beside-left": "a commentary column to the left of the exhibit",
   below: "points in a band under the exhibit",
+  auto: "beside the exhibit or under it, whichever reads better at what they measure: the runtime lays out both and keeps the one with the more readable lines and the less empty page",
   rail: "one claim in a filled side panel (`rail` text) beside the exhibit",
   "on-exhibit": "on the chart itself, no separate text: a number mark (`cagr`, `changeAnnotations`, labelled `referenceLines`, a labelled value `bands` range, `stackTotals`) first, sentence callouts (`annotations`) where the mechanism needs them",
   "in-exhibit": "the explanation lives in the exhibit's cells (an implication column, a findings matrix, labelled cards)",
   captions: "one finding under each panel (`caption` on every exhibit)",
   "so-what-bar": "one implication in a filled bar across the foot of the exhibit (`bar` text); the page's close",
+  grid: "on the page's own grid (`grid`: { columns, rows, gap, areas, place } as CSS grid writes one, or the name of one of the deck's `layouts`): each area takes the content of its name - exhibit, points, kpi, metrics, paragraphs, insight, callout, takeaway, photo - or what `place` stacks in it",
   none: "the exhibit carries the page alone",
 });
 
@@ -56,7 +60,7 @@ const CHART = (name) => `chart.${name}`;
 const MODEL_CHARTS = ["chart.column", "chart.line", "chart.area", "chart.stacked-column", "chart.combo"];
 // The so-what bar closes whatever the page drew, so it joins every placement
 // list of a type whose evidence can end on one implication.
-const ANY_TEXT = ["beside", "beside-left", "below", "rail", "so-what-bar"];
+const ANY_TEXT = ["beside", "beside-left", "below", "auto", "rail", "so-what-bar", "grid"];
 
 /**
  * The catalogue. `forms` maps each allowed form to the exhibit type or page
@@ -122,12 +126,12 @@ export const PAGE_TYPES = Object.freeze({
     task: "options or members judged against criteria, each cell coded",
     forms: { harvey: "harvey", heatmap: "heatmap", rag: "rag", lights: "lights", check: "check", bars: "bars",
       progress: "progress", dot: "dot", trend: "trend", binary: "binary" },
-    commentary: ["in-exhibit", "beside", "below", "so-what-bar", "none"], exhibits: 1, table: true,
+    commentary: ["in-exhibit", "beside", "below", "auto", "so-what-bar", "none"], exhibits: 1, table: true,
   },
   lookup: {
     task: "measures a reader looks up and compares, grouped under their units",
     forms: { "measure-table": "measure-table", table: "table" },
-    commentary: ["in-exhibit", "beside", "below", "so-what-bar", "none"], exhibits: 1, table: true,
+    commentary: ["in-exhibit", "beside", "below", "auto", "so-what-bar", "none"], exhibits: 1, table: true,
   },
   matrix: {
     task: "findings down the side, their evidence in two or three columns across",
@@ -150,7 +154,7 @@ export const PAGE_TYPES = Object.freeze({
     // growth next, options later - where a timeline would date them as tasks.
     // `rollout`: initiatives row by row, each one's phase in each year.
     forms: { timeline: "timeline", gantt: "gantt", roadmap: "roadmap", horizons: CHART("horizons"), rollout: "initiative-rollout" },
-    commentary: ["beside", "below", "so-what-bar", "none"], exhibits: 1,
+    commentary: ["beside", "below", "auto", "so-what-bar", "none"], exhibits: 1,
   },
   numbers: {
     task: "a few measured numbers that carry the claim, with the evidence under them",
@@ -158,7 +162,7 @@ export const PAGE_TYPES = Object.freeze({
     forms: { "hero-number": "hero-number", "metric-strip": "metrics-over-exhibit", "fact-grid": "fact-grid", "stat-list": "stat-list", "nested-circles": "nested-circles" },
     // Every numbers form sets its figures against one exhibit: the proof beside
     // a hero number, the tiles of a grid, the chart under a strip.
-    commentary: ["beside", "below", "none"], exhibits: 1,
+    commentary: ["beside", "below", "auto", "none"], exhibits: 1,
   },
   parallel: {
     task: "three to six parallel ideas, each headed, often with an icon",
@@ -167,7 +171,10 @@ export const PAGE_TYPES = Object.freeze({
     // exhibit at the right - three challenges, what changed in each area, a
     // diagnosis. The same reading task as cards, read down instead of across,
     // with room for the evidence each idea rests on.
-    forms: { cards: "cards", capsules: "capsules", "arrow-rows": "arrow-rows", "labelled-rows": "labelled-rows" },
+    // `icon-rows`: parallel reasons, features or benefits down a column, an icon tile and a bold lead each - listed
+    // before `arrow-rows` so it is the row form offered first (public/candidates.mjs walks the forms in this order).
+    // An arrow says its row leads to the consequence beside it, which a reason does not.
+    forms: { cards: "cards", "icon-rows": "icon-rows", capsules: "capsules", "arrow-rows": "arrow-rows", "labelled-rows": "labelled-rows" },
     commentary: ["in-exhibit", "below", "so-what-bar", "none"], exhibits: [0, 1],
   },
   profiles: {
@@ -204,8 +211,12 @@ export const PAGE_TYPES = Object.freeze({
     commentary: ["none"], exhibits: [0, 1],
   },
   summary: {
-    task: "the answer and its proof, at the opening or the close",
-    forms: { "executive-summary": "executive-summary", takeaways: "takeaways" },
+    task: "the answer and its proof, at the opening or the close - or the agenda a meeting follows",
+    // `agenda`: the topics a meeting works through, a numbered row each with a
+    // line on what it covers, and optionally the one the room has reached
+    // (`active`). The deck's own contents page is drawn from its sections
+    // (deck `contents`); this is the page an author writes.
+    forms: { "executive-summary": "executive-summary", takeaways: "takeaways", agenda: "agenda-rows" },
     commentary: ["none"], exhibits: [0, 1],
   },
   reference: { task: "reconstruct a supplied slide image as editable native elements", forms: { native: "reference" }, commentary: ["none"], exhibits: 0 },
@@ -246,7 +257,7 @@ export const PRESET_ROUTES = Object.freeze({
 // beside it or on it.
 const FORM_COMMENTARY = Object.freeze({
   "trend/sparklines": [...ANY_TEXT], "ranking/boxplot": [...ANY_TEXT], "composition/pictogram": [...ANY_TEXT],
-  "profiles/radar": ["beside", "beside-left", "rail", "below", "none"], "trend/model": ["beside", "on-exhibit"],
+  "profiles/radar": ["beside", "beside-left", "rail", "below", "auto", "none"], "trend/model": ["beside", "on-exhibit"],
   // A trellis is one exhibit: its commentary sits beside or under it as a chart's does, and its panels carry no captions.
   "panels/small-multiples": [...ANY_TEXT, "none"],
   // A dashboard's cells carry their own headings and figures: its words are the rail beside it or the bar under it.
@@ -255,7 +266,7 @@ const FORM_COMMENTARY = Object.freeze({
   "picture/device": ["beside", "below"],
 });
 // Forms that carry a different number of exhibits from their type: a trellis is one exhibit of many panels.
-const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1, "panels/dashboard": [2, 6], "panels/breakout": 2 });
+const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1, "panels/dashboard": [2, 6], "panels/breakout": 2, "summary/agenda": 1 });
 // The charts whose bars, columns and segments a breakout or a spread runs from:
 // the marks it links are boxes with a top, a bottom and a side to leave from.
 const LINKED_CHARTS = new Set(["chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"]);
@@ -375,7 +386,7 @@ export const LIMITS = Object.freeze({
   "chart.slope": { key: "categories", min: 2, max: 4 }, "chart.treemap": { key: "items", min: 2, max: 20 },
   "chart.sparklines": { key: "items", min: 2, max: 12 }, cycle: { key: "items", min: 3, max: 6 }, steps: { key: "items", min: 3, max: 6 },
   people: { key: "items", min: 2, max: 5 }, logos: { key: "items", min: 2, max: 12 }, cards: { key: "items", min: 2, max: 6 },
-  takeaways: { key: "items", min: 2, max: 5 }, gantt: { key: "periods", min: 2 },
+  takeaways: { key: "items", min: 2, max: 5 }, "agenda-rows": { key: "items", min: 2, max: 8 }, "icon-rows": { key: "items", min: 2, max: 6 }, gantt: { key: "periods", min: 2 },
   // A figure is a number, not a phrase: the renderers refuse a longer value.
   "stat-list": { key: "items", min: 2, max: 6, valueChars: 9 }, "fact-grid": { key: "items", min: 3, max: 9, valueChars: 10, columns: 4 },
   "chart.waffle": { key: "categories", min: 2 },
@@ -406,11 +417,13 @@ export const WATERFALL_BELOW_CALLOUTS = 2;
 // heading size and runs to eight lines, measured here the way the renderer sets it.
 const RAIL_WIDTH = 373;
 export const railFits = (text) => { try { sideStatementLayout({ x: 0, y: 0, width: RAIL_WIDTH, height: 600 }, { text }); return true; } catch { return false; } };
-// The so-what bar runs the body's width and holds two lines: one implication,
-// measured the way the insight band sets it. A third line is an argument, and
-// an argument belongs beside the exhibit.
+// The so-what bar runs the body's width and holds one implication: as much as
+// two lines across the band's text width take, in the band's bold body type.
+// More is an argument, and an argument belongs beside the exhibit. The band
+// sets its sentence at the reading measure (text-roles.mjs), in as many lines
+// as that takes there: what it may hold is an amount, not the lines it breaks into.
 const BAR_WIDTH = 1160;
-export const barFits = (text) => (measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "primary" }).body?.lines?.length ?? 99) <= 2;
+export const barFits = (text) => { try { const band = measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "primary" }); return measureAt(text, band.width, { size: "type.body", bold: true }).lines.length <= 2; } catch { return false; } };
 // A chart at the right of a row needs half the body's height: two rows hold one.
 const BLOCK_CHART_ROWS = 2, BLOCK_POINTS_MAX = 4;
 
@@ -746,6 +759,8 @@ export function citationForms(keys, registry, { primary = null } = {}) {
  */
 function defaultCommentary(page) {
   const allowed = placementsOf(page.type, page.form);
+  // A page that writes its own grid has said where everything goes.
+  if (page.grid !== undefined && allowed.includes("grid") && !(page.type === "panels" && page.form === "dashboard")) return "grid";
   const exhibits = exhibitsOf(page);
   const said = (text) => typeof text === "string" && text.trim();
   // Points beside a chart or a table are a column the page asks for, not the default: strong decks set one beside under a
@@ -830,7 +845,7 @@ function checkChoices(page, id, { sources = null, sourcePrimary = null, adjusted
  * does not draw, a highlight that lands nowhere, a callout a form has no room
  * for - is said in `pageType.advisories`.
  */
-export function compilePage(pageIn, index = 0, { players = null, spineOnly = false, sources = null, sourcePrimary = null } = {}) {
+export function compilePage(pageIn, index = 0, { players = null, spineOnly = false, sources = null, sourcePrimary = null, layouts = null } = {}) {
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
@@ -861,7 +876,7 @@ export function compilePage(pageIn, index = 0, { players = null, spineOnly = fal
   staged("evidence", () => checkExhibitData({ page, id, slide, exhibits, primary, adjusted }));
   staged("evidence", () => typedEvidence({ page, id, type, slide, exhibits, primary }));
   const { points } = staged("copy", () => checkCommentary({ page, id, slide, exhibits, primary, players, adjusted }));
-  staged("layout", () => layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points, adjusted }));
+  staged("layout", () => layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points, adjusted, layouts }));
   return withPageType({ page, slide, adjusted });
 }
 
@@ -892,7 +907,7 @@ function typedSlide(page, id, type, players) {
     if (!Array.isArray(chart.series) || !chart.series.length) throw new Error(`${id}: a model page's chart carries the \`series\` its data table prints`);
     slide.shape = "model-page";
   } else if (target.startsWith("chart.") || target === "aligned-bars" || ["mechanism", "schedule", "composition"].includes(page.type) || (page.type === "profiles" && page.form !== "logo-table")
-      || (page.type === "parallel" && exhibits.length) || (page.type === "numbers" && ["fact-grid", "stat-list", "nested-circles"].includes(page.form))) {
+      || (page.type === "parallel" && exhibits.length) || (page.type === "summary" && page.form === "agenda") || (page.type === "numbers" && ["fact-grid", "stat-list", "nested-circles"].includes(page.form))) {
     if (!exhibits.length) throw new Error(`${id}: form "${page.form}" needs its exhibit`);
     setType(slide.exhibit ?? slide.exhibits[0], target);
   }
@@ -1059,7 +1074,7 @@ function checkCommentary({ page, id, slide, exhibits, primary, players, adjusted
   const figureOf = (text) => pointFigure(names.reduce((said, name) => said.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (found) => " ".repeat(found.length)), String(text)));
   const pointTexts = (slide.points || []).map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase());
   // A point the author left unmarked is marked on its own figure.
-  if (points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
+  if (points >= 2 && ["beside", "beside-left", "below", "auto", "grid"].includes(page.commentary)) {
     const derived = [];
     (slide.points || []).forEach((point, at) => {
       if ((point && typeof point === "object" && point.highlight) || phrases.some((p) => p && hasPhrase(pointTexts[at], p))) return;
@@ -1085,7 +1100,7 @@ function checkCommentary({ page, id, slide, exhibits, primary, players, adjusted
     const { highlight: _set, ...rest } = p;
     return held.length ? { ...rest, highlight: held } : rest;
   });
-  if (["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
+  if (["beside", "beside-left", "below", "auto"].includes(page.commentary) && !points && !page.paragraphs)
     throw new Error(`${id}: commentary "${page.commentary}" places points beside or below the exhibit, and the page has none - give it \`points\`, or leave \`commentary\` out`);
   if (page.commentary === "captions") {
     const bare = exhibits.filter((e) => !(typeof e.caption === "string" && e.caption.trim()));
@@ -1121,16 +1136,40 @@ const tracks = (spec, name, id, most) => {
   return list;
 };
 /**
+ * A grid written as CSS grid writes one: `columns: "2fr 1fr 1fr"`, `rows: "1fr 1fr"` and `areas: ["hero a", "hero b"]`,
+ * each exhibit naming its area (`area: "hero"`). `grid: "<name>"` takes the template of that name from the deck's
+ * `layouts`, so a house keeps its own page grids beside its palette. Returned as the weights and 1-based areas the
+ * dashboard reads; a grid written in weights passes through.
+ */
+function gridTemplate(grid, layouts, id) {
+  const template = templateOf(grid, layouts, id);
+  if (template === undefined || template === null || typeof template !== "object") return { given: template ?? {}, named: {} };
+  const { named, columns, rows } = areasOf(template.areas, `${id}: grid.areas`);
+  // A dashboard's cells share the page's body between them, so its tracks are weights: `fr` and nothing else.
+  const weights = (value, name, count) => (typeof value !== "string" ? value ?? (count || undefined) : tracksOf(value, `${id}: grid.${name}`).map((track) => {
+    if (!(track?.fr > 0) || track.min !== undefined) throw new Error(`${id}: grid.${name} takes fr tracks ("2fr 1fr 1fr"): the cells share the page's body between them`);
+    return track.fr;
+  }));
+  return { given: { columns: weights(template.columns, "columns", columns), rows: weights(template.rows, "rows", rows) },
+    named: Object.fromEntries(Object.entries(named).map(([name, area]) => [name, { ...area, column: area.column + 1, row: area.row + 1 }])) };
+}
+
+/**
  * A dashboard's grid, checked against its exhibits: the column and row
  * tracks, and each exhibit's area on them (1-based, spans of tracks). An
  * exhibit with no `area` takes the next free cell in reading order. Areas
  * overlap nowhere, and every exhibit names what its cell shows (`heading`).
  */
-function dashboardGrid(page, id, exhibits) {
+function dashboardGrid(page, id, exhibitsIn, layouts) {
+  const { given, named } = gridTemplate(page.grid, layouts, id);
+  const exhibits = exhibitsIn.map((ex, at) => {
+    if (typeof ex.area !== "string") return ex;
+    if (!named[ex.area]) throw new Error(`${id}: exhibit ${at + 1} names area "${ex.area}", and the grid's areas are ${Object.keys(named).join(", ") || "not named"}`);
+    return { ...ex, area: named[ex.area] };
+  });
   const metrics = Array.isArray(page.metrics) ? page.metrics.length : 0;
   if (metrics && (metrics < 2 || metrics > DASHBOARD.metrics)) throw new Error(`${id}: a dashboard's strip of figures holds 2 to ${DASHBOARD.metrics} metrics (this has ${metrics})`);
-  const given = page.grid ?? {};
-  if (typeof given !== "object") throw new Error(`${id}: grid is { columns, rows }`);
+  if (typeof given !== "object") throw new Error(`${id}: grid is { columns, rows, areas } or the name of one of the deck's \`layouts\``);
   const unplaced = exhibits.filter((ex) => !ex.area).length;
   const columns = tracks(given.columns ?? Math.min(DASHBOARD.columns, Math.max(2, Math.ceil(exhibits.length / 2))), "columns", id, DASHBOARD.columns);
   const most = metrics ? DASHBOARD.rowsUnderStrip : DASHBOARD.rows;
@@ -1165,11 +1204,21 @@ function dashboardGrid(page, id, exhibits) {
 }
 
 /** The layout the commentary and the form ask for, and each type's own arrangement of the slide. */
-function layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points, adjusted }) {
-  const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
+function layOutPage(given) {
+  arrangeByType(given);
+  const { page, id, slide, layouts } = given;
+  // The page's own grid overrides the arrangement its type would take: the content is the same, set where the grid says.
+  if (page.commentary === "grid") {
+    if (page.grid === undefined) throw new Error(`${id}: commentary "grid" sets the page on its own grid - write it as \`grid\`, or name one of the deck's \`layouts\``);
+    Object.assign(slide, { layout: "template", grid: resolveTemplate(page.grid, layouts, id) });
+    if (page.exhibit && page.exhibits) { slide.exhibits = [page.exhibit, ...page.exhibits]; delete slide.exhibit; }
+  } else if (page.grid !== undefined && !(page.type === "panels" && page.form === "dashboard")) throw new Error(`${id}: \`grid\` sets the page on a grid of its own - choose commentary "grid" with it, or leave \`commentary\` out`);
+}
+function arrangeByType({ page, id, type, slide, target, exhibits, setType, primary, points, adjusted, layouts }) {
+  const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", auto: "arranged", rail: "sidebar" };
   if (page.type === "panels" && page.form === "dashboard") {
     slide.arrange = "dashboard";
-    slide.grid = dashboardGrid(page, id, exhibits);
+    slide.grid = dashboardGrid(page, id, exhibits, layouts);
     if (page.exhibit) { slide.exhibits = [page.exhibit, ...(page.exhibits || [])]; delete slide.exhibit; }
   } else if (trellisPage(page.type, page.form)) {
     // A trellis is one chart, set as a chart is: beside its commentary, over it, or across the page.
@@ -1226,6 +1275,8 @@ function layOutPage({ page, id, type, slide, target, exhibits, setType, primary,
     else { if (!primary) throw new Error(`${id}: a quotes page carries a quote-cluster exhibit`); setType(primary, "quote-cluster"); }
   } else if (page.type === "summary") {
     if (page.form === "executive-summary") { slide.role = "executive-summary"; if (!points) throw new Error(`${id}: an executive summary carries its developed \`points\``); }
+    // The agenda is its rows across the page: the topics are the content, so nothing sits beside them.
+    else if (page.form === "agenda") slide.layout = "exhibit-full";
     else { slide.kind = "takeaways"; if (!(page.items || []).length) throw new Error(`${id}: a takeaways page carries its \`items\``); }
   } else if (slide.shape === "model-page") {
     // The chart and its table stack in the exhibit's column, the points beside.
@@ -1394,6 +1445,7 @@ const SPARING_FORMS = Object.freeze({
   "relationship/bubble-grid": "a third measure read across rows and columns at once",
   "mechanism/sankey": "flows between stages whose sizes are the point",
   "mechanism/venn": "an overlap between two or three sets that is itself the finding",
+  "parallel/arrow-rows": "only where each row leads to the consequence written beside it (a scenario and what follows, a lever and its effect); parallel reasons, features or benefits are icon-rows",
   "parallel/capsules": "two to five priorities that each stand as a column with a sentence; cards or labelled rows say the same with less ink",
 });
 

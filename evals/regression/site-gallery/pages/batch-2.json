@@ -1,0 +1,1476 @@
+[
+  {
+    "id": "mechanism-chevron-process",
+    "type": "mechanism",
+    "form": "chevron-process",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Four phases make a cabin no polar bear can open, in 14 weeks",
+    "subtitle": "Standard two-room cabin on Arctic coastal permafrost, 2026 build programme",
+    "highlight": [
+      "31 trial cabins at zero break-ins"
+    ],
+    "exhibit": {
+      "items": [
+        {
+          "heading": "Weeks 1-3",
+          "label": "Survey and anchor",
+          "details": [
+            "Map every den within 5 km, and keep clear of whale bones",
+            "Drive 24 steel piles into the permafrost, no concrete",
+            "Lift the floor 1.8 m above a standing bear's reach",
+            "Fence the site in bear wire",
+            "Ship the crane before sea ice",
+            "Log the wind and the drifts",
+            "Survey signed off by week 3, before the first snow"
+          ]
+        },
+        {
+          "heading": "Weeks 4-7",
+          "label": "Armour the shell",
+          "details": [
+            "Spruce walls 30 cm thick",
+            "Steel mesh under the cladding on every side, roof included",
+            "No bins, bird feeders or fish sheds within 50 m of the walls",
+            "Roof pitched at 45°",
+            "Vents set above 3 m",
+            "Insulated to minus 45°C, so the stove can stay small",
+            "Seams glued, so there is no smell of dinner outside"
+          ]
+        },
+        {
+          "heading": "Weeks 8-11",
+          "label": "Doors and windows",
+          "details": [
+            "Doors open inwards only",
+            "Window bars rated to hold 900 kg of inquisitive bear",
+            "Shutters close from inside in under 20 seconds flat",
+            "No outside door handles",
+            "Bear-rated glass, 4 cm thick, in every window frame",
+            "Porch kept bare: bears open anything resembling a box",
+            "Dog flap strictly forbidden"
+          ]
+        },
+        {
+          "heading": "Weeks 12-14",
+          "label": "Test and hand over",
+          "details": [
+            "Fortnight-long trial using a decoy that smells of sardines",
+            "Zero break-ins in 31 trial cabins built since 2022",
+            "Owner drills: shutters, flares and the emergency radio",
+            "Keys and a flare gun",
+            "Bear-proof rating signed off",
+            "Welcome hamper, no fish inside",
+            "Free check-up each spring for the first five years"
+          ]
+        }
+      ]
+    },
+    "bar": "Bears pull but rarely push, so inward doors kept 31 trial cabins at zero break-ins.",
+    "source": "Source: Synthetic demonstration • no real company data; the site foreman's claw-marked notebook"
+  },
+  {
+    "id": "mechanism-cycle",
+    "type": "mechanism",
+    "form": "cycle",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Heavier pumpkins pull bigger crowds, and the crowds pay for next year's heavier pumpkins",
+    "subtitle": "League growth loop, 2023 to 2026 seasons",
+    "exhibit": {
+      "center": "The heavyweight loop",
+      "items": [
+        {
+          "label": "Heavier pumpkins",
+          "text": "The record reaches 1,140 kg"
+        },
+        {
+          "label": "Bigger crowds",
+          "text": "14,000 at the weigh-off"
+        },
+        {
+          "label": "Richer prize pot",
+          "text": "Gate money lifts it to £60,000"
+        },
+        {
+          "label": "Better seed",
+          "text": "Winners' seeds sold at auction"
+        },
+        {
+          "label": "Warmer greenhouses",
+          "text": "Prize money buys heated tunnels"
+        }
+      ]
+    },
+    "pointsHeading": "The loop in numbers",
+    "pointsStyle": "icon-lead",
+    "points": [
+      {
+        "icon": "growth",
+        "text": "Every 100 kg added to the record brings about 2,000 more spectators, and this year's champion weighed in at 1,140 kg.",
+        "highlight": "2,000 more spectators"
+      },
+      {
+        "icon": "money",
+        "text": "Gate money pays 60% of the £60,000 prize pot, and a pumpkin-soup stall and a tractor raffle cover the rest.",
+        "highlight": "60%"
+      },
+      {
+        "icon": "leaf",
+        "text": "Winners' seeds fetch up to £800 each at the spring auction, and one champion's seed grew a third of this year's finalists.",
+        "highlight": "£800 each"
+      },
+      {
+        "icon": "warning",
+        "text": "A wet August breaks the loop: rot cost three finalists their pumpkins in 2025, and the weigh-off crowd fell by a fifth.",
+        "highlight": "fell by a fifth"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the league secretary's mud-spattered tally book"
+  },
+  {
+    "id": "mechanism-flow",
+    "type": "mechanism",
+    "form": "flow",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "A six-week export permit, not the lab, sets the pace from desert to pendant",
+    "subtitle": "Supply chain for one meteorite, find to finished jewellery, 2026",
+    "exhibit": {
+      "nodes": [
+        {
+          "id": "hunt",
+          "label": "Desert hunt",
+          "text": "Bought from hunters in Morocco and Chile"
+        },
+        {
+          "id": "lab",
+          "label": "Authenticity lab",
+          "text": "Nickel and iron assay, takes three weeks"
+        },
+        {
+          "id": "permit",
+          "label": "Export permit",
+          "text": "Customs and heritage papers, six weeks"
+        },
+        {
+          "id": "slice",
+          "label": "Slicing",
+          "text": "Diamond saw, 1 mm slices, one week"
+        },
+        {
+          "id": "set",
+          "label": "Setting",
+          "text": "Silver bezels set by hand, two weeks"
+        },
+        {
+          "id": "shop",
+          "label": "Boutique",
+          "text": "Sold in a velvet crater box, with a certificate"
+        }
+      ],
+      "edges": [
+        {
+          "from": "hunt",
+          "to": "lab"
+        },
+        {
+          "from": "hunt",
+          "to": "permit"
+        },
+        {
+          "from": "lab",
+          "to": "slice"
+        },
+        {
+          "from": "permit",
+          "to": "slice"
+        },
+        {
+          "from": "slice",
+          "to": "set"
+        },
+        {
+          "from": "set",
+          "to": "shop"
+        }
+      ]
+    },
+    "pointsHeading": "Where the nine weeks go",
+    "pointsStyle": "prose",
+    "points": [
+      {
+        "text": "The lab and the permit run side by side; the permit's six weeks, not the lab's three, set the pace.",
+        "highlight": "six weeks"
+      },
+      {
+        "text": "From find to boutique takes nine weeks: six for the permit, one at the saw and two at the bench.",
+        "highlight": "nine weeks"
+      },
+      {
+        "text": "Only 1 in 4 rocks the hunters send passes the nickel test; the other three are slag or gravel.",
+        "highlight": "1 in 4"
+      },
+      {
+        "text": "Slicing turns 40% of each rock into dust, so a 1 kg find makes about 60 pendants, not the 100 hoped for.",
+        "highlight": "40%"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the head stone-cutter's dusty logbook"
+  },
+  {
+    "id": "mechanism-framework",
+    "type": "mechanism",
+    "form": "framework",
+    "commentary": "none",
+    "title": "Four new audiences take the puppet theatre from 52,000 to 90,000 tickets",
+    "subtitle": "Tickets sold per season, 2025-26 actual against the 2028-29 goal",
+    "exhibit": {
+      "variant": "house",
+      "roof": "90,000 tickets a season by 2028-29, up from 52,000",
+      "highlight": 0,
+      "pillars": [
+        {
+          "title": "Family matinées",
+          "points": [
+            "Shows at 11am and 2pm",
+            "Children's seats at £8, adults free alongside two",
+            "A shadow-puppet workshop in every interval",
+            "Adds 16,000 tickets"
+          ]
+        },
+        {
+          "title": "Late shows for grown-ups",
+          "points": [
+            "Marionette satire after 9pm",
+            "The bar opens on stage after the final bow",
+            "Two new scripts a year, none fit for children",
+            "Adds 10,000 tickets"
+          ]
+        },
+        {
+          "title": "The touring van",
+          "points": [
+            "A pop-up stage that tours 40 village halls",
+            "Folds into one van in 50 minutes",
+            "Schools booked through three county councils",
+            "Adds 7,000 tickets"
+          ]
+        },
+        {
+          "title": "Make-a-puppet classes",
+          "points": [
+            "Saturday sessions for 12 makers",
+            "Sock, rod and shadow puppets",
+            "Every maker leaves with a puppet and a ticket",
+            "Adds 5,000 tickets"
+          ]
+        }
+      ],
+      "foundation": "The workshop: 14 carvers, 600 puppets repaired a year and one irreplaceable untangler of strings"
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the box office's sock-puppet ledger",
+    "takeaway": "Families carry 16,000 of the 38,000 extra tickets, so the matinées open first, in the autumn 2026 season."
+  },
+  {
+    "id": "mechanism-funnel",
+    "type": "mechanism",
+    "form": "funnel",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Only 6 in 100 visitors book a treehouse; the height waiver loses 22 of them",
+    "subtitle": "Visitors reaching each step of the booking path, per 100 visitors, Q2 2026",
+    "exhibit": {
+      "rates": "none",
+      "stages": [
+        {
+          "label": "Visited the site",
+          "value": 100
+        },
+        {
+          "label": "Opened a treehouse",
+          "value": 62
+        },
+        {
+          "label": "Picked dates",
+          "value": 31
+        },
+        {
+          "label": "Signed the height waiver",
+          "value": 9
+        },
+        {
+          "label": "Paid and booked",
+          "value": 6
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "pointsStyle": "numbered",
+    "points": [
+      {
+        "text": "Browsing is healthy: 62 of every 100 visitors open a treehouse page, well above the travel-site norm of 45.",
+        "highlight": "62 of every 100"
+      },
+      {
+        "text": "Half of them leave at the calendar, because weekend nights sell out eight weeks ahead.",
+        "highlight": "eight weeks ahead"
+      },
+      {
+        "text": "The waiver page loses 22 of the 31 who picked dates; it opens with a diagram of the drop.",
+        "highlight": "22 of the 31"
+      },
+      {
+        "text": "Payment is the smallest leak: 6 of the 9 who sign the waiver then go on to pay.",
+        "highlight": "the smallest leak"
+      },
+      {
+        "text": "Move the waiver after payment as one checkbox and bookings could rise from 6 to about 15 in 100.",
+        "highlight": "from 6 to about 15"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; site analytics, squirrels excluded"
+  },
+  {
+    "id": "mechanism-layers",
+    "type": "mechanism",
+    "form": "layers",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Every £9,500 shower rests on £7,000 of cost, and the forecast sets the margin",
+    "subtitle": "Average cost per seeded storm, FY26, 212 storms flown",
+    "highlight": [
+      "78% of flights",
+      "over a third of the cost",
+      "£600 a storm"
+    ],
+    "exhibit": {
+      "layers": [
+        {
+          "label": "Rain guarantee",
+          "text": "£1,200 per storm in refunds, paid whenever the sky stays stubbornly dry for 48 hours after seeding"
+        },
+        {
+          "label": "Seeding flights",
+          "text": "£2,600 per storm for aircraft, pilots and fuel, paid in full whether the cloud cooperates or not"
+        },
+        {
+          "label": "Flares and chemistry",
+          "text": "£600 per storm for silver iodide flares, two per cloud, plus the occasional dud that only fizzles"
+        },
+        {
+          "label": "Permits and ground crew",
+          "text": "£800 per storm for airspace permits, landowner consents and the crew who watch the windsock"
+        },
+        {
+          "label": "Forecast and radar desk",
+          "text": "£1,800 per storm for the meteorologists and radar that decide which clouds are worth chasing"
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "points": [
+      {
+        "lead": "The forecast is the lever",
+        "text": "Better forecasts pick clouds that actually rain: 78% of flights did in FY26, up from 61%. Refunds fell from £2,100 to £1,200 a storm, so cost is now £7,000 against a £9,500 price."
+      },
+      {
+        "lead": "Flights are the bulk",
+        "text": "Aircraft, pilots and fuel are over a third of the cost, and a flight costs the same whether or not the cloud cooperates. Choosing the right cloud beats flying cheaper."
+      },
+      {
+        "lead": "Chemistry is a rounding error",
+        "text": "The flares cost £600 a storm. Clients ask about them more than anything else, and they move the margin least."
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the duty forecaster's soggy clipboard",
+    "pointsStyle": "prose"
+  },
+  {
+    "id": "mechanism-matrix",
+    "type": "mechanism",
+    "form": "matrix",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Waltzes are the sweet spot: easy for robots and loved by audiences",
+    "subtitle": "Eight candidate pieces, scored at 12 test concerts, spring 2026",
+    "exhibit": {
+      "xAxis": {
+        "label": "How easily the robots play it",
+        "minLabel": "Struggle",
+        "maxLabel": "Flawless"
+      },
+      "yAxis": {
+        "label": "Audience demand",
+        "minLabel": "Low",
+        "maxLabel": "High"
+      },
+      "quadrantLabels": {
+        "topLeft": "Train for these",
+        "topRight": "Programme now",
+        "bottomLeft": "Drop",
+        "bottomRight": "Encores only"
+      },
+      "highlightQuadrant": "topRight",
+      "highlight": 0,
+      "points": [
+        {
+          "label": "Waltzes",
+          "x": 0.84,
+          "y": 0.86
+        },
+        {
+          "label": "Jazz improvisation",
+          "x": 0.16,
+          "y": 0.82
+        },
+        {
+          "label": "Tango",
+          "x": 0.36,
+          "y": 0.64
+        },
+        {
+          "label": "Sea shanties",
+          "x": 0.66,
+          "y": 0.7
+        },
+        {
+          "label": "Marching tunes",
+          "x": 0.9,
+          "y": 0.58
+        },
+        {
+          "label": "Opera arias",
+          "x": 0.14,
+          "y": 0.4
+        },
+        {
+          "label": "Lullabies",
+          "x": 0.86,
+          "y": 0.2
+        },
+        {
+          "label": "Free-form noise",
+          "x": 0.3,
+          "y": 0.12
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "pointsStyle": "lettered",
+    "points": [
+      {
+        "text": "Waltzes keep a strict three-beat count that the robots never miss, and they filled 94% of seats in tests",
+        "highlight": "94% of seats"
+      },
+      {
+        "text": "Jazz sells, but the robots cannot swing yet: 38% of the test audience walked out at the interval",
+        "highlight": "38% of the test audience"
+      },
+      {
+        "text": "Tango is close: a softer gripper arm for the bandoneon, due in March 2027, should move it into the top right",
+        "highlight": "March 2027"
+      },
+      {
+        "text": "Lullabies are flawless and unwanted, and at one test concert they sent two percussion units into sleep mode",
+        "highlight": "two percussion units"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the conductor-bot's error log"
+  },
+  {
+    "id": "mechanism-process",
+    "type": "mechanism",
+    "form": "process",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "The 1999 capsules are one step from reopening, 409 of 412 intact",
+    "subtitle": "Vault B, the batch of 412 capsules sealed in December 1999, at October 2026",
+    "exhibit": {
+      "active": 3,
+      "items": [
+        {
+          "label": "Intake",
+          "period": "December 1999",
+          "detail": "412 capsules logged, weighed and X-rayed for anything that might rot, leak or hatch before 2027"
+        },
+        {
+          "label": "Seal",
+          "period": "December 1999",
+          "detail": "Argon-filled steel tubes, each welded shut and stamped with the date its owner chose to open it"
+        },
+        {
+          "label": "Store",
+          "period": "2000 to 2025",
+          "detail": "Kept at 12°C and 35% humidity, 40 metres down in a former salt mine, checked by torch every month"
+        },
+        {
+          "label": "Inspect",
+          "period": "January to September 2026",
+          "detail": "Every capsule weighed again: 409 unchanged, and three re-sealed after slow leaks of argon"
+        },
+        {
+          "label": "Reopen",
+          "period": "June 2027",
+          "detail": "Owners, or their grandchildren, invited to a ceremony with cake, speeches and a hacksaw each"
+        }
+      ]
+    },
+    "pointsHeading": "Before reopening day",
+    "pointsStyle": "checklist",
+    "points": [
+      {
+        "state": "yes",
+        "text": "409 capsules passed the weigh-in with no loss of argon, including the one that rattles in a worrying way",
+        "highlight": "409 capsules"
+      },
+      {
+        "state": "yes",
+        "text": "Three leaky capsules, all welded on one afternoon in 1999, were re-sealed and checked twice in September",
+        "highlight": "Three leaky capsules"
+      },
+      {
+        "text": "Owners traced: 377 of 412 so far, with the last 35 being found through old school registers by March 2027",
+        "highlight": "377 of 412"
+      },
+      {
+        "text": "Hacksaws sharpened, a marquee booked and a very large cake ordered for the reopening ceremony next June",
+        "highlight": "very large cake"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the vault keeper's very dusty logbook"
+  },
+  {
+    "id": "mechanism-quadrants",
+    "type": "mechanism",
+    "form": "quadrants",
+    "commentary": "none",
+    "title": "Hammock resorts win on doing nothing, and lose 22% of bookings when it rains",
+    "subtitle": "Nine resorts, 2026 season review",
+    "exhibit": {
+      "quadrants": [
+        {
+          "title": "Strengths",
+          "points": [
+            "Guests rate the hammocks 4.8 out of 5",
+            "Occupancy of 91% from May to September",
+            "Staff cost per guest 30% below beach hotels",
+            "No Wi-Fi complaints, because there is no Wi-Fi",
+            "Repeat guests are 58% of summer bookings"
+          ]
+        },
+        {
+          "title": "Weaknesses",
+          "points": [
+            "22% of bookings cancelled in rainy weeks",
+            "Two of nine resorts have no shade trees",
+            "Guests stay only 2.1 nights on average",
+            "Mosquito reviews drag Riverside to 3.9 stars",
+            "Hammock ropes replaced every 14 months"
+          ]
+        },
+        {
+          "title": "Opportunities",
+          "points": [
+            "Covered hammock pavilions for rainy days",
+            "Corporate nap retreats: 140 enquiries in 2026",
+            "Hammocks sold in the gift shop at £65 each",
+            "Winter sites in Lisbon and Valencia",
+            "Stargazing nights at the three darkest sites"
+          ]
+        },
+        {
+          "title": "Threats",
+          "points": [
+            "Rival beanbag resorts opening in three towns",
+            "Insurance up 18% after the 2025 rope recall",
+            "Tree-protection rules on two new sites",
+            "Wetter summers forecast for the north coast",
+            "Guests who fall asleep and miss checkout"
+          ]
+        }
+      ]
+    },
+    "takeaway": "Rain is the weakness with a fix in sight: covered pavilions at all nine resorts would win back most of the 22%.",
+    "source": "Source: Synthetic demonstration • no real company data; the head swinger's guest book"
+  },
+  {
+    "id": "mechanism-rank-flow",
+    "type": "mechanism",
+    "form": "rank-flow",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Heavier paper flew A4 Squadron from ninth to first in four years",
+    "subtitle": "Rank in the distance event at the national championship, twelve teams, 2022-2026",
+    "highlight": [
+      "the only teams to switch"
+    ],
+    "exhibit": {
+      "periods": [
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "entities": [
+        {
+          "name": "Glide Guild",
+          "ranks": [
+            1,
+            1,
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "name": "Origami Aces",
+          "ranks": [
+            2,
+            2,
+            1,
+            3,
+            3
+          ]
+        },
+        {
+          "name": "Fold Patrol",
+          "ranks": [
+            3,
+            4,
+            6,
+            8,
+            9
+          ]
+        },
+        {
+          "name": "Tailwinds",
+          "ranks": [
+            4,
+            3,
+            5,
+            5,
+            4
+          ]
+        },
+        {
+          "name": "Crease Club",
+          "ranks": [
+            5,
+            6,
+            7,
+            6,
+            8
+          ]
+        },
+        {
+          "name": "Loop Troop",
+          "ranks": [
+            6,
+            5,
+            3,
+            1,
+            2
+          ]
+        },
+        {
+          "name": "Wingnuts",
+          "ranks": [
+            7,
+            8,
+            10,
+            9,
+            12
+          ]
+        },
+        {
+          "name": "Flutterbys",
+          "ranks": [
+            8,
+            11,
+            12,
+            11,
+            11
+          ]
+        },
+        {
+          "name": "A4 Squadron",
+          "ranks": [
+            9,
+            7,
+            4,
+            2,
+            1
+          ]
+        },
+        {
+          "name": "Crumple Zone",
+          "ranks": [
+            10,
+            9,
+            9,
+            10,
+            7
+          ]
+        },
+        {
+          "name": "Nose Divers",
+          "ranks": [
+            11,
+            12,
+            11,
+            12,
+            10
+          ]
+        },
+        {
+          "name": "Sky Scribblers",
+          "ranks": [
+            12,
+            10,
+            8,
+            7,
+            6
+          ]
+        }
+      ],
+      "highlight": [
+        "A4 Squadron",
+        "Loop Troop"
+      ]
+    },
+    "bar": "Heavier 120 gsm paper is the edge: A4 Squadron and Loop Troop, the only teams to switch, now hold first and second.",
+    "source": "Source: Synthetic demonstration • no real company data; the judges' crumpled scorecards"
+  },
+  {
+    "id": "mechanism-relationship-network",
+    "type": "mechanism",
+    "form": "relationship-network",
+    "commentary": "beside-left",
+    "takeaway": false,
+    "title": "Five parties must agree before any dive, and the wreck registry links them all",
+    "subtitle": "Parties to a single wreck dive and who deals with whom, 2026 season",
+    "exhibit": {
+      "variant": "hub-ring",
+      "centerId": "registry",
+      "ringOrder": [
+        "crew",
+        "insurers",
+        "coastguard",
+        "heirs",
+        "museum"
+      ],
+      "nodes": [
+        {
+          "id": "registry",
+          "label": "Wreck registry",
+          "body": "Licenses every dive"
+        },
+        {
+          "id": "crew",
+          "label": "Our salvage crew",
+          "body": "Finds, lifts and logs",
+          "tone": "accent"
+        },
+        {
+          "id": "insurers",
+          "label": "Insurers",
+          "body": "Cover the submarine"
+        },
+        {
+          "id": "coastguard",
+          "label": "Coastguard",
+          "body": "Sets the dive windows"
+        },
+        {
+          "id": "heirs",
+          "label": "Cargo owners' heirs",
+          "body": "Claim a share of gold"
+        },
+        {
+          "id": "museum",
+          "label": "Maritime museum",
+          "body": "First pick of finds"
+        }
+      ],
+      "edges": [
+        {
+          "from": "registry",
+          "to": "crew",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "registry",
+          "to": "insurers",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "registry",
+          "to": "coastguard",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "registry",
+          "to": "heirs",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "registry",
+          "to": "museum",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "crew",
+          "to": "insurers",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "insurers",
+          "to": "coastguard",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "heirs",
+          "to": "museum",
+          "direction": "bidirectional"
+        },
+        {
+          "from": "museum",
+          "to": "crew",
+          "direction": "bidirectional"
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "pointsStyle": "bulleted",
+    "points": [
+      {
+        "text": "The registry licenses every dive and settles every claim, so its 62-day review sets the pace of each season",
+        "highlight": "62-day review"
+      },
+      {
+        "text": "Heirs of the 1712 cargo owners claim 25% of any gold, and the museum takes first pick of the rest",
+        "highlight": "25% of any gold"
+      },
+      {
+        "text": "Insurers cover the submarine only inside coastguard dive windows, which open for just 94 days a year",
+        "highlight": "94 days a year"
+      },
+      {
+        "text": "Agreeing all five used to take 140 days; in 2026 one shared filing cut that to 70, adding ten weeks of diving",
+        "highlight": "cut that to 70"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the quartermaster's barnacled logbook"
+  },
+  {
+    "id": "mechanism-sankey",
+    "type": "mechanism",
+    "form": "sankey",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Romance keeps the pigeons aloft: love letters are 41 of every 100 parcels",
+    "subtitle": "All 52,000 parcels flown from the Leeds loft in 2026, scaled to 100",
+    "exhibit": {
+      "left": [
+        {
+          "id": "love",
+          "label": "Love letters, 41: all fly direct, and most within one town"
+        },
+        {
+          "id": "legal",
+          "label": "Legal documents, 27: deeds and contracts, signed for on arrival"
+        },
+        {
+          "id": "seeds",
+          "label": "Seed packets, 18: too heavy for one bird over a long distance"
+        },
+        {
+          "id": "keys",
+          "label": "Spare keys, 14: the heaviest parcel that we ever fly"
+        }
+      ],
+      "right": [
+        {
+          "id": "direct",
+          "label": "One bird, direct, 48: under 40 km, and delivered on the same day"
+        },
+        {
+          "id": "relay",
+          "label": "Two-bird relay, 29: a fresh bird takes over at a halfway loft"
+        },
+        {
+          "id": "convoy",
+          "label": "Flock convoy, 23: four birds share the weight in a sling"
+        }
+      ],
+      "flows": [
+        {
+          "from": "love",
+          "to": "direct",
+          "value": 41
+        },
+        {
+          "from": "legal",
+          "to": "direct",
+          "value": 7
+        },
+        {
+          "from": "legal",
+          "to": "relay",
+          "value": 20
+        },
+        {
+          "from": "seeds",
+          "to": "relay",
+          "value": 9
+        },
+        {
+          "from": "seeds",
+          "to": "convoy",
+          "value": 9
+        },
+        {
+          "from": "keys",
+          "to": "convoy",
+          "value": 14
+        }
+      ],
+      "highlight": [
+        "love",
+        "convoy"
+      ]
+    },
+    "bar": "Sell a Valentine's express on the cheap direct route, and stop pricing convoys like letters: four birds in a sling cost four times as much to fly, so charge keys and seeds what they really cost.",
+    "source": "Source: Synthetic demonstration • no real company data; the loft's leg-ring scanner"
+  },
+  {
+    "id": "mechanism-spectrum",
+    "type": "mechanism",
+    "form": "spectrum",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "We still clean like rug beaters, while 64% of carpets brought in now fly",
+    "subtitle": "Position on five dimensions of the service, 2026 review of 3,100 jobs",
+    "highlight": [
+      "flying carpets pay twice as much per job"
+    ],
+    "exhibit": {
+      "items": [
+        {
+          "left": "Rug cleaner",
+          "right": "Carpet aviation",
+          "value": 0.22,
+          "text": "Yet 64% of the carpets brought in now fly, up from 22% in 2022"
+        },
+        {
+          "left": "Beaten by hand",
+          "right": "Spell-safe wash",
+          "value": 0.25,
+          "text": "Paddles still do 70% of the work, and paddles bruise the enchantment"
+        },
+        {
+          "left": "Drop-off counter",
+          "right": "We fly to you",
+          "value": 0.3,
+          "text": "Customers must roll up and carry a carpet that would rather fly itself"
+        },
+        {
+          "left": "Dust removed",
+          "right": "Lift restored",
+          "value": 0.35,
+          "text": "Only one cleaner in eight can re-tune a carpet's lift after washing"
+        },
+        {
+          "left": "Price per m²",
+          "right": "Price per flight hour",
+          "value": 0.15,
+          "text": "Prices ignore wear from flying, so long-haul carpets are cleaned at a loss"
+        }
+      ]
+    },
+    "bar": "Retrain the cleaners in spell-safe washing and collect by air before a rival does: flying carpets pay twice as much per job.",
+    "source": "Source: Synthetic demonstration • no real company data; the dust collector's very full bag"
+  },
+  {
+    "id": "mechanism-steps",
+    "type": "mechanism",
+    "form": "steps",
+    "commentary": "rail",
+    "takeaway": false,
+    "title": "Five lessons take a nervous beginner to a paid party gig in six weeks",
+    "subtitle": "Beginner course, spring 2026 intake of 120 students",
+    "highlight": [
+      "41% of drop-outs quit in week 1"
+    ],
+    "exhibit": {
+      "items": [
+        {
+          "label": "Tie knots",
+          "icon": "check",
+          "text": "Week 1: pops fall from one balloon in three to one in twenty, and nobody flinches any more"
+        },
+        {
+          "label": "Twist dogs",
+          "icon": "star",
+          "text": "Week 2: the classic three-bubble dog, twisted in under 40 seconds"
+        },
+        {
+          "label": "Build a zoo",
+          "icon": "layers",
+          "text": "Weeks 3-4: twelve shapes, from the giraffe to the dreaded swan"
+        },
+        {
+          "label": "Mock party",
+          "icon": "people",
+          "text": "Week 5: 30 shapes an hour at a mock party of shrieking, sticky-fingered nephews"
+        },
+        {
+          "label": "Get booked",
+          "icon": "money",
+          "text": "Week 6: 82% of graduates land a paid party within a month, at £85 an hour plus cake"
+        }
+      ]
+    },
+    "rail": "The knot is the real gatekeeper: 41% of drop-outs quit in week 1, so every beginner now takes home 200 practice balloons before the first class, and early quitting has halved.",
+    "source": "Source: Synthetic demonstration • no real company data; the academy's pop-count clipboard"
+  },
+  {
+    "id": "mechanism-tree",
+    "type": "mechanism",
+    "form": "tree",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Pupils quit over cold water and crowded lanes, not the monofin itself",
+    "subtitle": "Exit survey of 240 leavers before the tail-fin level, 2026; several reasons allowed",
+    "exhibit": {
+      "root": "Why do a third of pupils quit before the tail-fin badge?",
+      "branches": [
+        {
+          "id": "water",
+          "label": "Is it what happens in the water?",
+          "conclusions": [
+            {
+              "id": "w1",
+              "text": "Water at 27°C: 58% of leavers were simply too cold"
+            },
+            {
+              "id": "w2",
+              "text": "Chlorine: 11% blame stinging eyes and green-tinged hair"
+            },
+            {
+              "id": "w3",
+              "text": "The monofin: only 9% found the tail too hard to swim in"
+            }
+          ]
+        },
+        {
+          "id": "around",
+          "label": "Is it what happens around the lesson?",
+          "conclusions": [
+            {
+              "id": "a1",
+              "text": "Twelve to a lane: 41% waited longer than they swam"
+            },
+            {
+              "id": "a2",
+              "text": "Price: 14% left over the £18 fee, mostly families of three"
+            },
+            {
+              "id": "a3",
+              "text": "Timing: 6% could not make the 7am Saturday slot"
+            }
+          ]
+        }
+      ],
+      "conclusion": "The tail is not the problem: cold water and crowded lanes drive most of the drop-outs"
+    },
+    "bar": "Warm the pool to 30°C and cap lanes at eight pupils: the two fixes cost £22,000 a year and answer the top two complaints",
+    "source": "Source: Synthetic demonstration • no real company data; the academy's soggy exit-survey forms"
+  },
+  {
+    "id": "mechanism-tree-decision",
+    "type": "mechanism",
+    "form": "tree",
+    "commentary": "none",
+    "takeaway": false,
+    "title": "Rent the volcano's vents now; build our own incubators once clutches pass 400 eggs",
+    "subtitle": "Incubation options for the 2027 hatching season",
+    "exhibit": {
+      "root": "Should the hatchery build its own fireproof incubators or rent the volcano's vents?",
+      "branches": [
+        {
+          "id": "build",
+          "label": "Build fireproof incubators in-house",
+          "conclusions": [
+            {
+              "id": "b1",
+              "text": "The hatch rate rises to 92%, but the £2.4m kilns take 18 months to build and fire up, so they miss the 2027 season"
+            },
+            {
+              "id": "b2",
+              "text": "The kilns pay back only above 400 eggs a year, and this year's clutch from the hatchery's twelve dragons is 260"
+            }
+          ]
+        },
+        {
+          "id": "rent",
+          "label": "Rent the volcano's vents",
+          "conclusions": [
+            {
+              "id": "r1",
+              "text": "Ready this spring at £300,000 a year, with an 81% hatch rate and no building work to wait for"
+            },
+            {
+              "id": "r2",
+              "text": "The vents close for two months a year whenever the volcano grumbles, so eggs must move to the cellar ovens"
+            }
+          ]
+        }
+      ],
+      "conclusion": "Rent the vents for the 2027 season, and build the incubators once the clutch passes 400 eggs a year"
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the hatchery keeper's scorched notebook"
+  },
+  {
+    "id": "mechanism-zone-matrix",
+    "type": "mechanism",
+    "form": "zone-matrix",
+    "commentary": "rail",
+    "takeaway": false,
+    "title": "Three caves glow brightest and sit nearest the car park, so tours start there",
+    "subtitle": "Fourteen caves surveyed by night, winter 2025-26",
+    "highlight": [
+      "70% of all the worms"
+    ],
+    "exhibit": {
+      "size": 3,
+      "xAxis": {
+        "label": "Ease of access",
+        "low": "Crawl",
+        "high": "Stroll"
+      },
+      "yAxis": {
+        "label": "Glow",
+        "low": "Dim",
+        "high": "Bright"
+      },
+      "zoneLabels": {
+        "low": "Leave to the worms",
+        "high": "Open first"
+      },
+      "points": [
+        {
+          "label": "Starfield Cave, 150 m walk",
+          "x": 0.86,
+          "y": 0.9,
+          "highlight": true
+        },
+        {
+          "label": "Velvet Grotto, 220 m walk",
+          "x": 0.76,
+          "y": 0.8,
+          "highlight": true
+        },
+        {
+          "label": "Lantern Hollow, 300 m walk",
+          "x": 0.92,
+          "y": 0.72,
+          "highlight": true
+        },
+        {
+          "label": "Whisper Chamber, 900 m walk",
+          "x": 0.48,
+          "y": 0.76
+        },
+        {
+          "label": "Moss Gallery, 600 m walk",
+          "x": 0.58,
+          "y": 0.5
+        },
+        {
+          "label": "Drip Hall, 250 m walk",
+          "x": 0.84,
+          "y": 0.22
+        },
+        {
+          "label": "Long Crawl, a 40 m rope descent",
+          "x": 0.1,
+          "y": 0.9
+        },
+        {
+          "label": "Echo Pot, reached by ladder only",
+          "x": 0.26,
+          "y": 0.2
+        },
+        {
+          "label": "Bat Corner, flooded every winter",
+          "x": 0.1,
+          "y": 0.06
+        },
+        {
+          "label": "Fern Arch, 400 m walk",
+          "x": 0.74,
+          "y": 0.56
+        },
+        {
+          "label": "Glimmer Shaft, 30 m abseil",
+          "x": 0.2,
+          "y": 0.6
+        },
+        {
+          "label": "Cathedral Vault, 1.2 km walk",
+          "x": 0.4,
+          "y": 0.92
+        },
+        {
+          "label": "Old Mine Adit, 500 m walk",
+          "x": 0.55,
+          "y": 0.14
+        },
+        {
+          "label": "Pebble Hole, a tight squeeze",
+          "x": 0.44,
+          "y": 0.42
+        }
+      ]
+    },
+    "rail": "The three top-right caves hold 70% of all the worms counted and sit within 300 m of the car park, so they carry the night tours that start in March 2027.",
+    "source": "Source: Synthetic demonstration • no real company data; the head guide's head-torch survey"
+  },
+  {
+    "id": "numbers-fact-grid",
+    "type": "numbers",
+    "form": "fact-grid",
+    "commentary": "none",
+    "takeaway": false,
+    "title": "Underground and overbooked: the caves sold out 97% of August tours",
+    "exhibit": {
+      "columns": 3,
+      "items": [
+        {
+          "value": "212,000",
+          "label": "visitors in 2026",
+          "text": "Up 18% on 2025 and a record for the caves"
+        },
+        {
+          "value": "4.1 km",
+          "label": "of lamp-lit passages",
+          "text": "Six chambers, the deepest 140 metres down"
+        },
+        {
+          "value": "11°C",
+          "label": "in the caves all year",
+          "text": "So January tours sell almost as well as June"
+        },
+        {
+          "value": "97%",
+          "label": "of August tours sold out",
+          "text": "With 9,400 names left on the waiting list",
+          "gauge": 0.97
+        },
+        {
+          "value": "4.8 / 5",
+          "label": "average tour rating",
+          "text": "From 18,300 reviews; the echo chamber scores best",
+          "gauge": 0.96
+        },
+        {
+          "value": "72%",
+          "label": "of tickets booked online",
+          "text": "Up from 51% before the lantern app",
+          "gauge": 0.72
+        },
+        {
+          "value": "€38",
+          "label": "spent per visitor",
+          "text": "A €26 ticket plus €12 of photos and geodes"
+        },
+        {
+          "value": "26",
+          "label": "guides on the rota",
+          "text": "Every one a certified cave-rescue volunteer"
+        },
+        {
+          "value": "3",
+          "label": "chambers opening in 2027",
+          "text": "Adding 900 tour places a day at peak"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head guide's lantern log",
+    "subtitle": "The 2026 season in nine numbers"
+  },
+  {
+    "id": "numbers-hero-number",
+    "type": "numbers",
+    "form": "hero-number",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Campfire-grade marshmallows puff bag sales up 4.2 million a year by FY30",
+    "subtitle": "Bags sold a year, millions; FY24 and FY25 actual, FY26 to FY30 plan",
+    "kpi": {
+      "value": "+4.2m",
+      "label": "bags a year by FY30",
+      "sublabel": "11.8m in FY25 to 16.0m"
+    },
+    "exhibit": {
+      "type": "chart.line",
+      "heading": "Bags sold a year, with and without the campfire line",
+      "unit": "million",
+      "unitPlacement": "inline",
+      "yMin": 11,
+      "yMax": 16,
+      "categories": [
+        "FY24",
+        "FY25",
+        "FY26",
+        "FY27",
+        "FY28",
+        "FY29",
+        "FY30"
+      ],
+      "series": [
+        {
+          "name": "All bags",
+          "values": [
+            11.3,
+            11.8,
+            12.3,
+            13.1,
+            14.2,
+            15.1,
+            16
+          ]
+        },
+        {
+          "name": "Classic range alone",
+          "values": [
+            11.3,
+            11.8,
+            11.7,
+            11.8,
+            11.8,
+            11.9,
+            11.8
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "category": "FY26",
+          "series": "All bags",
+          "text": "Campfire line launches in spring"
+        },
+        {
+          "category": "FY28",
+          "series": "All bags",
+          "text": "Second toasting kiln fires up"
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "pointsStyle": "bulleted",
+    "points": [
+      {
+        "text": "Growth waits on the second toasting kiln in FY28; until then the foundry sells every jumbo puff it can char.",
+        "highlight": "second toasting kiln"
+      },
+      {
+        "text": "Autumn camping season brings 40% of the gain, so a wet October hurts more than any rival launch.",
+        "highlight": "40% of the gain"
+      },
+      {
+        "text": "Without the new kiln the line tops out at 13.9 million bags, still a record year for the foundry.",
+        "highlight": "13.9 million bags"
+      },
+      {
+        "text": "Each campfire bag earns a 31% margin, against 24% on the classic pillow puff it partly replaces.",
+        "highlight": "31% margin"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the foundry's sticky ledger"
+  },
+  {
+    "id": "numbers-metric-strip",
+    "type": "numbers",
+    "form": "metric-strip",
+    "commentary": "none",
+    "takeaway": false,
+    "title": "After-dark rides keep the wheel 94% full on summer evenings",
+    "subtitle": "Riders a month in 2026, thousands; tiles measure June to August evenings",
+    "metricsTone": "ring",
+    "metricsPosition": "top",
+    "metrics": [
+      {
+        "value": "94%",
+        "label": "of gondola seats filled after 7pm"
+      },
+      {
+        "value": "61%",
+        "label": "of night riders buy the summit photo"
+      },
+      {
+        "value": "38%",
+        "label": "of the year's ticket revenue from night rides"
+      }
+    ],
+    "exhibit": {
+      "type": "chart.column",
+      "heading": "Riders a month, 2026",
+      "unit": "thousand",
+      "unitPlacement": "inline",
+      "order": "given",
+      "categories": [
+        "Jan 2026",
+        "Feb 2026",
+        "Mar 2026",
+        "Apr 2026",
+        "May 2026",
+        "Jun 2026",
+        "Jul 2026",
+        "Aug 2026",
+        "Sep 2026",
+        "Oct 2026",
+        "Nov 2026",
+        "Dec 2026"
+      ],
+      "series": [
+        {
+          "name": "Riders",
+          "values": [
+            21,
+            19,
+            26,
+            34,
+            47,
+            68,
+            81,
+            84,
+            59,
+            42,
+            28,
+            39
+          ]
+        }
+      ],
+      "focus": [
+        "Jun 2026",
+        "Jul 2026",
+        "Aug 2026"
+      ],
+      "annotations": [
+        {
+          "category": "May 2026",
+          "text": "Night Loop opens with lit gondolas"
+        },
+        {
+          "category": "Dec 2026",
+          "text": "Winter lights festival"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the operator's turnstile counter"
+  }
+]

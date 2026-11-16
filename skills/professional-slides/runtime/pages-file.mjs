@@ -32,6 +32,15 @@ const PARTS = new WeakMap(), INCLUDED = new WeakMap(), BUDGETS = new WeakMap(), 
 /** The part file each page id of `doc` was read from (relative to the pages file), for pages that came from one. */
 export const partsOf = (doc) => PARTS.get(doc) ?? new Map();
 
+/**
+ * Every page of a pages file as the deck is built from it: the body's pages, then the appendix's, each part an include
+ * names spliced in. Commands that look a page up read this, never the file's own `pages` list, so a page written in a
+ * part or in the appendix is found like any other.
+ */
+export const pagesOf = (doc) => [...(doc?.pages ?? []), ...(doc?.appendix ?? [])].filter((page) => page && !isInclude(page));
+/** The page of `doc` with this id, wherever it was written, or undefined. */
+export const pageIn = (doc, id) => pagesOf(doc).find((page) => String(page.id) === String(id));
+
 /** `findings` with the part file named on each one whose page came from a part. */
 export function withParts(doc, findings) {
   const parts = partsOf(doc);

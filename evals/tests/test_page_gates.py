@@ -54,7 +54,7 @@ class MetricColumnVoidTests(unittest.TestCase):
     def test_measures_beside_a_short_exhibit_leave_no_band_empty(self):
         # Three measures stood in thirds of a 500px column beside a four-row
         # dumbbell, each figure centred in air: 110px between them read as a
-        # half-empty column (COLUMN_VOID, SCENE_VOID). As filled tiles dividing
+        # half-empty column. As filled tiles dividing
         # the column they carry it to the foot, where the dumbbell stops short.
         from node_probe import run_node
         scene = run_node('''
@@ -73,8 +73,6 @@ console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck
         self.assertTrue(all(t["x"] + t["width"] <= chart["x"] for t in tiles), "the measures stand beside the exhibit")
         self.assertAlmostEqual(max(t["y"] + t["height"] for t in tiles), chart["y"] + chart["height"], delta=1)
         self.assertEqual(sum(1 for n in slide["nodes"] if n.get("role") == "metric-surface"), 3, "each tile is filled")
-        report = page_gates.run_gates(scene, gates={"SCENE_VOID"})
-        self.assertNotIn("SCENE_VOID", codes(report))
 
 
 def good_slide():
@@ -102,8 +100,7 @@ def good_slide():
                 "That gap decides the shortlist before any visit is scheduled.",
             ], x=700, y=200, width=520, height=90),
             # The commentary runs down the chart's height: three lines at the
-            # top of a column beside a 440px chart is the half-empty column
-            # SCENE_VOID reads by column.
+            # top of a column beside a 440px chart is a half-empty column.
             text("p2", "paragraph", 12, [
                 "The nine points are the whole of the difference between them,",
                 "and neither school moved by more than two points in three years.",
@@ -174,9 +171,13 @@ class SyntheticGoodPageTests(unittest.TestCase):
                 self.assertIn(code, codes(report), f"{code} did not fire")
 
     def test_every_finding_carries_a_repair_sentence(self):
-        scene = load_scene()
-        report = page_gates.run_gates(scene, render_dir=None)
-        self.assertTrue(report["findings"])
+        # The shipped example passes every gate, so a page is broken on purpose: a title over its lines and body type off the scale.
+        slide = good_slide()
+        title = next(n for n in slide["nodes"] if n["id"] == "t")
+        title["text"], title["data"]["textLayout"] = "a\nb\nc", {"source": "a b", "lines": ["a", "b", "c"]}
+        next(n for n in slide["nodes"] if n["id"] == "p")["style"].update({"fontSize": {"value": 18}})
+        report = page_gates.run_gates({"slides": [slide]}, render_dir=None)
+        self.assertEqual(codes(report), {"TITLE_LINES", "TYPE_RANGE"})
         for item in report["findings"]:
             # A void past its blocking bar also names the bar (blockAbove); a
             # rule the deck predates says so (waived).

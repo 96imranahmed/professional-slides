@@ -5,10 +5,11 @@ import { DESIGN_NAMES } from "../design-systems.mjs";
 import { readJson, writeJsonWhole, pythonBin } from "../cli.mjs";
 import { runProcess } from "../process.mjs";
 import { authorDeck, readInsights } from "../author-deck.mjs";
-import { buildWorkspace, renderedSlide, fingerprint, runtimeFingerprint, selectPage, contentSignature, digest, complete, needed, blocked, runtime } from "./workspace.mjs";
+import { buildWorkspace, renderedSlide, fingerprint, runtimeFingerprint, selectPage, contentSignature, digest, complete, needed, blocked, runtime, expanded, rewritePages } from "./workspace.mjs";
+import { pagesOf } from "../pages-file.mjs";
 
 // What an option's own page must not carry: a refusal, or a finding the build stops on before the render.
-const HELD = new Set(["SCENE_VOID", "PAGE_ADJUSTED"]);
+const HELD = new Set(["PAGE_ADJUSTED"]);
 
 /**
  * The deck an option is drawn in. A design or a style is the deck's, so it restyles every page the deck composes;
@@ -31,14 +32,16 @@ async function optionDeck(work, { design, style }) {
 export async function makeOptions(work, selector, { count = 3, design, style, fetch = true } = {}) {
   if (!Number.isInteger(count) || count < 1 || count > 8) throw new Error("count must be an integer from 1 to 8");
   if (design && !DESIGN_NAMES.includes(design)) throw new Error(`Unknown design ${design}`);
-  const { page, index } = selectPage(work.doc, String(selector));
+  // The page is found and its options compiled in the deck as it is built (parts spliced in, the appendix after the body).
+  const whole = expanded(work);
+  const { page } = selectPage(whole, String(selector));
   if (page.carry || !page.type || page.type === "reference") return needed([{ kind: "page", page: page.id, evidence: page.draft || page,
     target: work.file, message: "Map the selected slide to a catalogue page type, retaining its words, data, citations, id and sourceSlide. Then request options." }]);
   const setId = `set-${(await fingerprint(work)).slice(0,12)}-${digest({ page: page.id, design, style }).slice(0,8)}`;
   const dir = path.join(work.root, "candidates", setId);
   await fs.mkdir(dir, { recursive: true });
   const deck = design || style ? await optionDeck(work, { design, style }) : work.doc.deck;
-  const restyled = design || style ? work.doc.pages.filter((p) => !p.carry && p.id !== page.id).map((p) => p.id) : [];
+  const restyled = design || style ? pagesOf(whole).filter((p) => !p.carry && p.id !== page.id).map((p) => p.id) : [];
   const insights = await readInsights(work.root, work.doc.deck.id);
   const definition = PAGE_TYPES[page.type], built = [], rejected = [], seen = new Set();
   const current = page.form || Object.keys(definition.forms)[0];
@@ -54,8 +57,8 @@ export async function makeOptions(work, selector, { count = 3, design, style, fe
       for (const exhibit of [value.exhibit,...(value.exhibits||[])].filter(Boolean))
         if(exhibit.type === definition.forms[current]) exhibit.type=definition.forms[form];
       if (contentSignature(value) !== contentSignature(page)) throw new Error("Candidate changed content");
-      const doc = { ...structuredClone(work.doc), deck: structuredClone(deck) };
-      doc.pages[index] = value;
+      const doc = { ...structuredClone(whole), deck: structuredClone(deck) };
+      for (const list of ["pages", "appendix"]) if (Array.isArray(doc[list])) doc[list] = doc[list].map((p) => (p && String(p.id) === String(page.id) ? value : p));
       const candidateId = `${setId}-${String(built.length + 1).padStart(2,"0")}`;
       const out = path.join(dir, candidateId);
       let authored;
@@ -109,14 +112,13 @@ export async function applyCandidate(work, id) {
   if (!entry) throw new Error("Candidate is not in its manifest");
   const record = await readJson(path.join(dir,id,"candidate.json"));
   if (record.sourceHash !== await fingerprint(work)) return blocked("CANDIDATE_STALE", "The source changed after these options were generated. Generate new options.");
-  if (digest(record)!==entry.recordHash || record.contentHash !== contentSignature(selectPage(work.doc,record.sourcePage).page)) return blocked("CANDIDATE_CHANGED", "The candidate no longer matches its saved preview");
+  if (digest(record)!==entry.recordHash || record.contentHash !== contentSignature(selectPage(expanded(work),record.sourcePage).page)) return blocked("CANDIDATE_CHANGED", "The candidate no longer matches its saved preview");
   // Only the option's page, and the deck's design where the option set one, change: every other page stays as written.
-  const next = structuredClone(work.doc);
-  next.pages[selectPage(next, record.sourcePage).index] = record.page;
-  if (record.deck) next.deck = record.deck;
-  if(record.runtimeHash!==await runtimeFingerprint()||record.dependenciesHash!==await fingerprint({...work,doc:{...work.doc,deck:next.deck}}))return blocked("CANDIDATE_STALE","The runtime or a candidate dependency changed. Generate fresh options.");
+  // The page is written back to the file that holds it (the pages file, or the part it was included from).
+  const deck = record.deck ?? work.doc.deck;
+  if(record.runtimeHash!==await runtimeFingerprint()||record.dependenciesHash!==await fingerprint({...work,doc:{...work.doc,deck}}))return blocked("CANDIDATE_STALE","The runtime or a candidate dependency changed. Generate fresh options.");
   if(record.imageHash!==digest(await fs.readFile(record.image))||record.pptxHash!==digest(await fs.readFile(record.pptx)))return blocked("CANDIDATE_CHANGED","The rendered preview or saved PowerPoint changed. Generate fresh options.");
-  await writeJsonWhole(work.file, next);
-  return complete({ candidate:id, artifacts:[work.file,record.image], ...(record.restyled?.length ? { restyled: record.restyled } : {}),
+  const written = await rewritePages(work, { [String(record.sourcePage)]: () => record.page }, record.deck ? { deck: record.deck } : {});
+  return complete({ candidate:id, artifacts:[...written,record.image], ...(record.restyled?.length ? { restyled: record.restyled } : {}),
     message:`Candidate applied${record.restyled?.length ? `; the deck's design changed, restyling ${record.restyled.join(", ")}` : ""}. Build to emit the revised deck.` });
 }

@@ -23,16 +23,15 @@
 // gaps open by a capped rhythm and no further (`ceiling`): past it the page
 // keeps the rest as margin, and the commentary sits against the schedule.
 // `orientation: "across" | "down"` on the exhibit settles it by hand.
-import { token, tokenValue, ellipsePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, readableOn } from "./core.mjs";
-import { measureAt } from "./draw.mjs";
+import { token, tokenValue, ellipsePrimitive, rectPrimitive, shapePrimitive, stableId, readableOn } from "./core.mjs";
+import { setText, drawText, roleMeasure, oneLineEach } from "./text-roles.mjs";
 import { elapsedSteps, sayElapsed } from "./time-axis.mjs";
-import { BODY, COMPACT, INK, SECONDARY, PRIMARY, SURFACE, RULE, HAIRLINE, STANDARD, SMALL_RADIUS, textStyle, boxStyle, openLine } from "./registry-shared.mjs";
+import { INK, SECONDARY, PRIMARY, SURFACE, RULE, HAIRLINE, STANDARD, SMALL_RADIUS, boxStyle, openLine } from "./registry-shared.mjs";
 
 export const STAGE_TOKENS = ["font.body", "type.heading", "type.body", "type.compact", "color.ink", "color.textSecondary", "color.componentPrimary",
   "color.surface", "color.surfaceTint", "color.rule", "color.onPrimary", "line.hairline", "line.standard", "radius.round", "radius.small", "radius.none",
   "space.1", "space.2", "space.3", "space.4", "space.5", "icon.small", "icon.medium"];
 
-const HEADING = token("type.heading");
 const v = (name) => tokenValue(token(name));
 const present = (value) => value !== undefined && value !== null && String(value).trim() !== "";
 
@@ -48,7 +47,11 @@ function stageOf(item, index, id) {
 /** Whether any stage carries its date or its detail: the stages are then set by this module, not as a strip of labels. */
 export const detailedStages = (items) => Array.isArray(items) && items.some((item) => item && typeof item === "object" && [item.date, item.period, item.maturity, item.text, item.detail].some(present));
 
-const measure = (text, width, size, bold = false) => measureAt(text, width, { size, bold });
+// Each text in its role (text-roles.mjs): a stage's label is its lead and its detail body text, each at its reading
+// measure; its date, the time since the last and an era's name are read off the schedule as an axis is, a word at a time.
+const LABEL = (text, width) => setText("lead", text, Math.max(1, width));
+const DETAIL = (text, width, lines = false) => setText("body", text, Math.max(1, width), { lines });
+const WHEN = (text, width, bold = true) => setText("axis", text, Math.max(1, width), { bold });
 
 // The columns: every stage's date on one line of dates, its marker or block on
 // one line, its label and detail beneath. Rows of the grid take the tallest
@@ -58,10 +61,10 @@ function across(frame, stages, roadmap) {
   if (width <= 0) throw new Error("the stages are too many for the width");
   const chevron = roadmap ? v("space.3") + inset : 0;
   const cells = stages.map((stage) => ({
-    when: stage.when ? measure(stage.when, width, COMPACT, true) : null,
-    elapsed: stage.elapsed ? measure(stage.elapsed, width, COMPACT) : null,
-    label: measure(stage.label, roadmap ? width - 2 * chevron : width, HEADING, true),
-    text: stage.text ? measure(stage.text, width, BODY) : null,
+    when: stage.when ? WHEN(stage.when, width) : null,
+    elapsed: stage.elapsed ? WHEN(stage.elapsed, width, false) : null,
+    label: LABEL(stage.label, roadmap ? width - 2 * chevron : width),
+    text: stage.text ? DETAIL(stage.text, width) : null,
   }));
   const tallest = (key) => Math.max(0, ...cells.map((cell) => cell[key]?.height ?? 0));
   const whenHeight = Math.max(0, ...cells.map((cell) => (cell.when?.height ?? 0) + (cell.elapsed?.height ?? 0))), labelHeight = tallest("label"), textHeight = tallest("text");
@@ -95,10 +98,10 @@ function staggered(frame, stages) {
     const x = frame.x + index * span + inset;
     const width = Math.min(2 * span - 2 * inset - v("space.4"), right - x);
     if (width < 120) throw new Error("the stages are too many for the width");
-    const when = stage.when ? measure(stage.when, width, COMPACT, true) : null;
-    const elapsed = stage.elapsed ? measure(stage.elapsed, width, COMPACT) : null;
-    const label = measure(stage.label, width, HEADING, true);
-    const text = stage.text ? measure(stage.text, width, BODY) : null;
+    const when = stage.when ? WHEN(stage.when, width) : null;
+    const elapsed = stage.elapsed ? WHEN(stage.elapsed, width, false) : null;
+    const label = LABEL(stage.label, width);
+    const text = stage.text ? DETAIL(stage.text, width) : null;
     const height = (when?.height ?? 0) + (elapsed?.height ?? 0) + (when || elapsed ? v("space.1") : 0) + label.height + (text ? v("space.1") + text.height : 0);
     return { x, width, when, elapsed, label, text, height, above: index % 2 === 0 };
   });
@@ -115,28 +118,40 @@ function staggered(frame, stages) {
 // label inside the block, which a frame with the height for it takes.
 function down(frame, stages, roadmap, stacked = false) {
   const gap = v("space.4"), inset = v("space.2"), marker = v("icon.small");
-  const whens = stages.map((stage) => (stage.when ? measure(stage.when, frame.width * 0.2, COMPACT, true) : null));
-  const elapsed = stages.map((stage) => (stage.elapsed ? measure(stage.elapsed, frame.width * 0.2, COMPACT) : null));
+  const whens = stages.map((stage) => (stage.when ? WHEN(stage.when, frame.width * 0.2) : null));
+  const elapsed = stages.map((stage) => (stage.elapsed ? WHEN(stage.elapsed, frame.width * 0.2, false) : null));
   const whenWidth = stacked ? 0 : Math.ceil(Math.max(0, ...whens.map((m) => m?.width ?? 0), ...elapsed.map((m) => m?.width ?? 0)));
   const headX = whenWidth ? whenWidth + gap : 0;
   // A block is as wide as its longest label set on one line, to three tenths
   // of the frame, with a pixel or two to spare so a label measured on one
   // line is drawn on one.
   const blockCap = Math.round(frame.width * 0.3);
-  const blockWidth = roadmap ? Math.min(blockCap, Math.ceil(Math.max(...stages.map((stage) => measure(stage.label, blockCap - 2 * inset, HEADING, true).width))) + 2 * inset + 2) : 0;
+  const blockWidth = roadmap ? Math.min(blockCap, Math.ceil(Math.max(...stages.map((stage) => LABEL(stage.label, blockCap - 2 * inset).width))) + 2 * inset + 2) : 0;
   const textX = headX + (roadmap ? blockWidth : marker) + gap, textWidth = frame.width - textX;
   if (textWidth < 120) throw new Error("the stages need more width for their detail");
+  // A timeline's row wider than its detail's reading measure sets each label beside its detail, in a column as wide as
+  // the longest label (to three tenths of the row): set under the label, the detail stops at its measure with the rest
+  // of the row air, and every row takes a line more than it needs.
+  const labelCap = Math.round(textWidth * 0.3);
+  const besideWidth = roadmap ? 0 : Math.min(labelCap, Math.ceil(Math.max(...stages.map((stage) => LABEL(stage.label, labelCap).width))) + 2);
+  const beside = false;
+  // A timeline whose details are each one line across the row sets them so; otherwise every detail stops at the measure.
+  const across = !roadmap && oneLineEach("body", stages.map((stage) => stage.text).filter(Boolean), textWidth);
+  const detailX = beside ? besideWidth + gap : 0, detailWidth = textWidth - detailX;
   const cells = stages.map((stage, index) => {
-    const label = measure(stage.label, roadmap ? blockWidth - 2 * inset : textWidth, HEADING, true);
-    const text = stage.text ? measure(stage.text, textWidth, BODY) : null;
+    const label = LABEL(stage.label, roadmap ? blockWidth - 2 * inset : beside ? besideWidth : textWidth);
+    const text = stage.text ? DETAIL(stage.text, detailWidth, across) : null;
     const block = roadmap ? label.height + (stacked && whens[index] ? v("space.1") + whens[index].height : 0) + 2 * inset : 0;
-    const body = roadmap ? (text?.height ?? 0) : label.height + (text ? v("space.1") + text.height : 0);
-    const dated = (whens[index]?.height ?? 0) + (elapsed[index]?.height ?? 0);
+    const body = roadmap ? (text?.height ?? 0) : beside ? Math.max(label.height, text?.height ?? 0) : label.height + (text ? v("space.1") + text.height : 0);
+    // The date sits level with the label's first line on a timeline and the time since the last under it, so the two
+    // reach that far down the row.
+    const when = whens[index]?.height ?? 0, since = elapsed[index]?.height ?? 0;
+    const dated = !roadmap && when && !stacked ? Math.max(when + since, (label.lineHeight + when) / 2 + since) : when + since;
     return { when: whens[index], elapsed: elapsed[index], label, text, block, height: Math.max(block, body, marker, dated) };
   });
   const rowGap = v("space.3"), growth = (stages.length - 1) * (v("space.5") - rowGap);
   const natural = cells.reduce((sum, cell) => sum + cell.height, 0) + rowGap * (stages.length - 1);
-  return { orientation: "down", stacked, cells, gap, inset, marker, whenWidth, headX, blockWidth, textX, textWidth, rowGap, growth, natural };
+  return { orientation: "down", stacked, cells, gap, inset, marker, whenWidth, headX, blockWidth, textX, textWidth, beside, besideWidth, detailX, detailWidth, rowGap, growth, natural };
 }
 
 /**
@@ -227,17 +242,17 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
     const span = L.inner.width / L.stages.length;
     for (const [index, era] of L.eras.entries()) {
       const x1 = frame.x + era.from * span + v("space.2"), x2 = frame.x + (era.to + 1) * span - v("space.2"), y = frame.y + L.eraHeight - v("space.2");
-      const layout = measure(era.label, x2 - x1, COMPACT, true);
-      nodes.push(textPrimitive({ id: stableId(id, "era-label", index), role: `${prefix}-era`, frame: { x: x1, y: y - 8 - layout.height, width: x2 - x1, height: layout.height }, text: layout.text,
-        style: { ...textStyle(COMPACT, SECONDARY, true, "center", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, era: era.label } }));
+      const layout = WHEN(era.label, x2 - x1);
+      nodes.push(drawText(stableId(id, "era-label", index), `${prefix}-era`, { x: x1, y: y - 8 - layout.height, width: x2 - x1 }, layout, { align: "center", data: { era: era.label } }));
       nodes.push(openLine(stableId(id, "era-bracket", index), x1, y - 4, x2, y - 4, `${prefix}-era-bracket`, RULE, HAIRLINE));
       nodes.push(openLine(stableId(id, "era-tick", index, "start"), x1, y - 4, x1, y + 2, `${prefix}-era-bracket`, RULE, HAIRLINE));
       nodes.push(openLine(stableId(id, "era-tick", index, "end"), x2, y - 4, x2, y + 2, `${prefix}-era-bracket`, RULE, HAIRLINE));
     }
   }
   frame = L.inner;
-  const say = (key, index, layout, box, size, color, bold, align = "left", valign = "top") => nodes.push(textPrimitive({ id: stableId(id, key, index), role: `${prefix}-${key}`, frame: box, text: layout.text,
-    style: { ...textStyle(size, color, bold, align, valign), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, stage: index } }));
+  // A text drawn as it was set, in its box: at the box's top, or centred in its height where the box is a block's.
+  const say = (key, index, layout, box, color, align = "left", valign = "top") => nodes.push(drawText(stableId(id, key, index), `${prefix}-${key}`,
+    { x: box.x, y: valign === "mid" ? box.y + (box.height - layout.height) / 2 : box.y, width: box.width }, layout, { color, align, data: { stage: index } }));
   const blockFill = token("color.surfaceTint");
   const active = (index) => props.active === index;
   if (L.stagger) {
@@ -253,12 +268,12 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
         style: boxStyle(props.active === undefined || active(index) ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")), data: { stage: index } }));
       // An upper block ends at its stem, a lower one starts at it: the date is always first, the detail last.
       let y = cell.above ? railY - L.marker / 2 - stem - cell.height : railY + L.marker / 2 + stem;
-      if (cell.when) { say("when", index, cell.when, { x, y, width, height: cell.when.height }, COMPACT, SECONDARY, true); y += cell.when.height; }
-      if (cell.elapsed) { say("elapsed", index, cell.elapsed, { x, y, width, height: cell.elapsed.height }, COMPACT, SECONDARY, false); y += cell.elapsed.height; }
+      if (cell.when) { say("when", index, cell.when, { x, y, width, height: cell.when.height }, SECONDARY); y += cell.when.height; }
+      if (cell.elapsed) { say("elapsed", index, cell.elapsed, { x, y, width, height: cell.elapsed.height }, SECONDARY); y += cell.elapsed.height; }
       if (cell.when || cell.elapsed) y += v("space.1");
-      say("label", index, cell.label, { x, y, width, height: cell.label.height }, HEADING, INK, true);
+      say("label", index, cell.label, { x, y, width, height: cell.label.height }, INK);
       y += cell.label.height;
-      if (cell.text) say("text", index, cell.text, { x, y: y + v("space.1"), width, height: cell.text.height }, BODY, INK, false);
+      if (cell.text) say("text", index, cell.text, { x, y: y + v("space.1"), width, height: cell.text.height }, INK);
     });
     return nodes;
   }
@@ -269,20 +284,20 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
     L.cells.forEach((cell, index) => {
       const x = frame.x + index * L.span + L.inset;
       const below = cell.elapsed?.height ?? 0;
-      if (cell.when) say("when", index, cell.when, { x, y: frame.y + L.whenHeight - below - cell.when.height, width: L.width, height: cell.when.height }, COMPACT, SECONDARY, true, roadmap ? "center" : "left");
-      if (cell.elapsed) say("elapsed", index, cell.elapsed, { x, y: frame.y + L.whenHeight - below, width: L.width, height: below }, COMPACT, SECONDARY, false, roadmap ? "center" : "left");
+      if (cell.when) say("when", index, cell.when, { x, y: frame.y + L.whenHeight - below - cell.when.height, width: L.width, height: cell.when.height }, SECONDARY, roadmap ? "center" : "left");
+      if (cell.elapsed) say("elapsed", index, cell.elapsed, { x, y: frame.y + L.whenHeight - below, width: L.width, height: below }, SECONDARY, roadmap ? "center" : "left");
       if (roadmap) {
         // One chevron a stage, abutting the next, so the row reads as one sequence.
         const fill = active(index) ? PRIMARY : blockFill;
         nodes.push(shapePrimitive({ id: stableId(id, "phase", index), role: "roadmap-phase-surface", geometry: "chevron", frame: { x: frame.x + index * L.span + 1, y: frame.y + at.headTop, width: L.span - 2, height: L.headHeight },
           style: boxStyle(fill, "none", HAIRLINE, token("radius.none")), data: { stage: index } }));
-        say("label", index, cell.label, { x: x + L.chevron, y: frame.y + at.headTop, width: L.width - 2 * L.chevron, height: L.headHeight }, HEADING, readableOn(INK, fill), true, "center", "mid");
+        say("label", index, cell.label, { x: x + L.chevron, y: frame.y + at.headTop, width: L.width - 2 * L.chevron, height: L.headHeight }, readableOn(INK, fill), "center", "mid");
       } else {
         nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "timeline-marker", frame: { x, y: railY - L.marker / 2, width: L.marker, height: L.marker },
           style: boxStyle(props.active === undefined || active(index) ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")), data: { stage: index } }));
-        say("label", index, cell.label, { x, y: frame.y + at.labelTop, width: L.width, height: cell.label.height }, HEADING, INK, true);
+        say("label", index, cell.label, { x, y: frame.y + at.labelTop, width: L.width, height: cell.label.height }, INK);
       }
-      if (cell.text) say("text", index, cell.text, { x, y: frame.y + at.textTop, width: L.width, height: cell.text.height }, BODY, INK, false);
+      if (cell.text) say("text", index, cell.text, { x, y: frame.y + at.textTop, width: L.width, height: cell.text.height }, INK);
     });
     return nodes;
   }
@@ -294,9 +309,8 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
   L.cells.forEach((cell, index) => {
     const era = L.eras.find((candidate) => candidate.from === index);
     if (era) {
-      const k = L.eras.indexOf(era), layout = measure(era.label, frame.width, COMPACT, true);
-      nodes.push(textPrimitive({ id: stableId(id, "era-label", k), role: `${prefix}-era`, frame: { x: frame.x, y, width: frame.width, height: layout.height }, text: layout.text,
-        style: { ...textStyle(COMPACT, SECONDARY, true, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, era: era.label } }));
+      const k = L.eras.indexOf(era), layout = WHEN(era.label, frame.width);
+      nodes.push(drawText(stableId(id, "era-label", k), `${prefix}-era`, { x: frame.x, y, width: frame.width }, layout, { data: { era: era.label } }));
       nodes.push(openLine(stableId(id, "era-bracket", k), frame.x, y + layout.height + 4, frame.x + frame.width, y + layout.height + 4, `${prefix}-era-bracket`, RULE, HAIRLINE));
       y += ERA_HEAD;
     }
@@ -312,21 +326,22 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
     // timeline, at the block's middle on a roadmap - or, where the rows are
     // stacked, inside the block under the label.
     const line = roadmap ? cell.height : cell.label.lineHeight;
-    if (cell.when && !L.stacked) say("when", index, cell.when, { x: frame.x, y: top + (line - cell.when.height) / 2, width: L.whenWidth, height: cell.when.height }, COMPACT, SECONDARY, true, "right");
-    if (cell.elapsed && cell.when && !L.stacked) say("elapsed", index, cell.elapsed, { x: frame.x, y: top + (line + cell.when.height) / 2, width: L.whenWidth, height: cell.elapsed.height }, COMPACT, SECONDARY, false, "right");
+    if (cell.when && !L.stacked) say("when", index, cell.when, { x: frame.x, y: top + (line - cell.when.height) / 2, width: L.whenWidth, height: cell.when.height }, SECONDARY, "right");
+    if (cell.elapsed && cell.when && !L.stacked) say("elapsed", index, cell.elapsed, { x: frame.x, y: top + (line + cell.when.height) / 2, width: L.whenWidth, height: cell.elapsed.height }, SECONDARY, "right");
     if (roadmap) {
       const fill = active(index) ? PRIMARY : blockFill, ink = readableOn(INK, fill);
       nodes.push(rectPrimitive({ id: stableId(id, "phase", index), role: "roadmap-phase-surface", frame: { x: frame.x + L.headX, y: top, width: L.blockWidth, height: cell.height }, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS), data: { stage: index } }));
       const under = L.stacked && cell.when ? v("space.1") + cell.when.height : 0, start = top + (cell.height - cell.label.height - under) / 2;
-      say("label", index, cell.label, { x: frame.x + L.headX + L.inset, y: start, width: L.blockWidth - 2 * L.inset, height: cell.label.height }, HEADING, ink, true);
-      if (under) say("when", index, cell.when, { x: frame.x + L.headX + L.inset, y: start + cell.label.height + v("space.1"), width: L.blockWidth - 2 * L.inset, height: cell.when.height }, COMPACT, active(index) ? ink : SECONDARY, true);
-      if (cell.text) say("text", index, cell.text, { x: frame.x + L.textX, y: top + Math.max(0, (cell.height - cell.text.height) / 2), width: L.textWidth, height: cell.text.height }, BODY, INK, false);
+      say("label", index, cell.label, { x: frame.x + L.headX + L.inset, y: start, width: L.blockWidth - 2 * L.inset, height: cell.label.height }, ink);
+      if (under) say("when", index, cell.when, { x: frame.x + L.headX + L.inset, y: start + cell.label.height + v("space.1"), width: L.blockWidth - 2 * L.inset, height: cell.when.height }, active(index) ? ink : SECONDARY);
+      if (cell.text) say("text", index, cell.text, { x: frame.x + L.textX, y: top + Math.max(0, (cell.height - cell.text.height) / 2), width: L.textWidth, height: cell.text.height }, INK);
       return;
     }
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: "timeline-marker", frame: { x: railX - L.marker / 2, y: top + (line - L.marker) / 2, width: L.marker, height: L.marker },
       style: boxStyle(props.active === undefined || active(index) ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")), data: { stage: index } }));
-    say("label", index, cell.label, { x: frame.x + L.textX, y: top, width: L.textWidth, height: cell.label.height }, HEADING, INK, true);
-    if (cell.text) say("text", index, cell.text, { x: frame.x + L.textX, y: top + cell.label.height + v("space.1"), width: L.textWidth, height: cell.text.height }, BODY, INK, false);
+    say("label", index, cell.label, { x: frame.x + L.textX, y: top, width: L.beside ? L.besideWidth : L.textWidth, height: cell.label.height }, INK);
+    if (cell.text) say("text", index, cell.text, L.beside ? { x: frame.x + L.textX + L.detailX, y: top, width: L.detailWidth, height: cell.text.height }
+      : { x: frame.x + L.textX, y: top + cell.label.height + v("space.1"), width: L.textWidth, height: cell.text.height }, INK);
   });
   return nodes;
 }

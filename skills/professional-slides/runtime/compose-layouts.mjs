@@ -128,7 +128,7 @@ export const hasCommentary = (s) => Boolean(s.points?.length || s.insight || s.i
  * measurer refuses outright. The chooser has to know that before it picks the
  * shape, or a page that would have composed simply fails.
  */
-function needsFullWidth(ex) {
+export function needsFullWidth(ex) {
   if (!ex) return false;
   // A timeline with many periods, a matrix, a map: exhibits whose horizontal
   // axis is the content and cannot be compressed.

@@ -1,0 +1,10 @@
+{
+  "package": "taffy-layout",
+  "version": "4.0.0",
+  "source": "https://registry.npmjs.org/taffy-layout/-/taffy-layout-4.0.0.tgz",
+  "licence": "MIT",
+  "files": {
+    "taffy_wasm.mjs": "pkg/taffy_wasm.js, sha256 d29c6f91096ef22de2e6de3514242ee5a398f275a6842db5d703b6aad7f32d9c",
+    "taffy_wasm_bg.wasm": "pkg/taffy_wasm_bg.wasm, sha256 0728735c4129457512dfd2b42271960e9854452261bc46cddf12e67ae55715ef"
+  }
+}

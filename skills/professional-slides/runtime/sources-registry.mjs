@@ -14,7 +14,6 @@
 // rounds on that refusal, which no section could fix from its own part file).
 import fs from "node:fs/promises";
 import path from "node:path";
-import { parsePeriod } from "./time-axis.mjs";
 
 /**
  * The registries the insight log's parts record beside them (`log` as
@@ -59,26 +58,6 @@ export function sourceDate(entry) {
   const [y, mo, d] = [Number(m[1]), m[2] ? Number(m[2]) : null, m[3] ? Number(m[3]) : null];
   return { printed: d ? `${d} ${MONTH_NAMES[mo - 1]} ${y}` : mo ? `${MONTH_NAMES[mo - 1]} ${y}` : String(y), through: d ? y * 12 + mo - 1 + d / 31 : mo ? y * 12 + mo : (y + 1) * 12 };
 }
-
-/**
- * Where a period ends, in parsePeriod's months, at the earliest it can: a
- * calendar year at the end of its December; a fiscal year (FY26, 2025-26) at
- * the end of the first month of the year that names its close, since where
- * in that year it closes is the company's; a quarter, a half, a month, a day
- * or a season at the end of its span. Null for a period marked as an
- * estimate, a forecast, a plan or a budget (2026E), a count of years, a bare
- * month, or a label that is no date - none says when it could be reported.
- */
-function periodEnd(label) {
-  const s = String(label ?? "").trim(), p = parsePeriod(s);
-  if (!p || /\d\s?[EFPB]$/i.test(s)) return null;
-  if (p.kind === "year") return /^FY/i.test(s) ? p.t + 1 : /^\d{4}[-–/]\d{2}$/.test(s) ? p.t + 13 : p.t + 12;
-  return Object.hasOwn(PERIOD_SPAN, p.kind) ? p.t + PERIOD_SPAN[p.kind] : null;
-}
-// How long each kind of period parsePeriod reads runs, in months.
-const PERIOD_SPAN = Object.freeze({ quarter: 3, half: 6, month: 1, day: 1 / 31, season: 6 });
-/** Where a period begins, at the latest it can: its end less its length, a year twelve months. */
-const periodStart = (label) => { const end = periodEnd(label), p = parsePeriod(String(label ?? "").trim()); return end === null || !p ? null : end - (p.kind === "year" ? 12 : PERIOD_SPAN[p.kind] ?? 0); };
 
 /** Every problem with the pages file's `sources` registry, as sentences: a source with no name, a key no source takes, a date the source line cannot print. */
 export function registryProblems(sources) {

@@ -153,7 +153,7 @@ export const KINDS = Object.freeze({
     columns: "(string | { label, type?, unit?, group?, width?, minWidth?, align?, bold?, heat?, domain?, better?, bar?, barScale?, bubble?, implication?, headerIcon?, logo?, scale?, numberDisplay?, labelDisplay?, vertical? })[] - the header; a column's keys reach each of its cells",
     rows: "(cell[one per column] | { cells, style?: plain|accented|total|group, better?: up|down, icon? })[] - the body rows; the label is the first cell",
   }, options: {
-    "cell": "string | number | { text, value, type?, highlight?: true | phrase, bold?, tone?: positive|negative, sub?, icon?, blank? } - typed cells: harvey 0-4, rag (on-track, behind, at-risk, complete, not-started, ...), lights green|amber|red, check / dot true|\"yes\", progress 0-100, trend up|flat|down (+ `better`), binary yes|no|missing, sparkline { values }, bars { values, scale }, bullets { items, lead? }, category { text, rowSpan?, sectionNumber? }, quote { text, by? }, logo { player | media }",
+    "cell": "string | number | { text, value, type?, highlight?: true | phrase, bold?, tone?: positive|negative, sub?, icon?, blank? } - typed cells: harvey 0-4, rag (on-track, behind, at-risk, complete, not-started, ...), tag (a category or priority as a pill in the deck's own colours: a word, or { text, tone: accent|primary|neutral }), lights green|amber|red, check / dot true|\"yes\", progress 0-100, trend up|flat|down (+ `better`), binary yes|no|missing, sparkline { values }, bars { values, scale }, bullets { items, lead? }, category { text, rowSpan?, sectionNumber? }, quote { text, by? }, logo { player | media }",
     "columns[].heat": "true - the column shaded by its figures (whole 1-5 as scores; else 5 steps over its range or `domain: [lo, hi]`); `better: \"down\"` turns it",
     "columns[].better": "\"up\" | \"down\" - on a heat column, the direction that is good; a row's or a cell's `better` colours its trend cells",
     "columns[].bar": "true - in-cell bars on one scale (needs `label` and `unit`; `barScale` shares one across columns)",
@@ -208,7 +208,7 @@ export const KINDS = Object.freeze({
   spectrum: { data: { items: "[{ left, right, value: 0-1, text?, quotes?: { left?, right? } }] 3-6 - or with `segments` 3-7: { left, right?, level }, or with `markers`: { left, right, values: { <marker id>: 0-1 } }" },
     options: { segments: "int 3-7", scale: "string[one per segment]", markers: "[{ id, label }] 2-3 - the first the subject" } },
   process: { data: { items: "(string | { label, period?, maturity?, detail? })[] 3+" }, options: { active: "index" } },
-  "chevron-process": { data: { items: "[{ heading?, label, details?: [string] }] 3+" }, options: { emphasizeFirst: "boolean", detailStyle: "\"circled-number\"" } },
+  "chevron-process": { data: { items: "[{ heading?, label, details?: [string] }] 3+" }, options: { emphasizeFirst: "boolean", active: "index | label | heading, or a list of them - the steps that take the accent (a heading names every step under it: \"Opportunity\")", detailStyle: "\"circled-number\"" } },
   "zone-matrix": { data: { xAxis: "{ label, low?, high? } - required", yAxis: "{ label, low?, high? } - required", points: "[{ label, x: 0-1, y: 0-1, highlight? }] 3-15" }, options: { size: "2 | 3 | 4 zones a side", zoneLabels: "{ low?, high? }" } },
   "rank-flow": { data: { periods: "string[2-6]", entities: "[{ name, ranks: int[one per period] }] 3-15 - each period ranks every entity once" }, options: { highlight: "entity name[]" } },
   organization: { data: { root: "string - required", children: "string[] 3+" }, options: { highlight: "child index", nodes: "[{ id, label, detail?, x, y, width, height (fractions), tone? }] with `connectors: [{ from, to }]` - laid out by hand instead" } },
@@ -225,6 +225,7 @@ export const KINDS = Object.freeze({
   cards: { data: { items: "[{ title, text?, points?: [string | { text }], icon?, logo?: media, number?, footer?, value? }] 2-6" },
     options: { tone: "outline | header | numbered | plain | disc | big-number | dark | columns | stat (needs `value` on every card)", align: "\"center\"", valign: "\"middle\"", question: "string - a panel on the left", columns: "int - cards a row" } },
   capsules: { data: { items: "[{ title, text?, icon? }] 2-5" }, options: {} },
+  "icon-rows": { data: { items: "[{ label (a few bold words), text? (the sentence under it), icon? (an icon name; without one the tile prints the row's number) }] 2-6 - parallel reasons, features or benefits" }, options: {} },
   "arrow-rows": { data: { items: "[{ label, text?, icon? }] 2-6 - the last takes the accent" }, options: {} },
   "labelled-rows": { page: { blocks: "[{ label (<= 5 words), icon? (an icon name, set over the label), points: 2-4 points, metric?: { value | measure, label, delta? } | exhibit?: { type, ... } }] 2-5 - every row a metric or exhibit, or none; no `exhibit` on the page" } },
   logos: { data: { items: "[{ name, caption?, image?: media }] 2-12 - a declared player's mark fills `image` by name" }, options: {} },
@@ -246,6 +247,7 @@ export const KINDS = Object.freeze({
   "quote-cluster": { data: { quotes: "[{ quote | text, attribution, detail?, avatarText? (<= 3 characters), portrait?, tone?: positive|negative|neutral }] 1-5 (or one `quote` and `attribution` on the exhibit)" },
     options: { treatment: "\"speech-bubble\" | \"contained\" | \"callout\"", placement: "\"full-field\" | \"section\" (4-5 quotes: full-field)", arrangement: "\"grid\" | \"staggered\" (3 full-field bubbles)", attributionPlacement: "inside | below-center | below-left", attributionAlign: "left | center | right", avatar: "boolean", avatarSize: "24-72" } },
   "executive-summary": { page: { points: "[{ lead, text }] - required: the answer, its proof, the consequence, the action; a ledger when every point is led and 20+ words", exhibit: "{ type, ... } - an answer table or chart, its `type` written", metrics: "metric[] - a strip" } },
+  "agenda-rows": { data: { items: "[{ topic, text? (one line on what it covers), number? (what the tile prints; 1, 2, ... by default) }] 2-8 - a row each, in running order" }, options: { active: "index - the item the meeting has reached: its tile and topic take the accent" } },
   takeaways: { page: { items: "string[2-5] - required: a lead clause before a colon set bold", tone: "dark | light", image: "media" } },
   row: { panels: true }, grid: { panels: true }, stack: { panels: true }, sequence: { panels: true }, dashboard: { panels: true }, breakout: { panels: true },
 });
@@ -273,7 +275,7 @@ const PANEL_FORMS = Object.freeze({
   grid: { ...PANELS, exhibits: "3-4 typed exhibits" },
   stack: { ...PANELS, stackWeights: "fractions - each panel's height" },
   sequence: { ...PANELS, exhibits: "2-3 typed exhibits, each with a `heading`; arrows between them" },
-  dashboard: { ...PANELS, exhibits: "2-6 typed exhibits, each with a `heading`; `area: { column, row, columnSpan?, rowSpan? }` places one, or `{ type: \"panel\", heading, text }`", grid: "{ columns: 1-4 | weights, rows: 1-3 | weights }", metrics: "metric[2-6] - a strip over the grid" },
+  dashboard: { ...PANELS, exhibits: "2-6 typed exhibits, each with a `heading`; `area: \"<name>\"` or `{ column, row, columnSpan?, rowSpan? }` places one, or `{ type: \"panel\", heading, text }`", grid: "{ columns: 1-4 | weights | \"2fr 1fr\", rows: 1-3 | weights | \"1fr 1fr\", areas?: [\"hero a\", \"hero b\"] }, or the name of one of the deck's `layouts`", metrics: "metric[2-6] - a strip over the grid" },
   breakout: { ...PANELS, exhibits: "exactly 2 bar, column or stacked charts - the overview, then the detail", breakout: "{ from: { exhibit (0), category, series? }, to: index (1) } - required: the mark the detail splits" },
 });
 

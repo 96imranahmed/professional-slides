@@ -149,6 +149,14 @@ export function peerOf(value, subject) {
   return SERIES_KEYS.map(value).find(neutral) ?? greys.find((grey) => reads(grey) && apart(grey)) ?? greys[0];
 }
 
+// The colours every palette derives rather than takes (resolvePalette, groundTokens): the reversed band from the ink, and
+// a chart's subject and its peers from the accent and the series (subjectOf, peerOf).
+const DERIVED_TOKENS = Object.freeze(["color.band", "color.chartSubject", "color.chartPeer"]);
+const DERIVED_FROM = "color.ink for the band; color.accent and color.chartSeries1 for a chart's subject and its peers";
+/** The tokens a palette's `colors` may set: the colour, style, font, type, line and layout tokens of `baseTokens`, less the ones derived from them. */
+export const overridableTokens = (baseTokens) => Object.keys(baseTokens)
+  .filter((key) => /^(color|style|font|type|line|layout)\./.test(key) && !key.startsWith("color.heat.") && !DERIVED_TOKENS.includes(key));
+
 export function resolvePalette(id = "midnight", baseTokens, slots) {
   // A palette object `{ base, colors, label? }` (a house profile imported from a
   // template deck) overlays its colours and style tokens on a named base.
@@ -157,10 +165,15 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
     const base = id.base ?? "midnight";
     if (!Object.hasOwn(PALETTES, base)) throw new Error(`Unknown palette base: ${base}`);
     const colors = id.colors || {};
+    const known = overridableTokens(baseTokens);
     for (const [key, value] of Object.entries(colors)) {
       if (key.startsWith("color.") && !/^#[0-9A-Fa-f]{6}$/.test(String(value))) throw new Error(`Palette colour ${key} must be a #RRGGBB hex`);
       // `line.` and `layout.` carry the house's title rule: its weight and the air around it.
       if (!/^(color|style|font|type|line|layout)\./.test(key)) throw new Error(`Palette override ${key} must be a color., style., font., type., line. or layout. token`);
+      // A name no page reads sets nothing, and a token the palette derives is written over below: either way the author's
+      // colour would be lost without a word, so both are refused with the names that are read.
+      if (DERIVED_TOKENS.includes(key)) throw new Error(`Palette override ${key} is derived from the palette's other colours for each ground and cannot be set; set the colour it follows (${DERIVED_FROM}). The colours a palette sets: ${known.filter((name) => name.startsWith("color.")).join(", ")}`);
+      if (!known.includes(key)) throw new Error(`Palette override ${key} is not a token a page reads. The ${key.split(".")[0]}. tokens a palette sets: ${known.filter((name) => name.startsWith(`${key.split(".")[0]}.`)).join(", ")}`);
       if (key.startsWith("type.") && !(Number.isFinite(value) && value >= 6 && value <= 200)) throw new Error(`Palette type size ${key} must be a point size`);
       if (/^(line|layout)\./.test(key) && !(Number.isFinite(value) && value >= 0 && value <= 200)) throw new Error(`Palette length ${key} must be a number of pixels`);
     }

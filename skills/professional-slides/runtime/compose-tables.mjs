@@ -430,7 +430,7 @@ function columnUnit(column, mark) {
 // filled label column keep the reader's place or structure the grid; they say
 // nothing about the figures, which stay free to take the device their shape
 // implies.
-const TREATMENT_CELLS = new Set(["heatmap", "bars", "harvey", "rating", "dot", "progress", "rag", "status", "lights", "lamp", "check", "binary", "trend", "logo"]);
+const TREATMENT_CELLS = new Set(["heatmap", "bars", "harvey", "rating", "dot", "progress", "rag", "tag", "status", "lights", "lamp", "check", "binary", "trend", "logo"]);
 const TREATMENT_COLUMNS = ["heat", "bar", "harvey", "logo", "icon"];
 const treatmentCell = (cell) => cell && typeof cell === "object" && (TREATMENT_CELLS.has(String(cell.type ?? "")) || Boolean(cell.icon));
 function tableTreated(ex) {

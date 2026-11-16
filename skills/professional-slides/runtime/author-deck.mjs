@@ -138,7 +138,7 @@ export function compileDeck(docIn, { insights = null, partial = false } = {}) {
       if (revision) { waiting.push(page.id ?? `page ${index + 1}`); return null; }
       return refuse(index, `${page.id ?? `page ${index + 1}`}: \`draft\` is an imported slide's old copy, which only a revision (\`workflow: "${REVISION}"\`) carries; give the page its \`type\` and write its copy`);
     }
-    const options = { insights, players: doc.deck.players, sources: doc.sources, rules: doc.deck };
+    const options = { insights, players: doc.deck.players, sources: doc.sources, rules: doc.deck, layouts: doc.deck.layouts };
     if (binding.bound.failed.has(id)) {
       // A page left out for a reference that does not bind is compiled for its own refusals, with its numbers stood in for.
       const stand = withPlaceholders(binding.bound.attempted.get(page) ?? page);
@@ -274,7 +274,7 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const revised = imported ? revisionChanges(spec, imported) : null;
   add(consistencyFindings(doc, insights, { spec, inventory: imported, changed: revised?.content ?? null }));
   const gates = composed.deck ? sceneGateFindings(composed.deck, python) : { ran: false, findings: [], advisories: [], reason: composed.error };
-  add(withFormLever([...gates.findings, ...gates.advisories], doc));
+  add([...gates.findings, ...gates.advisories]);
   if (composed.deck) add(sceneDesignFindings(composed.deck));
   const assets = baseDir ? await assetFindings(spec, baseDir) : { statement: null, findings: [] };
   add(assets.findings);
@@ -308,41 +308,6 @@ function twoValueFindings(spec, scene) {
     const changed = Boolean(chart.cagr) || (Array.isArray(chart.changeAnnotations) && chart.changeAnnotations.length > 0);
     const little = comparesTooLittle({ members: chart.categories.length, series: chart.series.length, shared, changed });
     return little ? [{ code: "NO_COMPARISON", id: String(slide.id), severity: "blocker", repair: `${slide.id}: ${little}` }] : [];
-  });
-}
-
-/**
- * An empty band on a page whose form sets its items in rows of a count it publishes (`columns`: cards, tiles, panels a
- * row) is first that count's to close: the run that built the Spacebar deck spent three of its four rounds on the
- * generic advice before it found `columns`, which only `--schema parallel/cards` named.
- */
-// The lever each form's empty band answers to, first: what closed it on the A350F deck, where each short page took three
-// tries of the generic advice. A table's height is its rows, so commentary beside one changes nothing; a timeline's items
-// run in one band across, so its rows-down form fills the page.
-const TABLE_LEVER = "a table stands as tall as its rows: add the rows or columns the comparison needs, transpose a short wide table (its columns as rows), or set points `below` it - points `beside` a table leave its height as it is";
-const FORM_LEVERS = {
-  lookup: TABLE_LEVER, scorecard: TABLE_LEVER, matrix: TABLE_LEVER,
-  "schedule/timeline": "a timeline sets its items in one band: take `form: \"roadmap\"`, one row an item down the page, or add items",
-  "options/compare": "each side stands as tall as its points: give each side every point the comparison has, or a `caption` under the panels",
-  "summary/executive-summary": "add a figure strip (`metrics`, three to five figures) under the points",
-  "argument/sidebar": "the paragraphs set the height beside the panel: add a paragraph, or say more in the panel",
-  "numbers/hero-number": "the figure's column fills with its points: the points the figure needs `beside` it, each a lead with its evidence or a lead over short bullets",
-  picture: "a picture keeps its shape: add a `kpi` under it, or set the points `below`",
-  ranking: "a few bars stand short: pair the chart with a second exhibit for the same claim (`type: \"panels\", form: \"row\"`), set the points `below`, or add the members the comparison leaves out",
-  trend: "a short run stands short: pair the chart with a second exhibit for the same claim (`type: \"panels\", form: \"row\"`), set the points `below`, or add the periods or series the comparison needs",
-};
-function withFormLever(found, doc) {
-  const byId = new Map([...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page?.id !== undefined && PAGE_TYPES[page.type]).map((page) => [String(page.id), page]));
-  return found.map((f) => {
-    const page = f.code === "SCENE_VOID" ? byId.get(String(f.id)) : null;
-    if (!page) return f;
-    const form = page.form ?? Object.keys(PAGE_TYPES[page.type].forms)[0];
-    const lever = FORM_LEVERS[`${page.type}/${form}`] ?? FORM_LEVERS[page.type];
-    let count;
-    try { count = formFields(page.type, form).exhibit?.columns; } catch { return f; }
-    if (typeof count !== "string" || !/^(int|\d+-\d+)\b/.test(count)) return lever ? { ...f, repair: `On a ${page.type}/${form} page, ${lever}. ${f.repair}` } : f;
-    const set = page.exhibit?.columns === undefined ? "it is set by the runtime" : `it is ${page.exhibit.columns}`;
-    return { ...f, repair: `On a ${page.type}/${form} page the band is closed first by \`exhibit.columns\` (${count.replace(/^int - /, "")}; ${set}): fewer a row stand taller and take the height, more a row take the width. ${f.repair}` };
   });
 }
 

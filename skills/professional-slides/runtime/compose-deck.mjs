@@ -428,7 +428,7 @@ function composeDeckWith(spec, baseDir) {
     const { sourceSlideId, hidden, sourceSlide: _imported, ...page } = resolveReferences(raw);
     if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
     remember(raw);
-    const composed = composeSlide(page, slides.length, baseDir, fill, 1, recent, recentStyles, { players: spec.players });
+    const composed = composeSlide(page, slides.length, baseDir, fill, 1, recent, recentStyles, { players: spec.players, layouts: spec.layouts });
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
     if (hidden) composed.hidden = true;
     slides.push(composed);

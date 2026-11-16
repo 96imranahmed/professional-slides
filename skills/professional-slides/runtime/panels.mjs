@@ -3,11 +3,12 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted, reversedFill, reversedType } from "./core.mjs";
+import { token, tokenValue, stableId, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted, reversedFill, reversedType } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
-import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
+import { fillRect } from "./draw.mjs";
 import { mediaNode, markDrawable } from "./media.mjs";
+import { setText, drawText, settingOfAll, TEXT_ROLE_TOKENS } from "./text-roles.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
@@ -18,12 +19,9 @@ const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.band", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "type.coverTitle", "type.figureLarge", "type.figureHero", "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.band", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round", ...TEXT_ROLE_TOKENS])]);
 
-const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
-const measure = (value, width, size, bold = false) => measureAt(value, width, { size, bold });
 const rect = (id, role, frame, fill, stroke = "none", radius = "radius.none") => fillRect(id, role, frame, fill, { stroke, radius });
-const label = measuredLabel;
 
 /* ------------------------------------------------------------------ cards */
 
@@ -93,16 +91,20 @@ export function cardsLayout(frame, props, rhythm = 0) {
   // `rhythm` opens the gaps inside a card that has height to spare (see
   // `cardsNodes`): the space between the blocks grows before the padding does.
   const headGap = v("space.2") + rhythm / 2, bodyGap = v("space.3") + rhythm;
+  // A card's words are the page's content, set in their roles (text-roles.mjs) at their reading measure: its title a lead
+  // (bold body type beside a stat card's figure), its text, points and footer body text. Its figure and its big numeral
+  // are display marks, set at the size their place calls for.
   const measured = items.map((item) => {
-    const statValueWidth = tone === "stat" && item.value ? Math.ceil(measure(item.value, inner, "type.heading", true).width) + 2 * v("space.3") : 0;
+    const statValue = tone === "stat" && item.value ? setText("figure", item.value, inner) : null;
+    const statValueWidth = statValue ? Math.ceil(statValue.width) + 2 * v("space.3") : 0;
     const titleWidth = tone === "numbered" ? inner - disc - v("space.3") : tone === "stat" ? inner - statValueWidth : inner;
-    const title = tone === "stat" ? measure(item.title, titleWidth, "type.body", true) : measure(item.title, titleWidth, "type.heading", true);
+    const title = tone === "stat" ? setText("body", item.title, titleWidth, { bold: true }) : setText("lead", item.title, titleWidth);
     const bodyWidth = tone === "big-number" ? inner - 2 * v("space.3") : inner;
-    const body = item.text ? measure(item.text, bodyWidth, "type.body") : null;
-    const points = item.points.map((p) => measure(p, bodyWidth - v("space.4"), "type.body"));
-    const footer = item.footer ? measure(item.footer, inner, "type.compact", true) : null;
-    const value = item.value && tone !== "stat" ? measure(item.value, inner, "type.metric", true) : null;
-    const number = tone === "big-number" ? measure(String(item.number).padStart(2, "0"), inner, "type.deckTitle", true) : null;
+    const body = item.text ? setText("body", item.text, bodyWidth) : null;
+    const points = item.points.map((p) => setText("body", p, bodyWidth - v("space.4")));
+    const footer = item.footer ? setText("body", item.footer, inner, { bold: true }) : null;
+    const value = item.value && tone !== "stat" ? setText("figure", item.value, inner, { size: "type.metric" }) : null;
+    const number = tone === "big-number" ? setText("mark", String(item.number).padStart(2, "0"), inner, { size: "type.deckTitle" }) : null;
     // Header zone: icon (outline/plain/disc), filled band (header), disc + title
     // (numbered), big numeral + title (big-number), dark tile (dark) or a ruled
     // column heading (columns).
@@ -113,10 +115,11 @@ export function cardsLayout(frame, props, rhythm = 0) {
     const valueHeight = value ? bodyGap + value.height : 0;
     const bodyHeight = (tone === "big-number" ? v("space.3") : 0) + (body ? bodyGap + body.height : 0) + points.reduce((sum, p) => sum + v("space.1") + p.height, points.length ? bodyGap - v("space.1") : 0) + (tone === "big-number" ? v("space.3") : 0);
     const footerHeight = footer ? bodyGap + footer.height : 0;
-    return { item, title, body, points, footer, value, number, iconBlock, numberBlock, bandHeight, titleHeight, valueHeight, bodyHeight, footerHeight, height: pad + iconBlock + numberBlock + bandHeight + titleHeight + valueHeight + bodyHeight + footerHeight + pad };
+    return { item, title, body, points, footer, value, statValue, number, iconBlock, numberBlock, bandHeight, titleHeight, valueHeight, bodyHeight, footerHeight, height: pad + iconBlock + numberBlock + bandHeight + titleHeight + valueHeight + bodyHeight + footerHeight + pad };
   });
   const headerHeight = Math.max(...measured.map((m) => m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight));
-  return { items: measured, tone, centred, open, gap, pad, width, inner, iconSize, disc, headGap, bodyGap, headerHeight, height: Math.max(...measured.map((m) => m.height - (m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight) + headerHeight)) };
+  return { items: measured, tone, centred, open, gap, pad, width, inner, iconSize, disc, headGap, bodyGap, headerHeight, height: Math.max(...measured.map((m) => m.height - (m.iconBlock + m.numberBlock + m.bandHeight + m.titleHeight + m.valueHeight) + headerHeight)),
+    texts: measured.flatMap((m) => [m.title, m.body, ...m.points, m.footer]) };
 }
 
 // The most a boxed card's rhythm opens: the gaps between icon, title, figure
@@ -144,7 +147,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   // takes the left quarter in dark grey; the cards answer it to the right.
   const asked = typeof props.question === "string" && props.question.trim();
   const qw = Math.round(frame.width * 0.24), qgap = v("space.4"), qpad = v("space.4");
-  const q = asked ? measure(props.question, qw - 2 * qpad, "type.heading", true) : null;
+  const q = asked ? setText("statement", props.question, qw - 2 * qpad) : null;
   if (asked) frame = { ...frame, x: frame.x + qw + qgap, width: frame.width - qw - qgap };
   const natural = cardsLayout(frame, props);
   if (natural.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
@@ -164,7 +167,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   if (asked) {
     const h = Math.max(cardHeight, q.height + 2 * qpad);
     nodes.push(rect(stableId(id, "question"), "card-question", { x: frameIn.x, y: frame.y, width: qw, height: h }, reversedFill(SECONDARY), "none", "radius.none"));
-    nodes.push(label(stableId(id, "question-text"), "card-question-text", { x: frameIn.x + qpad, y: frame.y + qpad, width: qw - 2 * qpad }, q, text("type.heading", reversedType(), true)));
+    nodes.push(drawText(stableId(id, "question-text"), "card-question-text", { x: frameIn.x + qpad, y: frame.y + qpad, width: qw - 2 * qpad }, q, { color: reversedType() }));
   }
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
@@ -178,7 +181,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     const align = L.centred ? "center" : "left";
     if (L.tone === "header") {
       nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, reversedFill(PRIMARY)));
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: top + v("space.2"), width: L.inner }, m.title, text("type.heading", reversedType(), true)));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx, y: top + v("space.2"), width: L.inner }, m.title, { color: reversedType() }));
       y = top + m.bandHeight + L.pad;
     } else if (L.tone === "dark") {
       // A navy tile carries icon and title in white; the copy sits below it on the page.
@@ -187,17 +190,17 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       let ty = top + (m.bandHeight - block) / 2;
       if (m.item.logo) { nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y: ty, width: L.inner, height: L.iconSize }, true, true)); ty += L.iconSize + L.headGap; }
       else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", reversedType(), true, "center")));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, { color: reversedType(), align: "center" }));
     } else if (L.tone === "big-number") {
       // "01 / 02 / 03": the numeral in display type, the title beside the next
       // card's arrow, and the copy on a muted band that runs to the frame's foot.
-      nodes.push(label(stableId(cid, "number"), "card-number", { x: cx, y, width: L.inner }, m.number, text("type.deckTitle", ACCENT_OR_PRIMARY(), true)));
+      nodes.push(drawText(stableId(cid, "number"), "card-number", { x: cx, y, width: L.inner }, m.number, { color: ACCENT_OR_PRIMARY() }));
       y += m.numberBlock;
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true)));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, { color: INK }));
       if (index < L.items.length - 1) nodes.push(...iconMarker({ id: stableId(cid, "arrow"), role: "card-arrow", x: x + L.width + (L.gap - L.disc) / 2, y: y + (m.title.lineHeight - L.disc) / 2, size: L.disc, icon: "arrow-right", tone: "plain", data: { muted: true } }));
       y += m.title.height;
     } else if (L.tone === "columns") {
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true)));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, { color: INK }));
       const ry = y + m.title.height + v("space.2");
       nodes.push(linePrimitive({ id: stableId(cid, "title-rule"), role: "card-rule", x1: cx, y1: ry, x2: cx + L.inner, y2: ry, style: { stroke: INK, lineWidth: token("line.hairline") } }));
       // The rule separates two columns of type, so it ends where the type
@@ -211,26 +214,26 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     } else if (L.tone === "stat") {
       // "88% | Investors that believe …": the figure in the heading role, a hairline
       // divider, the statement beside it; the copy continues below.
-      const vw = Math.ceil(measure(m.item.value, L.inner, "type.heading", true).width) + v("space.3");
-      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y, width: vw }, measure(m.item.value, vw, "type.heading", true), text("type.heading", INK, true)));
+      const vw = Math.ceil(m.statValue.width) + v("space.3");
+      nodes.push(drawText(stableId(cid, "value"), "card-value", { x: cx, y, width: vw }, m.statValue, { color: INK }));
       nodes.push(linePrimitive({ id: stableId(cid, "divider"), role: "card-divider", x1: cx + vw, y1: y, x2: cx + vw, y2: y + m.title.height, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + vw + v("space.3"), y, width: L.inner - vw - v("space.3") }, m.title, text("type.body", INK, true)));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx + vw + v("space.3"), y, width: L.inner - vw - v("space.3") }, m.title, { color: INK }));
       y += m.title.height;
     } else if (L.tone === "numbered") {
       nodes.push(...numberMarker({ id: stableId(cid, "number"), role: "card-marker", x: cx, y: y + (m.title.lineHeight - L.disc) / 2, size: L.disc, number: m.item.number }));
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + L.disc + v("space.3"), y, width: L.inner - L.disc - v("space.3") }, m.title, text("type.heading", INK, true)));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx + L.disc + v("space.3"), y, width: L.inner - L.disc - v("space.3") }, m.title, { color: INK }));
       y += m.title.height;
     } else {
       if (m.item.logo) nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y, width: L.inner, height: L.iconSize }, L.centred, false));
       else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: L.tone === "disc" ? "filled" : "outline" })); }
       y += m.iconBlock;
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true, align)));
+      nodes.push(drawText(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, { color: INK, align }));
       y += m.title.height;
     }
     if (m.value) {
       // A headline figure under the title (price, size, share) in the metric role.
       const vy = top + L.pad + (L.tone === "header" || L.tone === "dark" ? m.bandHeight : m.iconBlock + m.numberBlock + m.titleHeight) + L.bodyGap;
-      nodes.push(label(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, text("type.metric", readableOn(PRIMARY, onCard, 3), true, align)));
+      nodes.push(drawText(stableId(cid, "value"), "card-value", { x: cx, y: vy, width: L.inner }, m.value, { color: readableOn(PRIMARY, onCard, 3), align }));
     }
     // Content starts level across the row (row rule), below the tallest header.
     y = L.tone === "header" || L.tone === "dark" ? top + L.headerHeight + L.pad : top + L.pad + L.headerHeight;
@@ -240,17 +243,17 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: y + L.bodyGap, width: L.width, height: Math.max(0, cardHeight - (y + L.bodyGap - top)) }, cardMuted()));
       tx = cx + v("space.3"); tw = L.inner - 2 * v("space.3"); y += v("space.3");
     }
-    if (m.body) { y += L.bodyGap; nodes.push(label(stableId(cid, "text"), "card-text", { x: tx, y, width: tw }, m.body, text("type.body", INK, false, align))); y += m.body.height; }
+    if (m.body) { y += L.bodyGap; nodes.push(drawText(stableId(cid, "text"), "card-text", { x: tx, y, width: tw }, m.body, { color: INK, align })); y += m.body.height; }
     m.points.forEach((p, k) => {
       y += k ? v("space.1") : L.bodyGap;
       nodes.push(rect(stableId(cid, "bullet", k), "card-bullet", { x: tx, y: y + (p.lineHeight - v("space.1")) / 2, width: v("space.1"), height: v("space.1") }, INK));
-      nodes.push(label(stableId(cid, "point", k), "card-point", { x: tx + v("space.4"), y, width: tw - v("space.4") }, p, text("type.body")));
+      nodes.push(drawText(stableId(cid, "point", k), "card-point", { x: tx + v("space.4"), y, width: tw - v("space.4") }, p, { color: INK }));
       y += p.height;
     });
     if (m.footer) {
       const fy = frame.y + cardHeight - L.pad - m.footer.height;
       nodes.push(linePrimitive({ id: stableId(cid, "footer-rule"), role: "card-rule", x1: cx, y1: fy - v("space.2"), x2: cx + L.inner, y2: fy - v("space.2"), style: { stroke: RULE, lineWidth: token("line.hairline") } }));
-      nodes.push(label(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, text("type.compact", readableOn(PRIMARY, onCard), true)));
+      nodes.push(drawText(stableId(cid, "footer"), "card-footer", { x: cx, y: fy, width: L.inner }, m.footer, { color: readableOn(PRIMARY, onCard) }));
     }
   });
   return nodes;
@@ -265,14 +268,16 @@ export function quadrantsLayout(frame, props) {
   const width = (frame.width - gap) / 2, height = (frame.height - gap) / 2, inner = width - 2 * pad;
   const cells = quads.map((q, i) => {
     if (!q || typeof q.title !== "string" || !q.title.trim()) throw new Error(`Quadrant ${i + 1} requires a title`);
-    const title = measure(q.title, inner, "type.heading", true);
-    const points = (Array.isArray(q.points) ? q.points : q.text ? [q.text] : []).map((p) => measure(typeof p === "string" ? p : p.text, inner - v("space.4"), "type.body"));
+    // A quadrant's title is its lead and its points body text, at their reading measure (text-roles.mjs).
+    const title = setText("lead", q.title, inner);
+    const points = (Array.isArray(q.points) ? q.points : q.text ? [q.text] : []).map((p) => setText("body", typeof p === "string" ? p : p.text, inner - v("space.4")));
     const band = title.height + 2 * v("space.2");
     const body = points.reduce((sum, p) => sum + p.height, 0) + Math.max(0, points.length - 1) * v("space.1");
     return { title, points, band, needed: band + pad + body + pad };
   });
-  if (cells.some((c) => c.needed > height + 0.01)) throw new Error("Quadrant copy exceeds its cell; shorten the points");
-  return { cells, gap, pad, width, height, inner };
+  const over = cells.findIndex((c) => c.needed > height + 0.01);
+  if (over >= 0) throw new Error(`Quadrant ${over + 1}, "${quads[over].title}", needs ${Math.ceil(cells[over].needed)}px and its cell has ${Math.floor(height)}px; shorten its points or give the quadrants more height`);
+  return { cells, gap, pad, width, height, inner, texts: cells.flatMap((c) => [c.title, ...c.points]) };
 }
 
 export function quadrantsNodes({ id, frame, props }) {
@@ -285,11 +290,11 @@ export function quadrantsNodes({ id, frame, props }) {
     const x = frame.x + (i % 2) * (L.width + L.gap), y0 = frame.y + Math.floor(i / 2) * (L.height + L.gap), qid = stableId(id, "quadrant", i);
     nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, cardMuted()));
     nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, light ? TINT : reversedFill(PRIMARY)));
-    nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", light ? INK : reversedType(), true)));
+    nodes.push(drawText(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, { color: light ? INK : reversedType() }));
     let y = y0 + cell.band + L.pad;
     cell.points.forEach((p, k) => {
       nodes.push(rect(stableId(qid, "bullet", k), "quadrant-bullet", { x: x + L.pad, y: y + (p.lineHeight - v("space.1")) / 2, width: v("space.1"), height: v("space.1") }, INK));
-      nodes.push(label(stableId(qid, "point", k), "quadrant-point", { x: x + L.pad + v("space.4"), y, width: L.inner - v("space.4") }, p, text("type.body")));
+      nodes.push(drawText(stableId(qid, "point", k), "quadrant-point", { x: x + L.pad + v("space.4"), y, width: L.inner - v("space.4") }, p, { color: INK }));
       y += p.height + v("space.1");
     });
   });
@@ -303,7 +308,8 @@ function ringMetricNodes({ id, frame, props }) {
   const raw = String(props.value).trim();
   const share = /^\d+(\.\d+)?\s*%?$/.test(raw) ? Number(raw.replace("%", "")) : NaN;
   if (!(share >= 0 && share <= 100)) throw new Error("Ring metric takes a percentage value from 0 to 100");
-  const labelLayout = props.label ? measure(props.label, frame.width - 2 * v("space.2"), "type.compact") : null;
+  // What the share is of is the tile's content: a note at body size under the ring (text-roles.mjs).
+  const labelLayout = props.label ? setText("note", props.label, frame.width - 2 * v("space.2")) : null;
   const gap = v("space.2");
   const size = Math.max(56, Math.min(frame.width - 2 * v("space.2"), frame.height - (labelLayout ? labelLayout.height + gap : 0) - 4));
   const circle = { x: frame.x + (frame.width - size) / 2, y: frame.y + (frame.height - size - (labelLayout ? labelLayout.height + gap : 0)) / 2, width: size, height: size };
@@ -312,14 +318,15 @@ function ringMetricNodes({ id, frame, props }) {
   if (share > 0) nodes.push(wedgePrimitive({ id: stableId(id, "arc"), role: "metric-ring", frame: circle, startAngle: -90, endAngle: -90 + 360 * Math.min(share, 100) / 100, style: { fill: ACCENT, stroke: "none", lineWidth: token("line.hairline") }, data: { share } }));
   const hole = size * 0.72;
   nodes.push(ellipsePrimitive({ id: stableId(id, "hole"), role: "metric-ring-hole", frame: { x: circle.x + (size - hole) / 2, y: circle.y + (size - hole) / 2, width: hole, height: hole }, style: { fill: SURFACE, stroke: "none", lineWidth: token("line.hairline"), radius: token("radius.round") } }));
-  // The value takes the largest type that fits inside the hole.
-  let valueSize = "type.metric", value = null;
-  for (const candidate of ["type.metric", "type.heading", "type.compact"]) {
-    try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(FIGURES), fontSize: v(candidate), bold: true }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
+  // The value is a figure, set at the largest size that holds it on one line inside the hole; a hole too small for it at
+  // the figure's own size is refused, not filled with caption type.
+  let value = null;
+  for (const candidate of ["type.metric", "type.heading"]) {
+    try { value = setText("figure", String(props.value), hole - 8, { size: candidate }); if (value.lines.length === 1) break; } catch { value = null; }
   }
-  if (!value) throw new Error("Ring metric is too small for its value; give the ring more room or shorten the value");
-  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
-  if (labelLayout) nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, text("type.compact", SECONDARY, false, "center")));
+  if (!value || value.lines.length > 1) throw new Error(`Ring metric "${props.value}" does not fit its ${Math.floor(hole)}px hole on one line; give the ring more room or shorten the value`);
+  nodes.push(drawText(stableId(id, "value"), "metric-value", { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8 }, value, { color: INK, align: "center" }));
+  if (labelLayout) nodes.push(drawText(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, { align: "center" }));
   return nodes;
 }
 
@@ -328,15 +335,47 @@ function ringMetricNodes({ id, frame, props }) {
  * what a column sizes the tile to when the number heads its points, so the
  * first point sits under the number rather than under a fixed box's air.
  */
+/**
+ * The size a metric's figure is set at. `display` is the figure that is the page's point: it takes the largest display
+ * size that sets it on one line in the width it has, so a lone number in an open column is as large as the column
+ * allows and the same number in a narrow cell steps down rather than breaking.
+ */
+function figureSize(props, width) {
+  if (props.variant !== "display") return props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  // `ceiling`: the largest size the figure may take, where the page has less height than its width would allow.
+  // A figure too wide for the width at a size cannot be measured there (it does not break): that size does not fit.
+  const ladder = ["type.figureHero", "type.figureLarge", "type.coverTitle", "type.deckTitle"];
+  return ladder.slice(Math.max(0, ladder.indexOf(props.ceiling))).find((size) => { try { return measureText(String(props.value ?? ""), width, { fontFamily: tokenValue(FIGURES), fontSize: v(size), bold: true }).lines.length === 1; } catch { return false; } }) ?? "type.metric";
+}
+
+/** How much of the scale a display figure could take it gets at a width (1: the largest size; lower as it steps down). */
+const figureEmphasis = (props, width) => (props.variant === "display" ? v(figureSize(props, width)) / v("type.figureHero") : null);
+
+/**
+ * A metric's words measured at a width, by its measurement and its drawing alike. Under a display figure the words are
+ * the page's content, not a tile's furniture, and are set in their roles (text-roles.mjs): the label is the statement the
+ * figure makes, the sub-line a note under it, the delta body text in bold - each at its reading measure. A tile in a
+ * strip or a KPI card packs several figures into one row and keeps the caption sizes (`type`, for the drawing).
+ */
+function metricTexts(props, width) {
+  if (props.variant === "display") return { roles: true, label: props.label ? setText("statement", props.label, width) : null, sub: props.sublabel ? setText("note", props.sublabel, width) : null, delta: props.delta ? setText("body", props.delta, width, { bold: true }) : null };
+  // A tile in a strip or a KPI card says what its figure counts: that is content too, set as a note at body size, and
+  // its change body text in bold - the tile is as tall as they take (metricHeight), not a caption squeezed under it.
+  return { roles: true, label: props.label ? setText("note", props.label, width) : null, sub: props.sublabel ? setText("note", props.sublabel, width) : null, delta: props.delta ? setText("body", props.delta, width, { bold: true }) : null };
+}
+
+/** A metric's figure at a width: the display size its variant takes (figureSize), set as a figure. */
+const metricValue = (props, width) => setText("figure", String(props.value ?? ""), width, { size: figureSize(props, width) });
+
+/** A metric's height at a width. */
 export function metricHeight(width, props) {
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const inner = width - 2 * pad;
-  const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  const texts = metricTexts(props, inner);
   const gap = v("space.1");
-  const parts = [measureText(String(props.value ?? ""), inner, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true }).height,
-    ...(props.label ? [measure(props.label, inner, "type.compact").height] : []), ...(props.sublabel ? [measure(props.sublabel, inner, "type.label").height] : []),
-    ...(props.delta ? [measure(props.delta, inner, "type.label", true).height] : [])];
-  return parts.reduce((sum, h) => sum + h, 0) + gap * (parts.length - 1) + 2 * pad;
+  const value = metricValue(props, inner);
+  const parts = [value, texts.label, texts.sub, texts.delta].filter(Boolean);
+  return parts.reduce((sum, part) => sum + part.height, 0) + gap * (parts.length - 1) + 2 * pad;
 }
 
 export function metricNodes({ id, frame, props }) {
@@ -353,11 +392,9 @@ export function metricNodes({ id, frame, props }) {
   const dark = props.tone === "dark" || ink_;
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const width = frame.width - 2 * pad;
-  const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
-  const value = measureText(String(props.value), width, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true });
-  const labelLayout = props.label ? measure(props.label, width, "type.compact") : null;
-  const sub = props.sublabel ? measure(props.sublabel, width, "type.label") : null;
-  const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
+  const value = metricValue(props, width);
+  const display = props.variant === "display";
+  const { label: labelLayout, sub, delta } = metricTexts(props, width);
   const gap = v("space.1");
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
   if (total > frame.height + 0.01) throw new Error(`Metric tile is too short for its ${["value", labelLayout && "label", sub && "sublabel", delta && "delta"].filter(Boolean).join(", ")}: they take ${Math.ceil(total)}px at this width and the tile has ${Math.floor(frame.height)}px. Shorten the ${sub ? "sublabel or the label" : "label"}${delta ? ", or drop the delta" : ""}, or set fewer tiles so each is wider`);
@@ -381,10 +418,14 @@ export function metricNodes({ id, frame, props }) {
   // three lines against its neighbours' four would begin ten pixels lower, and
   // three numbers read across would step visibly down.
   let y = hero || props.valign === "top" ? frame.y : frame.y + (frame.height - total) / 2;
-  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
+  nodes.push(drawText(stableId(id, "value"), "metric-value", { x: frame.x + pad, y, width }, value, { color: ink, align }));
   y += value.height;
-  if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text("type.compact", grey, false, align))); y += labelLayout.height; }
-  if (sub) { y += gap; nodes.push(label(stableId(id, "sublabel"), "metric-sublabel", { x: frame.x + pad, y, width }, sub, text("type.label", grey, false, align))); y += sub.height; }
+  // Under a display figure the label is in the page's ink and the sub-line in the secondary colour, so the two read as a
+  // statement and its qualifier (their roles' colours); on a dark tile both keep the tile's pale type.
+  const tinted = display && !dark ? undefined : grey;
+  const words = (part, role, at, set, color) => drawText(stableId(id, part), role, at, set, { color, align });
+  if (labelLayout) { y += gap; nodes.push(words("label", "metric-label", { x: frame.x + pad, y, width }, labelLayout, tinted)); y += labelLayout.height; }
+  if (sub) { y += gap; nodes.push(words("sublabel", "metric-sublabel", { x: frame.x + pad, y, width }, sub, tinted)); y += sub.height; }
   if (delta) {
     y += gap;
     const falling = /^\s*[-−▼↓]/.test(String(props.delta));
@@ -394,7 +435,7 @@ export function metricNodes({ id, frame, props }) {
     const better = props.better ?? "up";
     const good = better === "up" ? rising : falling, bad = better === "up" ? falling : rising;
     const color = dark ? reversedType() : bad ? token("color.negative") : good ? token("color.positive") : PRIMARY;
-    nodes.push(label(stableId(id, "delta"), "metric-delta", { x: frame.x + pad, y, width }, delta, text("type.label", color, true, align)));
+    nodes.push(words("delta", "metric-delta", { x: frame.x + pad, y, width }, delta, color));
   }
   return nodes;
 }
@@ -432,8 +473,9 @@ export function agendaLayout(frame, props) {
   const detailWidth = hasDetail ? frame.width - labelWidth - disc - gap - 3 * pad - v("space.5") : 0;
   const items = props.items.map((item, index) => {
     if (!item || typeof item.label !== "string" || !item.label.trim()) throw new Error(`Agenda item ${index + 1} requires a label`);
-    const label = measure(item.label, labelWidth, "type.heading", index === props.active);
-    const detail = item.detail ? measure(item.detail, detailWidth, "type.body") : null;
+    // A section's name is its lead, bold where the deck has reached it; what it covers a note (text-roles.mjs).
+    const label = setText("lead", item.label, labelWidth, { bold: index === props.active });
+    const detail = item.detail ? setText("note", item.detail, detailWidth) : null;
     return { item, label, detail, number: item.number ?? index + 1, height: Math.max(label.height, detail?.height ?? 0, disc) + 2 * pad };
   });
   const rowGap = v("space.2");
@@ -466,8 +508,8 @@ export function agendaNodes({ id, frame, props }) {
     if (active) nodes.push(rect(stableId(rid, "band"), "agenda-active", { x: frame.x, y, width: frame.width, height: h }, TINT, "none", "radius.small"));
     const cy = y + h / 2;
     nodes.push(...numberMarker({ id: stableId(rid, "number"), role: "agenda-marker", x: frame.x + L.pad, y: cy - L.disc / 2, size: L.disc, number: row.number, data: { index: i, active } }));
-    nodes.push(label(stableId(rid, "label"), "agenda-label", { x: frame.x + L.pad + L.disc + L.gap, y: cy - row.label.height / 2, width: L.labelWidth }, row.label, text("type.heading", INK, active)));
-    if (row.detail) nodes.push(label(stableId(rid, "detail"), "agenda-detail", { x: frame.x + L.pad + L.disc + L.gap + L.labelWidth + v("space.5"), y: cy - row.detail.height / 2, width: L.detailWidth }, row.detail, text("type.body", active ? INK : SECONDARY)));
+    nodes.push(drawText(stableId(rid, "label"), "agenda-label", { x: frame.x + L.pad + L.disc + L.gap, y: cy - row.label.height / 2, width: L.labelWidth }, row.label, { color: INK }));
+    if (row.detail) nodes.push(drawText(stableId(rid, "detail"), "agenda-detail", { x: frame.x + L.pad + L.disc + L.gap + L.labelWidth + v("space.5"), y: cy - row.detail.height / 2, width: L.detailWidth }, row.detail, { color: active ? INK : SECONDARY }));
     if (!active && i < L.items.length - 1) nodes.push(linePrimitive({ id: stableId(rid, "rule"), role: "agenda-rule", x1: frame.x + L.pad + L.disc + L.gap, y1: y + h + L.rowGap / 2, x2: frame.x + frame.width, y2: y + h + L.rowGap / 2, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
     y += h + L.rowGap;
   });
@@ -489,9 +531,9 @@ export function agendaColumnsNodes({ id, frame, props }) {
   const measured = items.map((item, i) => {
     const active = i === props.active;
     const numeral = String(item.number ?? i + 1).padStart(2, "0");
-    const number = measureText(numeral, width, { fontFamily: tokenValue(FIGURES), fontSize: v("type.quoteMark"), bold: true });
-    const labelLayout = measure(item.label, width, "type.heading", active);
-    const detail = item.detail ? measure(item.detail, width, "type.body") : null;
+    const number = setText("mark", numeral, width, { size: "type.quoteMark" });
+    const labelLayout = setText("lead", item.label, width, { bold: active });
+    const detail = item.detail ? setText("note", item.detail, width) : null;
     return { numeral, number, labelLayout, detail, height: number.height + 20 + labelLayout.height + (detail ? 8 + detail.height : 0) };
   });
   // The columns run the body's height, each its own band: the active section's tinted, a hairline between the others. The
@@ -510,13 +552,13 @@ export function agendaColumnsNodes({ id, frame, props }) {
     const numberColor = active ? ACCENT : dark ? token("color.chartGrid") : SECONDARY;
     const textColor = active ? (dark ? WHITE : INK) : dark ? token("color.chartGrid") : SECONDARY;
     let y = top;
-    nodes.push(textPrimitive({ id: stableId(rid, "number"), role: "agenda-number", frame: { x, y, width, height: number.height }, text: numeral, style: { fontFamily: FIGURES, fontSize: token("type.quoteMark"), color: numberColor, bold: true, align: "left", valign: "top", wrap: false, lineHeight: number.lineHeight }, data: { index: i, active, textLayout: number } }));
+    nodes.push(drawText(stableId(rid, "number"), "agenda-number", { x, y, width }, number, { color: numberColor, data: { index: i, active } }));
     y += number.height + 8;
     nodes.push(linePrimitive({ id: stableId(rid, "rule"), role: "agenda-rule", x1: x, y1: y, x2: x + width, y2: y, style: { stroke: active ? ACCENT : dark ? token("color.chartGrid") : RULE, lineWidth: token(active ? "line.standard" : "line.hairline") } }));
     y += 12;
-    nodes.push(label(stableId(rid, "label"), "agenda-label", { x, y, width }, labelLayout, text("type.heading", textColor, active)));
+    nodes.push(drawText(stableId(rid, "label"), "agenda-label", { x, y, width }, labelLayout, { color: textColor }));
     y += labelLayout.height;
-    if (detail) { y += 8; nodes.push(label(stableId(rid, "detail"), "agenda-detail", { x, y, width }, detail, text("type.body", textColor))); }
+    if (detail) { y += 8; nodes.push(drawText(stableId(rid, "detail"), "agenda-detail", { x, y, width }, detail, { color: textColor })); }
   });
   return nodes;
 }
@@ -545,7 +587,7 @@ export function registerPanels(registry) {
       if (props.valign === "middle") return null;
       if (!(typeof props.question === "string" && props.question.trim())) return grownCards(frame, props).height;
       const qw = Math.round(frame.width * 0.24), pad = v("space.4");
-      const q = measure(props.question, qw - 2 * pad, "type.heading", true);
+      const q = setText("statement", props.question, qw - 2 * pad);
       return Math.max(grownCards({ ...frame, width: frame.width - qw - v("space.4") }, props).height, q.height + 2 * pad);
     },
     guidance: { useWhen: "three to five parallel pillars, principles, options or initiatives each with a title and a line of description", why: "equal cards make parallel things read as parallel; the row rule keeps their bodies level", actionTitle: "state what the set of pillars achieves together" }
@@ -562,6 +604,11 @@ export function registerPanels(registry) {
     metric.tokens = [...new Set([...metric.tokens, ...PANEL_TOKENS])];
     metric.render = (input) => ({ nodes: metricNodes(input) });
     metric.variants = { default: {}, prominent: { props: { variant: "prominent" } }, dark: { props: { tone: "dark" } }, hero: { props: { tone: "hero", variant: "prominent", value: "80%", label: "(Insert what the number is)" } }, ink: { props: { tone: "ink", variant: "prominent", value: "1.6x", label: "(Insert what the number is)" } }, ring: { props: { tone: "ring", value: "68%", label: "(Insert what the share is)" } }, rule: { props: { tone: "rule", variant: "prominent", value: "443", label: "(Insert what the number is)" } } };
+    // What a metric is there to make large: its figure (core.mjs emphasisOf, read where the engine weighs an arrangement).
+    metric.emphasis = ({ props, width }) => figureEmphasis(props, width);
+    // How a display figure's words break at a width (text-roles.mjs): its statement left with a widow counts against the arrangement.
+    metric.setting = ({ props, width }) => { if (props.variant !== "display") return null; const texts = metricTexts(props, width - 2 * (props.tone === "hero" ? 0 : v("space.3"))); return settingOfAll([texts.label, texts.sub, texts.delta]); };
+    metric.measureContent = ({ frame, props }) => ({ height: Math.ceil(metricHeight(frame.width, props)) });
     metric.resolveVariant = (props = {}) => ["dark", "hero", "ink", "rule", "ring"].includes(props.tone) ? props.tone : props.variant ?? "default";
   }
   return registry;

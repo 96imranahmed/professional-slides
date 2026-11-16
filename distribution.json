@@ -37,6 +37,8 @@
     "skills/*/runtime/**/*.py",
     "skills/*/runtime/**/*.json",
     "skills/*/runtime/**/*.md",
+    "skills/*/runtime/**/*.wasm",
+    "skills/*/runtime/vendor/**/LICENSE",
     "skills/*/references/**/*.md",
     "skills/*/references/**/*.json",
     "skills/*/examples/*.json",

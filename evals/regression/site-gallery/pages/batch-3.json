@@ -1,0 +1,1458 @@
+[
+  {
+    "id": "numbers-stat-list",
+    "type": "numbers",
+    "form": "stat-list",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Shoppers buy the glacier, not the bottle: 58% choose us for the source",
+    "subtitle": "FY26 survey of 1,500 bottled-water shoppers",
+    "highlight": [
+      "three in five",
+      "65p more",
+      "One in three",
+      "only 12%"
+    ],
+    "exhibit": {
+      "tone": "dark",
+      "items": [
+        {
+          "value": "58%",
+          "text": "choose the brand for its glacier source above taste or price"
+        },
+        {
+          "value": "£1.85",
+          "text": "is what most will pay for 750 ml, against £1.20 for spring water"
+        },
+        {
+          "value": "1 in 3",
+          "text": "would switch to a refillable glass bottle with a deposit"
+        },
+        {
+          "value": "2.4x",
+          "text": "more repeat buying among shoppers who scan the ice-cam code"
+        },
+        {
+          "value": "12%",
+          "text": "can name the glacier the water actually comes from"
+        }
+      ]
+    },
+    "points": [
+      {
+        "lead": "The source sells the bottle",
+        "text": "Nearly three in five buyers name the glacier as their reason, and they pay 65p more than for spring water to get it. The label should lead with the ice, not the price."
+      },
+      {
+        "lead": "Glass is the next lever",
+        "text": "One in three would switch to refillable glass, about 4 million bottles a year at today's volumes, and the deposit pays for the washing line."
+      },
+      {
+        "lead": "The story runs on feeling",
+        "text": "Shoppers love the glacier but only 12% can name it. The ice-cam code turns a vague idea into a real place, and its scanners buy again 2.4 times as often."
+      }
+    ],
+    "pointsHeading": false,
+    "source": "Source: Synthetic demonstration • no real company data; a very cold clipboard"
+  },
+  {
+    "id": "options-compare",
+    "type": "options",
+    "form": "compare",
+    "commentary": "in-exhibit",
+    "takeaway": false,
+    "title": "Online classes out-yodel a second valley school at a third of the cost",
+    "subtitle": "Two ways to grow from 240 pupils; five-year plan from 2027",
+    "highlight": [
+      "€1.2 million",
+      "180 more pupils",
+      "year six",
+      "four new teachers",
+      "natural echo",
+      "14 months",
+      "€390,000",
+      "420 more pupils",
+      "year two",
+      "six current teachers",
+      "reverb",
+      "16 months",
+      "80 ms"
+    ],
+    "exhibit": {
+      "left": {
+        "heading": "Open a second valley school",
+        "points": [
+          "€1.2 million to buy and soundproof a chalet near Innsbruck",
+          "180 more pupils a year, once full in year three",
+          "Pays back in year six, at €640 of cost per pupil",
+          "Needs four new teachers, and alpine yodellers are scarce",
+          "Free natural echo off the mountain wall",
+          "Pupils reach the grade-three yodel in 14 months on average",
+          "Planning permission for the chalet takes 14 months"
+        ]
+      },
+      "right": {
+        "heading": "Teach live classes online",
+        "points": [
+          "€390,000 for two studios, software and a sound engineer",
+          "420 more pupils a year by year two, from 31 countries",
+          "Pays back in year two, at €290 of cost per pupil",
+          "The six current teachers cover it with evening slots",
+          "No real echo: the reverb is added in the mix",
+          "Pupils reach grade three in 16 months, two months slower",
+          "A lag check keeps duets in time on any connection under 80 ms"
+        ]
+      },
+      "winner": "right"
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head yodeller's spreadsheet, sung aloud"
+  },
+  {
+    "id": "options-table-halves",
+    "type": "options",
+    "form": "table-halves",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "Station pods pay back in 19 months, a year faster than airport pods",
+    "subtitle": "Next 20 pods, per-pod figures from the 2026 pilot sites",
+    "highlight": [
+      "half as often",
+      "Cheaper rent",
+      "more per hour slept",
+      "whole concourses"
+    ],
+    "exhibit": {
+      "type": "table",
+      "columns": [
+        "Term",
+        "Airport terminal",
+        "Rail station"
+      ],
+      "rows": [
+        [
+          "Stay",
+          "5.2 hours, layovers",
+          "9.1 hours, overnight"
+        ],
+        [
+          "Occupancy",
+          "71% across the day",
+          "84% across the day"
+        ],
+        [
+          "Rent",
+          "€1,450 a pod a month",
+          "€820 a pod a month"
+        ],
+        [
+          "Revenue",
+          "€3,900 a pod a month",
+          "€4,300 a pod a month"
+        ],
+        [
+          "Hourly price",
+          "€19 an hour slept",
+          "€14 an hour slept"
+        ],
+        [
+          "Busiest",
+          "Midnight to 6am",
+          "10pm to 7am"
+        ],
+        [
+          "Cleans",
+          "4.6 a pod a day",
+          "2.1 a pod a day"
+        ],
+        [
+          "Vetting",
+          "Nine weeks a hire",
+          "None needed"
+        ],
+        [
+          "Expansion",
+          "Gate leases rarely free",
+          "Three whole concourses"
+        ],
+        [
+          "Noise",
+          "A tannoy every 4 minutes",
+          "Silent 1am to 5am"
+        ],
+        [
+          "Guest rating",
+          "4.1 out of 5",
+          "4.6 out of 5"
+        ],
+        [
+          "Payback",
+          "31 months",
+          "19 months"
+        ]
+      ]
+    },
+    "points": [
+      "Station guests sleep the whole night, so each pod is cleaned half as often.",
+      "Cheaper rent and fuller pods outweigh the airport's higher hourly prices.",
+      "Airports still earn more per hour slept: keep both terminal sites open.",
+      "Open the next 20 pods in the three stations offering whole concourses."
+    ],
+    "pointsHeading": false,
+    "source": "Source: Synthetic demonstration • no real company data; the night manager's yawning log"
+  },
+  {
+    "id": "options-two-up",
+    "type": "options",
+    "form": "two-up",
+    "commentary": "none",
+    "takeaway": false,
+    "title": "Plant wax gets small lamps blobbing twice as fast; giants stay paraffin",
+    "subtitle": "Minutes from switch-on to the first rising blob, average of 50 test lamps a size",
+    "exhibits": [
+      {
+        "type": "chart.column",
+        "heading": "Classic paraffin wax",
+        "unit": "minutes",
+        "categories": [
+          "Mini 20 cm",
+          "Classic 40 cm",
+          "Grande 60 cm",
+          "Giant 90 cm"
+        ],
+        "series": [
+          {
+            "name": "Classic paraffin wax",
+            "values": [
+              38,
+              52,
+              75,
+              118
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Giant 90 cm"
+          }
+        ],
+        "caption": "Paraffin is slow to start in small lamps but holds the giants' heat best"
+      },
+      {
+        "type": "chart.column",
+        "heading": "Plant wax",
+        "unit": "minutes",
+        "categories": [
+          "Mini 20 cm",
+          "Classic 40 cm",
+          "Grande 60 cm",
+          "Giant 90 cm"
+        ],
+        "series": [
+          {
+            "name": "Plant wax",
+            "values": [
+              19,
+              31,
+              64,
+              131
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Mini 20 cm"
+          },
+          {
+            "category": "Classic 40 cm"
+          }
+        ],
+        "caption": "Plant wax halves the wait in a mini lamp, then lags in the 90 cm giant"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the night-shift blob watcher"
+  },
+  {
+    "id": "panels-grid",
+    "type": "panels",
+    "form": "grid",
+    "commentary": "captions",
+    "takeaway": false,
+    "title": "The pearl-gripper upgrade halved jams and lifted daily cups by a third",
+    "highlight": [
+      "6.3 to 3.1",
+      "34%",
+      "150 to 90 seconds",
+      "more than doubled"
+    ],
+    "exhibits": [
+      {
+        "type": "chart.column",
+        "heading": "Pearl jams",
+        "unit": "per 1,000 cups",
+        "categories": [
+          "Q2 2025",
+          "Q3 2025",
+          "Q4 2025",
+          "Q1 2026",
+          "Q2 2026",
+          "Q3 2026"
+        ],
+        "series": [
+          {
+            "name": "Pearl jams",
+            "values": [
+              6.4,
+              6.3,
+              4.1,
+              3.2,
+              3,
+              3.1
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Q3 2026"
+          }
+        ],
+        "caption": "Jams fell from 6.3 to 3.1 per 1,000 cups: no more squashed tapioca"
+      },
+      {
+        "type": "chart.column",
+        "heading": "Cups sold",
+        "unit": "per kiosk per day",
+        "categories": [
+          "Q2 2025",
+          "Q3 2025",
+          "Q4 2025",
+          "Q1 2026",
+          "Q2 2026",
+          "Q3 2026"
+        ],
+        "series": [
+          {
+            "name": "Cups sold",
+            "values": [
+              318,
+              322,
+              351,
+              392,
+              415,
+              430
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Q3 2026"
+          }
+        ],
+        "caption": "Daily cups rose 34%, from 322 to 430, as hatches stayed open"
+      },
+      {
+        "type": "chart.line",
+        "heading": "Average wait",
+        "unit": "seconds",
+        "categories": [
+          "Q2 2025",
+          "Q3 2025",
+          "Q4 2025",
+          "Q1 2026",
+          "Q2 2026",
+          "Q3 2026"
+        ],
+        "series": [
+          {
+            "name": "Average wait",
+            "values": [
+              151,
+              150,
+              124,
+              101,
+              94,
+              90
+            ]
+          }
+        ],
+        "caption": "Waits shrank from 150 to 90 seconds without the re-scoops"
+      },
+      {
+        "type": "chart.line",
+        "heading": "Five-star ratings",
+        "unit": "% of ratings",
+        "categories": [
+          "Q2 2025",
+          "Q3 2025",
+          "Q4 2025",
+          "Q1 2026",
+          "Q2 2026",
+          "Q3 2026"
+        ],
+        "series": [
+          {
+            "name": "Five-star ratings",
+            "values": [
+              38,
+              40,
+              55,
+              68,
+              76,
+              81
+            ]
+          }
+        ],
+        "caption": "Five-star ratings more than doubled to 81%; reviewers love the wave"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the robots' own maintenance logs"
+  },
+  {
+    "id": "panels-row",
+    "type": "panels",
+    "form": "row",
+    "commentary": "captions",
+    "takeaway": false,
+    "title": "Wet-sand beaches draw twice the crowds on half the prize money",
+    "subtitle": "Average per heat at the league's five venues, 2026 summer season",
+    "highlight": [
+      "twice the 8,300",
+      "half the €26,700",
+      "nine in ten"
+    ],
+    "exhibits": [
+      {
+        "type": "chart.bar",
+        "heading": "Spectators per heat",
+        "unit": "thousand",
+        "categories": [
+          "Weymouth",
+          "Knokke",
+          "Scheveningen",
+          "Biarritz",
+          "Sylt"
+        ],
+        "series": [
+          {
+            "name": "Spectators per heat",
+            "values": [
+              18.4,
+              16.2,
+              9.1,
+              8.3,
+              7.6
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Weymouth"
+          },
+          {
+            "category": "Knokke"
+          }
+        ],
+        "caption": "The two wet-sand venues average 17,300 spectators a heat, twice the 8,300 at the dry ones"
+      },
+      {
+        "type": "chart.bar",
+        "heading": "Prize pot per heat",
+        "unit": "€ thousand",
+        "categories": [
+          "Weymouth",
+          "Knokke",
+          "Scheveningen",
+          "Biarritz",
+          "Sylt"
+        ],
+        "series": [
+          {
+            "name": "Prize pot per heat",
+            "values": [
+              12,
+              14,
+              26,
+              30,
+              24
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Weymouth"
+          },
+          {
+            "category": "Knokke"
+          }
+        ],
+        "caption": "Yet they pay €13,000 a heat, half the €26,700 the dry venues need to lure builders"
+      },
+      {
+        "type": "chart.bar",
+        "heading": "Towers standing at judging",
+        "unit": "%",
+        "categories": [
+          "Weymouth",
+          "Knokke",
+          "Scheveningen",
+          "Biarritz",
+          "Sylt"
+        ],
+        "series": [
+          {
+            "name": "Towers standing at judging",
+            "values": [
+              92,
+              88,
+              61,
+              54,
+              58
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Weymouth"
+          },
+          {
+            "category": "Knokke"
+          }
+        ],
+        "caption": "Damp sand holds: nine in ten towers survive to judging, so crowds stay for the finale"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the league's bucket-and-spade ledger"
+  },
+  {
+    "id": "panels-sequence",
+    "type": "panels",
+    "form": "sequence",
+    "commentary": "captions",
+    "takeaway": false,
+    "title": "Quieter thrusters cut complaints 70% and doubled suburban mower sales",
+    "subtitle": "Rocket mower fleet, financial years FY22 to FY26",
+    "highlight": [
+      "109 to 82 decibels",
+      "from 40 to 12",
+      "doubled to 6,800"
+    ],
+    "exhibits": [
+      {
+        "type": "chart.column",
+        "heading": "Thruster noise at 10 metres",
+        "unit": "dB",
+        "categories": [
+          "FY22",
+          "FY23",
+          "FY24",
+          "FY25",
+          "FY26"
+        ],
+        "series": [
+          {
+            "name": "Thruster noise at 10 metres",
+            "values": [
+              121,
+              118,
+              109,
+              94,
+              82
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "FY26"
+          }
+        ],
+        "caption": "The baffled nozzle took noise from 109 to 82 decibels, about as loud as a hairdryer"
+      },
+      {
+        "type": "chart.column",
+        "heading": "Complaints",
+        "unit": "per 1,000 mowers",
+        "categories": [
+          "FY22",
+          "FY23",
+          "FY24",
+          "FY25",
+          "FY26"
+        ],
+        "series": [
+          {
+            "name": "Complaints",
+            "values": [
+              44,
+              41,
+              40,
+              21,
+              12
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "FY26"
+          }
+        ],
+        "caption": "Complaints fell 70%, from 40 to 12, once Saturdays stopped sounding like a launch"
+      },
+      {
+        "type": "chart.column",
+        "heading": "Suburban sales",
+        "unit": "thousand units",
+        "categories": [
+          "FY22",
+          "FY23",
+          "FY24",
+          "FY25",
+          "FY26"
+        ],
+        "series": [
+          {
+            "name": "Suburban sales",
+            "values": [
+              2.9,
+              3.2,
+              3.4,
+              5.1,
+              6.8
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "FY26"
+          }
+        ],
+        "caption": "With the street on side, suburban sales doubled to 6,800 units in two years"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the test pilot's ear-defender log"
+  },
+  {
+    "id": "panels-stack",
+    "type": "panels",
+    "form": "stack",
+    "commentary": "captions",
+    "takeaway": false,
+    "title": "Honey sales peak at 7,400 jars in August, a month after the hikers",
+    "subtitle": "Guided hikers and trail-shop honey sales by month, 2026 season",
+    "highlight": [
+      "6,200 in July",
+      "7,400 in August"
+    ],
+    "exhibits": [
+      {
+        "type": "chart.column",
+        "heading": "Guided hikers",
+        "unit": "thousand",
+        "categories": [
+          "Mar 2026",
+          "Apr 2026",
+          "May 2026",
+          "Jun 2026",
+          "Jul 2026",
+          "Aug 2026",
+          "Sep 2026",
+          "Oct 2026"
+        ],
+        "series": [
+          {
+            "name": "Guided hikers",
+            "values": [
+              1.2,
+              2.1,
+              3.4,
+              4.8,
+              6.2,
+              6,
+              3.9,
+              1.8
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Jul 2026"
+          }
+        ],
+        "caption": "Hikers peak at 6,200 in July, when the clover and lime-blossom meadows are in full flower"
+      },
+      {
+        "type": "chart.column",
+        "heading": "Honey jars sold in trail shops",
+        "unit": "thousand",
+        "categories": [
+          "Mar 2026",
+          "Apr 2026",
+          "May 2026",
+          "Jun 2026",
+          "Jul 2026",
+          "Aug 2026",
+          "Sep 2026",
+          "Oct 2026"
+        ],
+        "series": [
+          {
+            "name": "Honey jars sold in trail shops",
+            "values": [
+              0.8,
+              1.1,
+              2,
+              3.1,
+              4.6,
+              7.4,
+              6.1,
+              2.2
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "Aug 2026"
+          }
+        ],
+        "caption": "Jar sales peak at 7,400 in August, when the heather harvest lands and walkers buy one to take home"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the head beekeeper's clipboard"
+  },
+  {
+    "id": "parallel-arrow-rows",
+    "type": "parallel",
+    "form": "arrow-rows",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Bubbles love a muggy evening: humid air triples their lifespan",
+    "subtitle": "Average life of a two-metre bubble and what follows, 2026 outdoor tour of 140 shows",
+    "highlight": [
+      "humidity chart"
+    ],
+    "exhibit": {
+      "items": [
+        {
+          "icon": "cloud",
+          "label": "Humidity above 60%",
+          "text": "Giant bubbles last 41 seconds on average against 13 in dry air: long enough to drift over the whole audience and pop above the back row, which is where the cheers are loudest."
+        },
+        {
+          "icon": "clock",
+          "label": "Shows moved to dusk",
+          "text": "Evening slots gain 18 points of humidity on the 3pm ones and sell 2,300 more seats a month at the same venues, because families come after school and dinner."
+        },
+        {
+          "icon": "globe",
+          "label": "Wind under 8 km/h",
+          "text": "Two-metre bubbles reach the back row intact; above that speed they tear within three seconds, so the crew switches to the indoor tent set and loses no performance."
+        },
+        {
+          "icon": "leaf",
+          "label": "Glycerine at 6%",
+          "text": "A thicker film adds 9 seconds to every bubble for €0.40 more a show, which a single extra ticket pays back several times over."
+        },
+        {
+          "icon": "star",
+          "label": "All four at once",
+          "text": "The four-metre cathedral bubble stays up a full minute, so it becomes a nightly finale rather than a lucky one, and it is the clip every audience films."
+        }
+      ]
+    },
+    "bar": "Book next summer's outdoor tour by the humidity chart, not the calendar: muggy towns at dusk fill first.",
+    "source": "Source: Synthetic demonstration • no real company data; the bubble-master's stopwatch"
+  },
+  {
+    "id": "parallel-capsules",
+    "type": "parallel",
+    "form": "capsules",
+    "commentary": "none",
+    "takeaway": false,
+    "title": "Five workshop rules keep every wind-up toy ticking past 10,000 turns",
+    "subtitle": "The rules every toy is built and tested to, from first sketch to final wind",
+    "exhibit": {
+      "items": [
+        {
+          "icon": "gear",
+          "title": "Brass, never plastic",
+          "text": "Every spring and gear is cut from brass, never moulded plastic, so a toy still walks after 10,000 winds. The brass costs 40p more a toy and saves three returns in every hundred."
+        },
+        {
+          "icon": "lock",
+          "title": "One key fits all",
+          "text": "A single quarter-turn key winds all 64 toys in the range, so a lost key never strands a robot. Spare keys ship in every box and hang by every shop till."
+        },
+        {
+          "icon": "clock",
+          "title": "Thirty seconds a wind",
+          "text": "Each full wind runs for thirty seconds: long enough to cross a kitchen table, short enough to want another go. Longer springs were tested in 2025 and bored the panel."
+        },
+        {
+          "icon": "wrench",
+          "title": "Mend, never bin",
+          "text": "Any toy comes back to the bench for free repairs for life, and 96% of them leave walking. Parts from the broken 4% go into the next batch of spare gears."
+        },
+        {
+          "icon": "people",
+          "title": "Tested by children",
+          "text": "A panel of 40 children under ten signs off every new walk, hop and flip before it ships. A toy needs 30 of the 40 to grin, and only two in five pass first time."
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the clockwork foreman's notebook"
+  },
+  {
+    "id": "parallel-cards",
+    "type": "parallel",
+    "form": "cards",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Four pedal upgrades let 24 riders power a blockbuster, down from 33",
+    "subtitle": "Riders needed to run one 120-minute screening, before and after the upgrades",
+    "highlight": [
+      "spring 2027"
+    ],
+    "exhibit": {
+      "tone": "dark",
+      "align": "center",
+      "items": [
+        {
+          "icon": "bolt",
+          "title": "Regenerative hubs",
+          "value": "+38%",
+          "text": "More watts from every rider, so 24 cyclists now run a feature where 33 were needed.",
+          "points": [
+            "Fitted to all 33 bikes",
+            "Cost: €410 a bike",
+            "Live: March 2026"
+          ]
+        },
+        {
+          "icon": "people",
+          "title": "Tandem back row",
+          "value": "+40",
+          "text": "Twenty tandems add 40 pedalling seats without widening the hall or losing a sightline.",
+          "points": [
+            "Twenty tandems in row J",
+            "Cost: €18,000",
+            "Live: June 2026"
+          ]
+        },
+        {
+          "icon": "calendar",
+          "title": "Pedal-in matinées",
+          "value": "6 a week",
+          "text": "Morning shows for cycling clubs bank spare power in the battery wall for evening screenings.",
+          "points": [
+            "Battery wall holds 90 minutes",
+            "Cost: €64,000",
+            "Live: September 2026"
+          ]
+        },
+        {
+          "icon": "heart",
+          "title": "Popcorn per kilometre",
+          "value": "92%",
+          "text": "Of riders now pedal the whole film, up from 71%, once popcorn was priced in kilometres.",
+          "points": [
+            "Odometer on every saddle",
+            "Cost: €2,500",
+            "Live: November 2026"
+          ]
+        }
+      ]
+    },
+    "bar": "Together the upgrades retire the diesel backup by spring 2027, and every screening runs on legs alone.",
+    "source": "Source: Synthetic demonstration • no real company data; the projectionist's watt-meter"
+  },
+  {
+    "id": "parallel-labelled-rows",
+    "type": "parallel",
+    "form": "labelled-rows",
+    "commentary": "in-exhibit",
+    "takeaway": false,
+    "title": "Four knots tie up the spice caravans: wells, tolls, camels and customs",
+    "subtitle": "Bottlenecks on the Saffron Road, 2026 trading season",
+    "highlight": [
+      "four days at Tamrit",
+      "twice the 2024 toll",
+      "no extra caravan",
+      "halve the wait"
+    ],
+    "blocks": [
+      {
+        "label": "Wells run dry",
+        "points": [
+          "Three of the seven oasis wells fall below a day's water for 60 camels by mid-August.",
+          "Caravans then wait four days at Tamrit while the well refills overnight."
+        ],
+        "metric": {
+          "value": "4 days",
+          "label": "average August wait at Tamrit",
+          "delta": "+3 days on May"
+        }
+      },
+      {
+        "label": "Tolls have doubled",
+        "points": [
+          "The Qasr pass now charges €38 a camel-load, twice the 2024 toll, on every caravan heading north.",
+          "The southern loop avoids it but adds two days and a sandstorm season."
+        ],
+        "metric": {
+          "value": "€38",
+          "label": "toll per camel-load at the pass",
+          "delta": "+100% since 2024"
+        }
+      },
+      {
+        "label": "No camels spare",
+        "points": [
+          "All 420 camels are hired from March to October, so no extra caravan can leave in high season.",
+          "Leasing 60 more from the coast costs about €90,000 a season."
+        ],
+        "metric": {
+          "value": "420",
+          "label": "camels hired out of 420 in peak",
+          "delta": "0 spare"
+        }
+      },
+      {
+        "label": "Customs drag on",
+        "points": [
+          "Spice crates wait six days for inspection in Muscat, against two days for cloth.",
+          "Sealed, pre-cleared crates would halve the wait from the 2027 season."
+        ],
+        "metric": {
+          "value": "6 days",
+          "label": "customs wait for spice crates",
+          "delta": "+4 days on cloth"
+        }
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the caravan master's saddlebag ledger"
+  },
+  {
+    "id": "picture-photo-backdrop",
+    "type": "picture",
+    "form": "photo-backdrop",
+    "commentary": "captions",
+    "takeaway": false,
+    "title": "The higher the treehouse, the fuller it is: top-canopy rooms run 97% full",
+    "subtitle": "Room occupancy by floor height above the forest floor, all sites, FY26",
+    "photo": {
+      "path": "assets/hills.jpg",
+      "alt": "Illustration of a layered forest",
+      "credit": "Placeholder illustration from the runtime's examples"
+    },
+    "photoSide": "left",
+    "exhibit": {
+      "type": "chart.column",
+      "heading": "Occupancy by floor height, FY26",
+      "unit": "% of room-nights sold",
+      "categories": [
+        "Under 5 m",
+        "5 to 10 m",
+        "10 to 15 m",
+        "15 to 20 m",
+        "Over 20 m"
+      ],
+      "series": [
+        {
+          "name": "Occupancy by floor height, FY26",
+          "values": [
+            58,
+            71,
+            84,
+            93,
+            97
+          ]
+        }
+      ],
+      "highlights": [
+        {
+          "category": "Over 20 m"
+        }
+      ],
+      "caption": "Guests pay £110 more a night above 20 m and still book those rooms first, while ground-level cabins sit empty two nights in five: build all six new sites into the canopy"
+    },
+    "highlight": [
+      "£110 more a night",
+      "two nights in five"
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the squirrel-proof booking system, FY26"
+  },
+  {
+    "id": "picture-picture-hero",
+    "type": "picture",
+    "form": "picture-hero",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Meteor weeks fill every telescope suite at twice the normal nightly rate",
+    "subtitle": "Telescope-suite bookings and rates, Atacama hotel, 2026",
+    "highlight": [
+      "Nine in ten",
+      "€640 a night",
+      "14% of bookings",
+      "three years"
+    ],
+    "pictures": [
+      {
+        "path": "assets/moor.jpg",
+        "alt": "Illustration of a night sky over mountains",
+        "credit": "Placeholder illustration from the runtime's examples",
+        "kind": "illustration",
+        "label": "The product",
+        "text": "310 clear nights a year, 2,400 m above the sea"
+      }
+    ],
+    "kpi": {
+      "value": "2.1x",
+      "label": "the nightly rate in the four meteor-shower weeks of 2026"
+    },
+    "points": [
+      {
+        "lead": "Why guests come",
+        "text": "Nine in ten guests book for a named sky event, a meteor shower or a close asteroid pass, and fix their dates months ahead."
+      },
+      {
+        "lead": "What they pay",
+        "text": "Telescope suites sell at €640 a night in meteor weeks against €300 the rest of the year, and still sell out within a day."
+      },
+      {
+        "lead": "What clouds cost",
+        "text": "Cloudy nights cost 14% of bookings in refunds, almost all of them outside the meteor weeks."
+      },
+      {
+        "lead": "What to build next",
+        "text": "A €1.8m planetarium dome gives guests a sky when the real one hides, and pays back in three years if it halves those refunds."
+      }
+    ],
+    "pointsHeading": false,
+    "source": "Source: Synthetic demonstration • no real company data; the night porter's star log. Illustration: original illustration drawn for this gallery"
+  },
+  {
+    "id": "picture-picture-pair",
+    "type": "picture",
+    "form": "picture-pair",
+    "commentary": "captions",
+    "title": "Camels pay in the dunes, reindeer in the snow: keep the two fleets apart",
+    "subtitle": "Rides, fares and working months by fleet, 2026 season",
+    "takeaway": "A 2025 trial sent four camels to Lapland; all four were home within a week, at a cost of £21,000.",
+    "pictures": [
+      {
+        "path": "assets/coast.jpg",
+        "alt": "Illustration of desert dunes under a low sun",
+        "credit": "Placeholder illustration from the runtime's examples",
+        "label": "Camels: the Merzouga dunes, Morocco",
+        "text": "62% of rides at £38 a ride. No fuel bill, but no work above 40°C, so the camels rest from June to August."
+      },
+      {
+        "path": "assets/hills.jpg",
+        "alt": "Illustration of a snowy pine forest",
+        "credit": "Placeholder illustration from the runtime's examples",
+        "label": "Reindeer: the Lapland forest, Finland",
+        "text": "38% of rides at £54 a ride, mostly to see the northern lights. Sleds need snow, so the herd idles from May to October."
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the hay-and-lichen ledger, 2026"
+  },
+  {
+    "id": "picture-picture-strip",
+    "type": "picture",
+    "form": "picture-strip",
+    "commentary": "captions",
+    "title": "The carnival makes half the profit, but the lighthouse is growing ten times faster",
+    "subtitle": "Profit and growth by attraction, 2026",
+    "takeaway": "Buy a second lighthouse in 2027, before the carnival's big wheel needs its £2m refit.",
+    "pictures": [
+      {
+        "path": "assets/coast.jpg",
+        "alt": "Illustration of a lighthouse on a rock above the sea",
+        "credit": "Placeholder illustration from the runtime's examples",
+        "label": "Lighthouse climbs",
+        "text": "£0.5m profit, up 31%. Sunset climbs at £18 a head sell out every evening from May to September."
+      },
+      {
+        "path": "assets/station.jpg",
+        "alt": "Illustration of a pier carnival with a big wheel",
+        "credit": "Placeholder illustration from the runtime's examples",
+        "label": "Pier carnival",
+        "text": "£1.4m profit, half the group's total, but up just 3%. The big wheel turns 40 in 2027."
+      },
+      {
+        "path": "assets/terraces.jpg",
+        "alt": "Illustration of a row of seafront guesthouses",
+        "credit": "Placeholder illustration from the runtime's examples",
+        "label": "Seafront guesthouses",
+        "text": "£0.9m profit, up 9%. All 64 rooms fill on summer weekends; half stand empty from November."
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the candyfloss-sticky accounts, 2026"
+  },
+  {
+    "id": "place-map",
+    "type": "place",
+    "form": "map",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Kingston and Havana load half our cargo, and all of it sails via Nassau",
+    "highlight": [
+      "77,000 of 150,000",
+      "two days",
+      "three days to one"
+    ],
+    "exhibit": {
+      "type": "map",
+      "geography": "americas",
+      "crop": "fit",
+      "markers": [
+        {
+          "label": "Nassau",
+          "longitude": -77.34,
+          "latitude": 25.05,
+          "hub": true
+        },
+        {
+          "label": "Kingston",
+          "longitude": -76.79,
+          "latitude": 17.97,
+          "value": 42
+        },
+        {
+          "label": "Havana",
+          "longitude": -82.37,
+          "latitude": 23.11,
+          "value": 35
+        },
+        {
+          "label": "Tortuga",
+          "longitude": -72.8,
+          "latitude": 20.05,
+          "value": 24
+        },
+        {
+          "label": "Cartagena",
+          "longitude": -75.51,
+          "latitude": 10.39,
+          "value": 18
+        },
+        {
+          "label": "Charleston",
+          "longitude": -79.93,
+          "latitude": 32.78,
+          "value": 12
+        },
+        {
+          "label": "Bridgetown",
+          "longitude": -59.61,
+          "latitude": 13.1,
+          "value": 10
+        },
+        {
+          "label": "Willemstad",
+          "longitude": -68.93,
+          "latitude": 12.11,
+          "value": 6
+        },
+        {
+          "label": "Veracruz",
+          "longitude": -96.13,
+          "latitude": 19.17,
+          "value": 3
+        }
+      ],
+      "routes": [
+        {
+          "from": "Kingston",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Havana",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Tortuga",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Cartagena",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Charleston",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Bridgetown",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Willemstad",
+          "to": "Nassau",
+          "status": "operating"
+        },
+        {
+          "from": "Veracruz",
+          "to": "Nassau",
+          "status": "planned"
+        }
+      ],
+      "sizeLegend": {
+        "label": "Cargo loaded, thousand barrels a year"
+      }
+    },
+    "points": [
+      {
+        "icon": "flag",
+        "text": "Kingston and Havana load 77,000 of 150,000 barrels a year, mostly rum and molasses bound for the northern ports."
+      },
+      {
+        "icon": "clock",
+        "text": "Every route calls at Nassau to clear its cargo, so one missed tide there delays ships from all seven ports at once."
+      },
+      {
+        "icon": "warning",
+        "text": "Navy patrols off Cartagena add two days to the run north, which is why its sloops now sail only in convoy."
+      },
+      {
+        "icon": "growth",
+        "text": "A second berth at Nassau would cut the average wait to unload from three days to one, and pay back in a season."
+      },
+      {
+        "icon": "map-pin",
+        "text": "The planned Veracruz run, dashed, waits on that berth: it would add an eighth port to a hub that is already full."
+      }
+    ],
+    "pointsHeading": false,
+    "source": "Source: Synthetic demonstration • no real company data; the quartermaster's waterlogged manifest"
+  },
+  {
+    "id": "profiles-cards",
+    "type": "profiles",
+    "form": "cards",
+    "commentary": "none",
+    "takeaway": false,
+    "title": "Mowbital's quiet rocket mower takes 44% of sales, outselling Turfjet's loud one",
+    "subtitle": "Share of FY26 rocket-lawnmower unit sales, with each maker's flagship model",
+    "exhibit": {
+      "tone": "dark",
+      "align": "center",
+      "items": [
+        {
+          "title": "Mowbital",
+          "value": "44%",
+          "text": "Swapped its solid-fuel booster for a whisper-quiet ion thruster in 2025, and its sales in the suburbs doubled within a year.",
+          "points": [
+            "Top speed 22 km/h",
+            "58 dB: quieter than a chat over the fence",
+            "£2,900 for the flagship",
+            "The bet: neighbours, not lap times"
+          ],
+          "footer": "Sales up 2.1x since the ion thruster"
+        },
+        {
+          "title": "Turfjet",
+          "value": "38%",
+          "text": "The original rocket mower and still the fastest on sale, loud enough to set off car alarms two streets away on a Sunday.",
+          "points": [
+            "Top speed 41 km/h",
+            "104 dB: louder than a chainsaw",
+            "£3,400 for the flagship",
+            "The bet: speed, for estates and golf courses"
+          ],
+          "footer": "Top seller to golf courses, 7 in 10"
+        },
+        {
+          "title": "Blastblade",
+          "value": "18%",
+          "text": "Sells a cheap kit that bolts a booster onto any old mower; buyers love the price right up until the kit catches fire.",
+          "points": [
+            "Top speed 30 km/h",
+            "96 dB: a leaf blower at full tilt",
+            "£1,200 for the kit",
+            "The bet: price, at the cost of reliability"
+          ],
+          "footer": "Warranty returns: 1 kit in 5"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; garden-centre till rolls, FY26"
+  },
+  {
+    "id": "profiles-logo-table",
+    "type": "profiles",
+    "form": "logo-table",
+    "commentary": "in-exhibit",
+    "takeaway": false,
+    "title": "Charter Oolong Arrow for speed and Jade Monsoon for volume; pass on the rest",
+    "subtitle": "Six racing clippers on the Fuzhou to London run, 2022 to 2026 seasons",
+    "exhibit": {
+      "columns": [
+        {
+          "label": "Clipper",
+          "type": "logo"
+        },
+        {
+          "label": "Best passage, days",
+          "align": "right"
+        },
+        {
+          "label": "Tea carried, tonnes",
+          "align": "right"
+        },
+        {
+          "label": "Races won, 2022-26",
+          "align": "right"
+        },
+        {
+          "label": "Charter fee, £k",
+          "align": "right"
+        },
+        {
+          "label": "What it means",
+          "implication": true
+        }
+      ],
+      "rows": [
+        [
+          {
+            "type": "logo",
+            "player": "Oolong Arrow"
+          },
+          96,
+          540,
+          3,
+          48,
+          {
+            "text": "Charter for the first flush: the first chests home sell at double the price",
+            "tone": "positive"
+          }
+        ],
+        [
+          {
+            "type": "logo",
+            "player": "Jade Monsoon"
+          },
+          104,
+          820,
+          1,
+          52,
+          {
+            "text": "Charter for bulk: half as much tea again as the Arrow, for £4k more",
+            "tone": "positive"
+          }
+        ],
+        [
+          {
+            "type": "logo",
+            "player": "Kettle Comet"
+          },
+          99,
+          610,
+          1,
+          45,
+          "Hold in reserve: nearly as quick, if the Arrow is already booked"
+        ],
+        [
+          {
+            "type": "logo",
+            "player": "Sencha Sprite"
+          },
+          101,
+          480,
+          0,
+          39,
+          "Cheapest, but the smallest hold on the run: good for samples only"
+        ],
+        [
+          {
+            "type": "logo",
+            "player": "Pekoe Swift"
+          },
+          108,
+          590,
+          0,
+          44,
+          {
+            "text": "Pass: too slow to earn the first-flush premium and too small for bulk",
+            "tone": "negative"
+          }
+        ],
+        [
+          {
+            "type": "logo",
+            "player": "Camellia Star"
+          },
+          112,
+          700,
+          0,
+          41,
+          {
+            "text": "Pass: 6% of its 2025 cargo arrived damp and could not be sold",
+            "tone": "negative"
+          }
+        ]
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the harbourmaster's logbook, Fuzhou to London, 2022-26"
+  },
+  {
+    "id": "profiles-logos",
+    "type": "profiles",
+    "form": "logos",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "Eight robot-vacuum teams race the Dust Circuit, but only two ever win",
+    "subtitle": "The 2026 grid, with championship titles won since the circuit began in 2022",
+    "highlight": [
+      "all four titles",
+      "without a recharge"
+    ],
+    "exhibit": {
+      "items": [
+        {
+          "name": "Rug Rockets",
+          "caption": "Champions in 2022 and 2024; quickest on deep-pile carpet"
+        },
+        {
+          "name": "Static Sharks",
+          "caption": "Champions in 2023 and 2025; the best cornering on tile"
+        },
+        {
+          "name": "Fluff Falcons",
+          "caption": "Runner-up three times; the strongest suction on the grid"
+        },
+        {
+          "name": "Crumb Comets",
+          "caption": "Fastest pit crew on the circuit: a full bin out in 4.1 seconds"
+        },
+        {
+          "name": "Grit Gliders",
+          "caption": "Rookies in 2026, racing a chassis borrowed from the Lizards"
+        },
+        {
+          "name": "Dust Bunnies",
+          "caption": "The fan favourite, yet never finished a season above fifth"
+        },
+        {
+          "name": "Lint Lizards",
+          "caption": "Lightest robot on the grid at 2.3 kg, but it stalls on rugs"
+        },
+        {
+          "name": "Bristlebolt",
+          "caption": "Most crashes in 2025, with 14 hits on the skirting board"
+        }
+      ]
+    },
+    "points": [
+      "Rug Rockets and Static Sharks have split all four titles since 2022, and both finish every 40-minute race without a recharge.",
+      "Fluff Falcons have the most suction but stop to recharge twice a race, which is why they keep finishing second."
+    ],
+    "pointsHeading": "Why the same two teams keep winning",
+    "source": "Source: Synthetic demonstration • no real company data; the race steward's lint log"
+  }
+]

@@ -2,9 +2,9 @@
 // (`sidebarPage`), and a page of words alone (`textPage`) - developed points
 // as a ledger, in columns or in rows, a memo's prose beside its panel, or a
 // document's columns of prose.
-import { textWords, proseParts } from "./text-contract.mjs";
+import { textWords } from "./text-contract.mjs";
 import { SIZE, PANEL_MIN_WIDTH, BODY_WIDTH, COLUMN_GAP, HUG, deckDensity } from "./compose-body.mjs";
-import { proseOf, proseBeside, proseFillRange, pointsItem, documentItem, summaryLedger, sideTreatment, pointBullets } from "./compose-points.mjs";
+import { proseBeside, pointsItem, documentItem, summaryLedger, sideTreatment, pointBullets, proseOf } from "./compose-points.mjs";
 import { exhibitItem } from "./compose-exhibits.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 
@@ -32,7 +32,7 @@ export function sidebarPage(items, { id, slide, exhibits, baseDir, fill, pointsS
     size: { width: { fr: 1 }, height: "fill" } };
   const body = [];
   exhibits.forEach((ex, i) => body.push(exhibitItem(ex, `${id}-exhibit-${i}`, baseDir, SIZE)));
-  if (slide.points?.length) body.push(pointsItem(slide.points, `${id}-points`, "open", fill, !exhibits.length, pointsStyle));
+  if (slide.points?.length) body.push(pointsItem(slide.points, `${id}-points`, "open", fill, pointsStyle));
   body.push(...proseOf(slide, id));
   if (!body.length) throw new Error(`${id}: a sidebar page needs an exhibit, points or paragraphs beside its panel`);
   // The copy starts level with the panel's top edge. Centred beside a
@@ -59,7 +59,7 @@ export function textPage(items, { id, slide, fill, pointsStyle }) {
     && points.every((point) => textWords(typeof point === "string" ? point : [point?.text, ...(pointBullets(point) ?? [])].filter(Boolean).join(" ")) >= 20);
   const numberedAt = (point, at) => (pointsStyle !== "numbered" ? point
     : typeof point === "string" ? { text: point, number: at + 1 } : point?.number === undefined ? { ...point, number: at + 1 } : point);
-  const cell = (point, at) => pointsItem([numberedAt(point, at)], `${id}-points-${String.fromCharCode(97 + at)}`, tone, fill, false, pointsStyle);
+  const cell = (point, at) => pointsItem([numberedAt(point, at)], `${id}-points-${String.fromCharCode(97 + at)}`, tone, fill, pointsStyle);
   const led = points.every((point) => point && typeof point === "object" && typeof point.lead === "string" && point.lead.trim());
   if (developed && led && (points.length === 4 || (points.length === 3 && slide.role === "executive-summary"))) {
     items.push(summaryLedger(points.map(numberedAt), { id, tone, pointsStyle }));
@@ -89,16 +89,15 @@ export function textPage(items, { id, slide, fill, pointsStyle }) {
     // page leaves a third of it empty under the shorter column, which is the
     // void the ink gate reports on a page that carries five real findings.
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-      pointsItem(ordered.slice(0, half), `${id}-points-a`, tone, fill, true, pointsStyle, false),
-      pointsItem(ordered.slice(half), `${id}-points-b`, tone, fill, true, pointsStyle, false),
+      pointsItem(ordered.slice(0, half), `${id}-points-a`, tone, fill, pointsStyle),
+      pointsItem(ordered.slice(half), `${id}-points-b`, tone, fill, pointsStyle),
     ] });
   } else if (points.length) {
     // A text page's sole list owns the remaining body track. Letting it hug
     // pins it below a metrics strip (or above a closing band), pooling all
     // the spare height into one internal void. A list followed by authored
     // paragraphs still shares the track and keeps its natural height.
-    items.push(pointsItem(points, `${id}-points`, tone, fill,
-      !(slide.paragraphs || []).length, pointsStyle));
+    items.push(pointsItem(points, `${id}-points`, tone, fill, pointsStyle));
   }
   // A memo: the prose first at a readable measure, sized to reach the foot
   // (proseBeside), and its panel - the conclusion or the figures to keep -

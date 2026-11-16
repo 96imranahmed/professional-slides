@@ -4205,6 +4205,30 @@
       "id": "figure-pictogram"
     },
     {
+      "title": "Three reasons customers stay with a bank that goes green",
+      "layout": "exhibit-full",
+      "exhibit": {
+        "type": "icon-rows",
+        "items": [
+          {
+            "label": "Trust is already there",
+            "icon": "shield",
+            "text": "They keep the bank that holds their salary and mortgage when it offers a sustainable product."
+          },
+          {
+            "label": "Switching costs time",
+            "icon": "clock",
+            "text": "Moving accounts and direct debits takes weeks that few customers want to spend."
+          },
+          {
+            "label": "The offer is comparable",
+            "text": "A green product at the same rate removes the reason to look elsewhere."
+          }
+        ]
+      },
+      "id": "figure-icon-rows"
+    },
+    {
       "title": "Two paths for customers, and only one keeps them",
       "layout": "exhibit-full",
       "exhibit": {
@@ -4223,6 +4247,37 @@
         ]
       },
       "id": "figure-arrow-rows"
+    },
+    {
+      "title": "Agenda",
+      "layout": "exhibit-full",
+      "exhibit": {
+        "type": "agenda-rows",
+        "active": 1,
+        "items": [
+          {
+            "topic": "Where customers stand",
+            "text": "What the survey says they want from a green bank"
+          },
+          {
+            "topic": "Two paths",
+            "text": "Who stays, who leaves and what each is worth"
+          },
+          {
+            "topic": "Product gaps",
+            "text": "The three offers the range is missing"
+          },
+          {
+            "topic": "Decisions",
+            "text": "What the committee is asked to approve"
+          },
+          {
+            "topic": "Next steps",
+            "text": "Owners and dates before the next meeting"
+          }
+        ]
+      },
+      "id": "figure-agenda-rows"
     },
     {
       "title": "Three priorities for the budget",

@@ -33,10 +33,10 @@ export const cellText = (cell) => {
 const labelInCells = (row) => Array.isArray(row) || row?.label === undefined;
 export const rowLabel = (row) => (labelInCells(row) ? rowCells(row)[0] : row.label);
 export const resultCells = (row) => rowCells(row).slice(labelInCells(row) ? 1 : 0);
-// A scorecard's judged cell - a Harvey ball, a RAG state, a lamp, a tick, a dot,
+// A scorecard's judged cell - a Harvey ball, a RAG state, a tag, a lamp, a tick, a dot,
 // an arrow, one of two states - is a grade on the author's scale, not a measurement:
 // no measure holds it, so it is neither bound nor counted as a plotted value.
-const JUDGED_CELLS = new Set(["harvey", "rag", "lights", "check", "dot", "trend", "binary"]);
+const JUDGED_CELLS = new Set(["harvey", "rag", "tag", "lights", "check", "dot", "trend", "binary"]);
 export const judgedCell = (cell) => Boolean(cell) && typeof cell === "object" && JUDGED_CELLS.has(cell.type);
 const numericCells = (ex) => ex.rows.reduce((n, row) => n + resultCells(row).filter((c) => !judgedCell(c) && /\d/.test(cellText(c))).length, 0);
 

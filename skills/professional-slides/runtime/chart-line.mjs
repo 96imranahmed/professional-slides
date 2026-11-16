@@ -15,7 +15,6 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, SUBJECT, CONTEXT
 import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumns, seriesState, stateLabel, statesSeries, markerGutter } from "./chart-decorations.mjs";
 import { normalizeIntervals, intervalValues, intervalLabelWidth, intervalNodes } from "./chart-bands.mjs";
 
-const SPARSE_DIRECT_LABEL_LIMIT = 8;
 // An area's values that move under this share of their height above zero draw flat from a zero baseline: a line instead.
 const AREA_FLAT_SHARE = 0.25;
 

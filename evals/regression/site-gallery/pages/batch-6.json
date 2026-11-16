@@ -1,0 +1,1429 @@
+[
+  {
+    "id": "table-dimensions",
+    "type": "lookup",
+    "form": "table",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "The Tin Spurs win 14 of 18 bouts yet sell half the Golden Goose's seats",
+    "subtitle": "Eight houses of the Grand Lance League, 2026 season",
+    "highlight": "falconry and feast",
+    "bar": "Winning does not fill the stands: put the Goose's falconry and feast on every home fixture.",
+    "exhibit": {
+      "treatment": "dimensions",
+      "columns": [
+        "House",
+        {
+          "label": "Bouts won",
+          "unit": "of 18",
+          "group": "On the field",
+          "bar": true
+        },
+        {
+          "label": "Lances shattered",
+          "unit": "count",
+          "group": "On the field",
+          "align": "center"
+        },
+        {
+          "label": "Seats sold",
+          "unit": "thousand",
+          "group": "In the stands",
+          "bar": true
+        },
+        {
+          "label": "Crowd favourite",
+          "unit": "% of votes",
+          "group": "In the stands",
+          "align": "center"
+        },
+        "Showpiece"
+      ],
+      "rows": [
+        [
+          "Tin Spurs",
+          {
+            "text": "14",
+            "highlight": true,
+            "bold": true
+          },
+          "52",
+          "22",
+          "6",
+          "None: all lance, no lute"
+        ],
+        [
+          "Ravenmoor",
+          "12",
+          "46",
+          "31",
+          "12",
+          "Torchlit night jousts"
+        ],
+        [
+          "Brambleford",
+          "10",
+          "40",
+          "28",
+          "10",
+          "Bagpipe parade before each bout"
+        ],
+        [
+          "Golden Goose",
+          "9",
+          "31",
+          {
+            "text": "44",
+            "highlight": true,
+            "bold": true
+          },
+          "27",
+          "Falconry display and a feast"
+        ],
+        [
+          "Wychwood",
+          "8",
+          "33",
+          "26",
+          "9",
+          "Wolfhound mascot on the walls"
+        ],
+        [
+          "Copper Lance",
+          "7",
+          "29",
+          "34",
+          "18",
+          "A jester on the commentary"
+        ],
+        [
+          "Saltmarsh",
+          "7",
+          "30",
+          "24",
+          "8",
+          "Heron-plumed helmets"
+        ],
+        [
+          "Iron Pudding",
+          "5",
+          "21",
+          "25",
+          "10",
+          "Free pudding at half-time"
+        ]
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the herald's scroll and the box-office tally"
+  },
+  {
+    "id": "table-groups",
+    "type": "lookup",
+    "form": "table",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Collector globes are just 6% of units but make 45% of the profit",
+    "subtitle": "Seven globes in three ranges, financial year 2026",
+    "highlight": "£34 a globe",
+    "bar": "Collector globes earn £34 a globe against £1.60 for souvenirs, so they get the Christmas production slots.",
+    "exhibit": {
+      "highlightColumn": 5,
+      "total": false,
+      "columns": [
+        "Globe",
+        {
+          "label": "Units shipped",
+          "unit": "thousand"
+        },
+        {
+          "label": "Price",
+          "unit": "£"
+        },
+        {
+          "label": "Revenue",
+          "unit": "£ thousand"
+        },
+        {
+          "label": "Gross margin",
+          "unit": "%"
+        },
+        {
+          "label": "Share of profit",
+          "unit": "%"
+        },
+        {
+          "label": "Broken in transit",
+          "unit": "%"
+        }
+      ],
+      "rows": [
+        {
+          "style": "group",
+          "cells": [
+            "Souvenir globes: 82% of units, 29% of profit",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        [
+          "City skyline, 65mm",
+          "182",
+          "6.00",
+          "1,092",
+          "22",
+          "10.9",
+          "3.1"
+        ],
+        [
+          "Seaside pier, 65mm",
+          "124",
+          "6.00",
+          "744",
+          "20",
+          "6.8",
+          "2.8"
+        ],
+        [
+          "Glitter unicorn, 80mm",
+          "96",
+          "9.00",
+          "864",
+          "28",
+          "11.0",
+          "3.5"
+        ],
+        {
+          "style": "group",
+          "cells": [
+            "Collector globes: 6% of units, 45% of profit",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        [
+          "Musical carousel, 120mm",
+          "18",
+          "48.00",
+          "864",
+          "52",
+          "20.4",
+          "1.2"
+        ],
+        [
+          "Hand-painted village, 150mm",
+          "11",
+          "85.00",
+          "935",
+          "58",
+          "24.7",
+          "0.9"
+        ],
+        {
+          "style": "group",
+          "cells": [
+            "Custom globes: 12% of units, 26% of profit",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        [
+          "Company-logo globe, 100mm",
+          "42",
+          "22.00",
+          "924",
+          "38",
+          "16.0",
+          "1.8"
+        ],
+        [
+          "Wedding-cake globe, 90mm",
+          "15",
+          "34.00",
+          "510",
+          "44",
+          "10.2",
+          "1.4"
+        ],
+        {
+          "style": "total",
+          "cells": [
+            "All globes",
+            "488",
+            "12.16",
+            "5,933",
+            "37",
+            "100.0",
+            "2.8"
+          ]
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the dispatch book, with glitter still in its spine"
+  },
+  {
+    "id": "table-implication",
+    "type": "lookup",
+    "form": "table",
+    "commentary": "in-exhibit",
+    "takeaway": false,
+    "title": "Whistlebot Mk II gets 98% of calls right in under 2 seconds; promote it",
+    "subtitle": "Six robot referees, 2026 trial season, 412 matches",
+    "highlight": "every top-flight fixture",
+    "exhibit": {
+      "treatment": "standard",
+      "highlightRow": 0,
+      "columns": [
+        "Robot referee",
+        {
+          "label": "Calls reviewed",
+          "unit": "thousand"
+        },
+        {
+          "label": "Correct calls",
+          "unit": "%"
+        },
+        {
+          "label": "Decision time",
+          "unit": "seconds"
+        },
+        {
+          "label": "Players' trust",
+          "unit": "score out of 5"
+        },
+        {
+          "label": "What it means",
+          "implication": true
+        }
+      ],
+      "rows": [
+        [
+          "Whistlebot Mk II",
+          "4.2",
+          "98.1",
+          "1.8",
+          "4.6",
+          "Promote to every top-flight fixture from the 2027 season"
+        ],
+        [
+          "Judge Gearbox",
+          "3.6",
+          "96.4",
+          "2.6",
+          "4.1",
+          "Keep for cup ties, where a slower, louder verdict suits the crowd"
+        ],
+        [
+          "Ref-O-Matic 7",
+          "5.1",
+          "95.2",
+          "1.2",
+          "3.4",
+          "Fast but distrusted: pair it with a human for penalties"
+        ],
+        [
+          "Penalty Prime",
+          "2.2",
+          "93.8",
+          "3.9",
+          "3.9",
+          "Too slow for open play; keep it for shoot-out reviews only"
+        ],
+        [
+          "Captain Calibrate",
+          "1.8",
+          "89.5",
+          "2.2",
+          "2.7",
+          "Recalibrate its offside sensor before it runs another match"
+        ],
+        [
+          "The Linesman 9",
+          "2.9",
+          "84.0",
+          "4.8",
+          "2.1",
+          "Retire to the training ground; it flags its own shadow"
+        ]
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the robots' own log files, double-checked by humans"
+  },
+  {
+    "id": "table-rules",
+    "type": "lookup",
+    "form": "table",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "Bath takes 16 days to mend a typewriter; Hay-on-Wye does it in 6",
+    "subtitle": "Nine branches, January to September 2026",
+    "highlight": [
+      "cast their own keys",
+      "9 weeks",
+      "halve its 16-day turnaround"
+    ],
+    "pointsHeading": "Why Bath queues",
+    "points": [
+      "Turnaround follows the key bench: branches that cast their own keys rarely wait weeks for parts from the specialist foundry.",
+      "Bath mends the most machines but casts only 44% of its own keys, so its waiting list has reached 9 weeks.",
+      "A second casting bench in Bath costs £18,000, pays back within a year and would halve its 16-day turnaround."
+    ],
+    "exhibit": {
+      "highlightRow": "Bath",
+      "columns": [
+        "Branch",
+        {
+          "label": "Machines mended",
+          "unit": "count"
+        },
+        {
+          "label": "Turnaround",
+          "unit": "days"
+        },
+        {
+          "label": "Keys cast in-house",
+          "unit": "% of keys",
+          "bar": true
+        },
+        {
+          "label": "Waiting list",
+          "unit": "weeks",
+          "align": "center"
+        },
+        "Most-mended model"
+      ],
+      "rows": [
+        [
+          "Hay-on-Wye",
+          "1,140",
+          "6",
+          "82",
+          "1",
+          "1950s folding travel portables"
+        ],
+        [
+          "Edinburgh",
+          "1,320",
+          "8",
+          "74",
+          "3",
+          "Old newsroom uprights"
+        ],
+        [
+          "York",
+          "980",
+          "9",
+          "70",
+          "2",
+          "Railway booking-office machines"
+        ],
+        [
+          "Cambridge",
+          "1,050",
+          "10",
+          "61",
+          "4",
+          "Thesis-era golf-ball electrics"
+        ],
+        [
+          "Oxford",
+          "1,210",
+          "11",
+          "65",
+          "5",
+          "Thesis-era golf-ball electrics"
+        ],
+        [
+          "Brighton",
+          "870",
+          "12",
+          "58",
+          "3",
+          "Pastel 1960s portables"
+        ],
+        [
+          "Norwich",
+          "640",
+          "13",
+          "49",
+          "2",
+          "Children's tin toy typewriters"
+        ],
+        [
+          "Whitby",
+          "720",
+          "14",
+          "52",
+          "4",
+          "Seaside postcard portables"
+        ],
+        [
+          "Bath",
+          "1,380",
+          "16",
+          "44",
+          "9",
+          "Novelists' heavy uprights"
+        ]
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the bench ledgers, typed in triplicate"
+  },
+  {
+    "id": "table-zebra",
+    "type": "lookup",
+    "form": "table",
+    "commentary": "in-exhibit",
+    "title": "Liverpool's booths are 92% full; Cardiff's sit silent half the week",
+    "subtitle": "Ten bars, average week, July to September 2026",
+    "highlight": "Wednesday choir-off",
+    "takeaway": "Cardiff fills its booths only at weekends; a Wednesday choir-off could wake the silent ones.",
+    "exhibit": {
+      "highlightRow": "Liverpool",
+      "columns": [
+        "Bar",
+        {
+          "label": "Booths",
+          "unit": "count"
+        },
+        {
+          "label": "Songs a night",
+          "unit": "count"
+        },
+        {
+          "label": "Booth occupancy",
+          "unit": "% of hours",
+          "bar": true
+        },
+        {
+          "label": "Spend per singer",
+          "unit": "£"
+        },
+        "Most-belted era"
+      ],
+      "rows": [
+        [
+          "Liverpool",
+          "14",
+          "1,620",
+          "92",
+          "23.40",
+          "1980s stadium rock"
+        ],
+        [
+          "Glasgow",
+          "16",
+          "1,900",
+          "88",
+          "21.10",
+          "1990s boy bands"
+        ],
+        [
+          "Manchester",
+          "18",
+          "1,750",
+          "84",
+          "22.60",
+          "Britpop anthems"
+        ],
+        [
+          "Leeds",
+          "12",
+          "1,180",
+          "79",
+          "19.80",
+          "2000s pop-punk"
+        ],
+        [
+          "Newcastle",
+          "10",
+          "980",
+          "76",
+          "20.50",
+          "1970s disco"
+        ],
+        [
+          "Bristol",
+          "13",
+          "1,050",
+          "72",
+          "20.10",
+          "2010s indie singalongs"
+        ],
+        [
+          "Birmingham",
+          "15",
+          "1,240",
+          "68",
+          "18.90",
+          "Power ballads"
+        ],
+        [
+          "Sheffield",
+          "9",
+          "760",
+          "61",
+          "17.40",
+          "1980s synth-pop"
+        ],
+        [
+          "Brighton",
+          "11",
+          "820",
+          "57",
+          "24.80",
+          "Musical theatre"
+        ],
+        [
+          "Cardiff",
+          "12",
+          "690",
+          "49",
+          "16.20",
+          "Male-voice choir classics"
+        ]
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the booth timers and a very tired DJ"
+  },
+  {
+    "id": "trend-area",
+    "type": "trend",
+    "form": "area",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "Sunset flights lifted July to 10,400 passengers, 40% above last summer",
+    "exhibit": {
+      "heading": "Passengers flown a month",
+      "unit": "thousand",
+      "categories": [
+        "Jan 25",
+        "Feb 25",
+        "Mar 25",
+        "Apr 25",
+        "May 25",
+        "Jun 25",
+        "Jul 25",
+        "Aug 25",
+        "Sep 25",
+        "Oct 25",
+        "Nov 25",
+        "Dec 25",
+        "Jan 26",
+        "Feb 26",
+        "Mar 26",
+        "Apr 26",
+        "May 26",
+        "Jun 26",
+        "Jul 26",
+        "Aug 26",
+        "Sep 26",
+        "Oct 26",
+        "Nov 26",
+        "Dec 26"
+      ],
+      "series": [
+        {
+          "name": "Passengers",
+          "values": [
+            1.2,
+            1.5,
+            2.6,
+            4.1,
+            5.8,
+            7,
+            7.4,
+            6.9,
+            5.2,
+            3.4,
+            1.6,
+            1.1,
+            1.4,
+            1.9,
+            3.4,
+            5.6,
+            8.1,
+            9.6,
+            10.4,
+            9.9,
+            7.5,
+            4.9,
+            2.2,
+            1.5
+          ]
+        }
+      ],
+      "valueFormat": {
+        "decimals": 1
+      },
+      "annotations": [
+        {
+          "category": "Jul 25",
+          "text": "7,400 in July, dawn flights only"
+        },
+        {
+          "category": "Apr 26",
+          "text": "Sunset flights added in April"
+        },
+        {
+          "category": "Jul 26",
+          "text": "10,400, up 40% on July 2025"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the basket-side clipboard"
+  },
+  {
+    "id": "trend-column",
+    "type": "trend",
+    "form": "column",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Croissant sales tripled once the dough stopped floating off the trays",
+    "bar": "At 42,000 a quarter the one oven runs at 93% of its 45,000 capacity, so the next spend is a second oven, not marketing.",
+    "exhibit": {
+      "heading": "Croissants sold a quarter",
+      "unit": "thousand",
+      "categories": [
+        "Q1 2025",
+        "Q2 2025",
+        "Q3 2025",
+        "Q4 2025",
+        "Q1 2026",
+        "Q2 2026",
+        "Q3 2026",
+        "Q4 2026"
+      ],
+      "series": [
+        {
+          "name": "Croissants sold",
+          "values": [
+            13.8,
+            14.2,
+            12.9,
+            16.5,
+            24.1,
+            31.7,
+            37.2,
+            42
+          ]
+        }
+      ],
+      "valueFormat": {
+        "decimals": 1
+      },
+      "highlights": [
+        {
+          "category": "Q4 2026"
+        }
+      ],
+      "change": {
+        "from": "Q1 2025",
+        "to": "Q4 2026",
+        "text": "+204%"
+      },
+      "periods": [
+        {
+          "from": "Q1 2025",
+          "to": "Q4 2025",
+          "label": "Dough floated off the trays"
+        },
+        {
+          "from": "Q1 2026",
+          "to": "Q4 2026",
+          "label": "Weighted trays fitted"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head baker's flour-dusted tally"
+  },
+  {
+    "id": "trend-combo",
+    "type": "trend",
+    "form": "combo",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Cones sold doubled to 412,000 as the average queue fell to four minutes",
+    "highlight": [
+      "31% more cones an hour",
+      "eight minutes",
+      "trial vans sold 9% more"
+    ],
+    "exhibit": {
+      "heading": "Cones sold and average queue, summer season",
+      "unit": "thousand cones; minutes",
+      "secondaryAxis": true,
+      "secondaryUnit": "min",
+      "secondaryValueFormat": {
+        "decimals": 1
+      },
+      "categories": [
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "series": [
+        {
+          "name": "Cones sold",
+          "values": [
+            205,
+            238,
+            276,
+            318,
+            361,
+            412
+          ]
+        },
+        {
+          "name": "Average queue",
+          "values": [
+            11.5,
+            10.8,
+            9.2,
+            7.1,
+            5.4,
+            4
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "series": "Average queue",
+          "category": "2024",
+          "text": "Under the eight-minute walk-away point"
+        }
+      ]
+    },
+    "points": [
+      {
+        "lead": "Vans go where the heat is",
+        "text": "Since 2023 the route app sends each van to the park or beach with the hottest pavement and the longest walk to a shop. Vans no longer idle on cool streets, so each one now sells 31% more cones an hour.",
+        "highlight": "31% more cones an hour"
+      },
+      {
+        "lead": "Short queues sell second cones",
+        "text": "Children give up on a queue after about eight minutes. Once the wait fell under that in 2024, walk-aways halved and parents began buying a second round before the van moved on.",
+        "highlight": "eight minutes"
+      },
+      {
+        "lead": "The chime is the next lever",
+        "text": "Playing the chime only on arrival, not all along the route, drew fewer noise complaints from the council, and the trial vans sold 9% more over the same summer.",
+        "highlight": "trial vans sold 9% more"
+      }
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the fleet's sticky-fingered till rolls"
+  },
+  {
+    "id": "trend-indexed",
+    "type": "trend",
+    "form": "indexed",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "The Narwhals more than tripled paying members; no rival managed to double",
+    "exhibit": {
+      "heading": "Paying channel members by club",
+      "unit": "index, 2021 = 100",
+      "indexBase": "2021",
+      "subject": "Neon Narwhals",
+      "yMin": 0,
+      "yMax": 400,
+      "categories": [
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "series": [
+        {
+          "name": "Neon Narwhals",
+          "values": [
+            100,
+            121,
+            162,
+            226,
+            288,
+            341
+          ]
+        },
+        {
+          "name": "Critical Hedgehogs",
+          "values": [
+            100,
+            115,
+            136,
+            148,
+            157,
+            167
+          ]
+        },
+        {
+          "name": "Respawn Raccoons",
+          "values": [
+            100,
+            112,
+            122,
+            128,
+            139,
+            148
+          ]
+        },
+        {
+          "name": "Lagless Llamas",
+          "values": [
+            100,
+            106,
+            109,
+            115,
+            118,
+            122
+          ]
+        },
+        {
+          "name": "Tilted Toucans",
+          "values": [
+            100,
+            96,
+            91,
+            95,
+            90,
+            87
+          ]
+        }
+      ],
+      "referenceLines": [
+        {
+          "value": 200,
+          "label": "Double the 2021 base"
+        }
+      ],
+      "annotations": [
+        {
+          "series": "Neon Narwhals",
+          "category": "2024",
+          "text": "Coach-cam streams from 2023 let members watch drafts"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the club's overheated stats server"
+  },
+  {
+    "id": "trend-line",
+    "type": "trend",
+    "form": "line",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "All three roof types spiked in the 2022 hatching year; two recovered below break-even",
+    "subtitle": "Scorch-damage loss ratio by roof type, claims paid over premiums, 2019-2026",
+    "exhibit": {
+      "heading": "Loss ratio by roof type",
+      "unit": "% of premiums",
+      "directLabels": "end",
+      "categories": [
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "series": [
+        {
+          "name": "Thatch",
+          "values": [
+            96,
+            104,
+            112,
+            148,
+            131,
+            118,
+            109,
+            101
+          ]
+        },
+        {
+          "name": "Slate",
+          "values": [
+            64,
+            70,
+            76,
+            112,
+            88,
+            70,
+            58,
+            50
+          ]
+        },
+        {
+          "name": "Fireproof tile",
+          "values": [
+            41,
+            44,
+            47,
+            79,
+            52,
+            35,
+            28,
+            24
+          ]
+        }
+      ],
+      "referenceLines": [
+        {
+          "value": 65,
+          "label": "Break-even 65%"
+        }
+      ],
+      "annotations": [
+        {
+          "series": "Thatch",
+          "category": "2022",
+          "text": "Three dragon nests hatched in one season, and every roof type spiked"
+        },
+        {
+          "series": "Thatch",
+          "category": "2026",
+          "text": "Thatch still pays out £1.01 for every £1 of premium"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the claims adjuster's singed ledger"
+  },
+  {
+    "id": "trend-model",
+    "type": "trend",
+    "form": "model",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "The elevator lifts 9,000 tonnes by 2031 if the second ribbon is spun on time",
+    "exhibit": {
+      "type": "chart.column",
+      "heading": "Cargo lifted to orbit a year, by case",
+      "unit": "tonnes",
+      "categories": [
+        "2026",
+        "2027",
+        "2028",
+        "2029",
+        "2030",
+        "2031"
+      ],
+      "series": [
+        {
+          "name": "Central",
+          "values": [
+            1200,
+            2100,
+            3400,
+            5200,
+            7100,
+            9000
+          ]
+        },
+        {
+          "name": "Low",
+          "values": [
+            1200,
+            1900,
+            2800,
+            3900,
+            5100,
+            6500
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "category": "2026",
+          "series": "Central",
+          "text": "One ribbon today, with climbers running double shifts"
+        },
+        {
+          "category": "2029",
+          "series": "Central",
+          "text": "Second ribbon enters service in 2029 and the cases part"
+        },
+        {
+          "category": "2031",
+          "series": "Low",
+          "text": "A year's ribbon slip leaves the low case 2,500 tonnes short"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the lift log"
+  },
+  {
+    "id": "trend-slope",
+    "type": "trend",
+    "form": "slope",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Ghent jumped from last to first after quiet hours let the cats nap",
+    "bar": "Quiet hours cost Ghent two signs and a ban on laser pointers, so every branch adopts them from January 2027.",
+    "exhibit": {
+      "heading": "Table bookings a week, by branch",
+      "unit": "bookings",
+      "categories": [
+        "2023",
+        "2026"
+      ],
+      "focusSeries": "Ghent",
+      "series": [
+        {
+          "name": "Ghent",
+          "values": [
+            410,
+            905
+          ]
+        },
+        {
+          "name": "Lisbon",
+          "values": [
+            820,
+            860
+          ]
+        },
+        {
+          "name": "Kyoto",
+          "values": [
+            790,
+            760
+          ]
+        },
+        {
+          "name": "Montreal",
+          "values": [
+            600,
+            720
+          ]
+        },
+        {
+          "name": "Leeds",
+          "values": [
+            640,
+            610
+          ]
+        },
+        {
+          "name": "Melbourne",
+          "values": [
+            560,
+            590
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "series": "Ghent",
+          "category": "2026",
+          "text": "Up 121% since quiet hours began"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head cat's paw-printed booking book"
+  },
+  {
+    "id": "trend-sparklines",
+    "type": "trend",
+    "form": "sparklines",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Every hotel filled up again except York, where the ghost stopped appearing",
+    "bar": "York has lost 33 points since 2020 as the sightings dried up, so the new candlelit séance dinners open there first.",
+    "exhibit": {
+      "heading": "Room occupancy by hotel, 2019-2026",
+      "unit": "%",
+      "columns": 4,
+      "sharedScale": true,
+      "items": [
+        {
+          "label": "Edinburgh",
+          "values": [
+            76,
+            78,
+            62,
+            72,
+            81,
+            84,
+            86,
+            88
+          ]
+        },
+        {
+          "label": "Prague",
+          "values": [
+            71,
+            72,
+            53,
+            66,
+            75,
+            78,
+            80,
+            81
+          ]
+        },
+        {
+          "label": "New Orleans",
+          "values": [
+            80,
+            81,
+            65,
+            76,
+            83,
+            85,
+            86,
+            87
+          ]
+        },
+        {
+          "label": "York",
+          "values": [
+            80,
+            82,
+            66,
+            76,
+            74,
+            68,
+            58,
+            49
+          ],
+          "note": "No sightings since 2023"
+        },
+        {
+          "label": "Savannah",
+          "values": [
+            66,
+            68,
+            56,
+            65,
+            71,
+            73,
+            74,
+            76
+          ]
+        },
+        {
+          "label": "Dublin",
+          "values": [
+            69,
+            70,
+            54,
+            66,
+            72,
+            74,
+            75,
+            75
+          ]
+        },
+        {
+          "label": "Bruges",
+          "values": [
+            62,
+            64,
+            50,
+            58,
+            65,
+            68,
+            70,
+            71
+          ]
+        },
+        {
+          "label": "Salem",
+          "values": [
+            74,
+            76,
+            60,
+            73,
+            80,
+            83,
+            85,
+            86
+          ]
+        }
+      ],
+      "highlights": [
+        {
+          "category": "York"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the night porter's sightings log"
+  },
+  {
+    "id": "trend-stacked-area",
+    "type": "trend",
+    "form": "stacked-area",
+    "commentary": "rail",
+    "takeaway": false,
+    "title": "Lion's mane grew from a curiosity to a third of the co-op's harvest",
+    "rail": "Nearly nine in ten tonnes of growth since 2022 are lion's mane. At four times the button price per kilo, the twelve converted sheds now out-earn the forty button sheds.",
+    "exhibit": {
+      "heading": "Mushrooms harvested by variety",
+      "unit": "tonnes",
+      "categories": [
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "series": [
+        {
+          "name": "Button",
+          "values": [
+            410,
+            405,
+            398,
+            390,
+            384,
+            380,
+            372
+          ]
+        },
+        {
+          "name": "Oyster",
+          "values": [
+            120,
+            135,
+            150,
+            162,
+            172,
+            178,
+            184
+          ]
+        },
+        {
+          "name": "Shiitake",
+          "values": [
+            80,
+            92,
+            104,
+            118,
+            126,
+            131,
+            135
+          ]
+        },
+        {
+          "name": "Lion's mane",
+          "values": [
+            5,
+            15,
+            52,
+            120,
+            210,
+            300,
+            360
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "series": "Lion's mane",
+          "category": "2026",
+          "text": "34% of the 2026 harvest"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the co-op's spore-stained weigh-bridge book"
+  },
+  {
+    "id": "trend-stacked-column",
+    "type": "trend",
+    "form": "stacked-column",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "Fortnightly loaves overtook the weekly plan and now carry the growth",
+    "exhibit": {
+      "heading": "Active subscribers by plan, at year end",
+      "unit": "thousand",
+      "categories": [
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "series": [
+        {
+          "name": "Weekly loaf",
+          "values": [
+            9,
+            11.5,
+            14,
+            15.2,
+            14.6,
+            13.1,
+            12,
+            11.2
+          ]
+        },
+        {
+          "name": "Fortnightly loaf",
+          "values": [
+            1.2,
+            2.5,
+            4.8,
+            8.6,
+            13.4,
+            18.9,
+            23.5,
+            27.6
+          ]
+        },
+        {
+          "name": "Starter kit only",
+          "values": [
+            0.8,
+            1.4,
+            2.6,
+            3.9,
+            5,
+            6.8,
+            8.1,
+            9.2
+          ]
+        }
+      ],
+      "valueFormat": {
+        "decimals": 1
+      },
+      "annotations": [
+        {
+          "category": "2022",
+          "series": "Weekly loaf",
+          "text": "Weekly peaks at 15,200, then falls 26%"
+        },
+        {
+          "category": "2024",
+          "series": "Fortnightly loaf",
+          "text": "Fortnightly overtakes weekly as members bake less often"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the starter jar's own guestbook"
+  }
+]

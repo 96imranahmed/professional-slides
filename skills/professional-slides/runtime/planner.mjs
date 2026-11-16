@@ -13,7 +13,8 @@ import {
   overlay,
   resolveTitleVariant,
   section,
-  token
+  token,
+  choice,
 } from "./core.mjs";
 import { REGISTRY } from "./registry.mjs";
 
@@ -82,6 +83,8 @@ export function resolveSlideDensity(plan) {
 
 function validateItem(item, path, registry) {
   if (!item?.id) throw new Error(`${path}.id is required`);
+  // A choice is valid when every way of realising it is.
+  if (item.options) return item.options.forEach((option, at) => validateItem(option, `${path}.options[${at}]`, registry));
   if (item.component && !registry.has(item.component)) throw new Error(`${path}.component is not registered: ${item.component}`);
   if ((!item.component && (!Array.isArray(item.items) || !item.items.length)) || (item.items !== undefined && (!Array.isArray(item.items) || !item.items.length))) throw new Error(`${path} needs a component or nested items`);
   if (item.items) assertSectionHeadingProps(item);
@@ -185,6 +188,14 @@ function alignRowPanels(items) {
   return items.map((item) => aligned.get(item) ?? item);
 }
 
+/** The cells that start a grid's row together are a row of panels, and are aligned as one is. */
+function alignGridRows(items) {
+  const rows = new Map();
+  for (const item of items) if (item.cell) rows.set(item.cell.row, [...(rows.get(item.cell.row) || []), item]);
+  const aligned = new Map([...rows.values()].flatMap((row) => { const set = alignRowPanels(row); return row.map((item, at) => [item, set[at]]); }));
+  return items.map((item) => aligned.get(item) ?? item);
+}
+
 /**
  * A row whose every column is a section holding nothing but prose: the shape
  * the composer builds when a page's commentary goes under its exhibit rather
@@ -242,11 +253,22 @@ function layoutKind(plan, items) {
 }
 
 function makeItem(item, index, cell = null) {
+  // A grid offering alternative tracks (`tracks`, each { label, columns, rows }; layout-templates.mjs) is a choice between
+  // those grids, the preference first, made by the engine where the grid lands as any other way of setting a page is
+  // (tasteful-layout), recorded as a decision and held by a recorded choice. Each grid fills the frame the one grid
+  // would (`hints.sizing`), so the tracks are all that differs between them.
+  if (item.layout === "grid" && item.tracks?.length > 1) {
+    const { tracks, ...grid } = item, size = item.size || { width: { fr: 1 }, height: "fill" };
+    const options = tracks.map((way) => ({ label: way.label, node: makeItem({ ...grid, gridColumns: way.columns, gridRows: way.rows, hints: { ...item.hints, sizing: "fill" } }, index, cell) }));
+    return Object.assign(flow({ id: `${item.id}-tracks`, direction: "best", gap: token("space.minor"), leftover: "center", size, cell, children: [choice({ id: item.id, options })] }), { rhythm: true });
+  }
+  // The same content realised several ways (`options`, each { label, ...item }): the engine draws the one that reads best.
+  if (item.options) return choice({ id: item.id, kind: item.kind, options: item.options.map(({ label, family, ...option }, at) => ({ label, ...(family ? { family } : {}), node: makeItem({ ...option, ...(item.cell ? { cell: item.cell } : {}), ...(item.size ? { size: item.size } : {}) }, at, cell) })) });
   const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "callout", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
     const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover, textFlow: item.textFlow, gridColumns: item.gridColumns, gridRows: item.gridRows };
     const nested = makeComposition(nestedPlan, item.items);
-    return section({
+    return Object.assign(section({
       id: item.id,
       treatment: item.treatment || "open",
       edge: item.edge || "contained",
@@ -257,9 +279,10 @@ function makeItem(item, index, cell = null) {
       size,
       cell,
       frame: item.frame || null
-    });
+      // Where a panel that hugs its content sits in its cell (core.mjs).
+    }), item.alignSelf ? { alignSelf: item.alignSelf } : {}, item.hints ? { hints: item.hints } : {});
   }
-  return componentNode({
+  return Object.assign(componentNode({
     id: item.id,
     component: item.component,
     props: item.props || {},
@@ -267,15 +290,20 @@ function makeItem(item, index, cell = null) {
     cell,
     frame: item.frame || null,
     role: item.role || item.job
-  });
+    // What the composer says of the widths the block reads at, for an arrangement the engine chooses (tasteful-layout),
+    // and where a block as tall as its content sits in its cell.
+  }), item.alignSelf ? { alignSelf: item.alignSelf } : {}, item.hints ? { hints: item.hints } : {});
 }
 
 function makeComposition(plan, items, { root = false } = {}) {
   const kind = layoutKind(plan, items);
   if (plan.gap !== undefined && (typeof plan.gap !== "string" || !plan.gap.startsWith("space.") || !Object.hasOwn(TOKENS, plan.gap))) throw new Error(`${plan.id}.gap must name a canonical spacing token`);
-  if (plan.gap !== undefined && !["flow.row", "flow.column"].includes(kind)) throw new Error(`${plan.id}.gap is supported only for row and column flows`);
+  if (plan.gap !== undefined && !["flow.row", "flow.column", "flow.best", "grid"].includes(kind)) throw new Error(`${plan.id}.gap is supported only for row and column flows and grids`);
   if (kind === "absolute") return absolute({ id: `${plan.id}-absolute`, children: items.map((item, index) => makeItem(item, index)) });
   if (kind === "overlay") return overlay({ id: `${plan.id}-overlay`, children: items.map((item, index) => makeItem(item, index)) });
+  // Blocks the engine arranges itself once it knows their frame: stacked, side by side or in columns, whichever reads best (tasteful-layout).
+  // With no gap of its own the flow keeps the page's rhythm (`rhythm`): the engine sets the major or the minor gap by what the flow holds.
+  if (kind === "flow.best") return Object.assign(flow({ id: `${plan.id}-flow-best`, direction: "best", gap: token(plan.gap ?? "space.minor"), leftover: plan.leftover ?? "center", children: items.map((item, index) => makeItem(item, index)) }), plan.gap ? {} : { rhythm: true });
   if (kind === "flow.row" || kind === "flow.column") {
     let direction = kind.endsWith("row") ? "row" : "column";
     let children = items;
@@ -302,15 +330,14 @@ function makeComposition(plan, items, { root = false } = {}) {
         }
       }
     }
-    // A slide body whose blocks all hug their content claims less than the frame.
-    // Without a policy the remainder is abandoned below the last block, which is
-    // what produces a dead band across the lower third of the page.
+    // A slide body whose blocks all hug their content claims less than the frame: they stay one group in the middle of
+    // it, rather than standing at the top over an empty foot or pinned to its two ends.
     const bodyColumn = root && direction === "column";
     return flow({
       id: `${plan.id}-flow-${direction}`,
       direction,
       gap: token(plan.gap ?? "space.4"),
-      leftover: plan.leftover ?? (bodyColumn ? "distribute" : "start"),
+      leftover: plan.leftover ?? (bodyColumn ? "center" : "start"),
       children: children.map((item, index) => makeItem(item, index))
     });
   }
@@ -332,11 +359,15 @@ function makeComposition(plan, items, { root = false } = {}) {
     // Tracks a plan sets (a dashboard's: weights each way), else equal ones by the square root of the count.
     const columns = plan.gridColumns?.length ?? Math.min(3, Math.ceil(Math.sqrt(items.length)));
     const rows = plan.gridRows?.length ?? Math.ceil(items.length / columns);
+    // A track is a weight (a dashboard's plain number) or a track as a template writes one (layout-templates.mjs: `{ fr }`,
+    // "hug", `{ min, fr }`, or a fixed length `{ px }`, which the engine takes as a bare number of pixels).
+    const tracks = (given, count) => (given ? given.map((spec) => (typeof spec === "number" ? { fr: spec } : spec?.px !== undefined ? spec.px : spec)) : Array.from({ length: count }, () => ({ fr: 1 })));
     return grid({
       id: `${plan.id}-grid`,
-      columns: plan.gridColumns ? plan.gridColumns.map((fr) => ({ fr })) : Array.from({ length: columns }, () => ({ fr: 1 })),
-      rows: plan.gridRows ? plan.gridRows.map((fr) => ({ fr })) : Array.from({ length: rows }, () => ({ fr: 1 })),
-      children: items.map((item, index) => makeItem(item, index, { column: index % columns, row: Math.floor(index / columns), ...(item.cell || {}) }))
+      columns: tracks(plan.gridColumns, columns),
+      rows: tracks(plan.gridRows, rows),
+      ...(plan.gap ? { columnGap: token(plan.gap), rowGap: token(plan.gap) } : {}),
+      children: alignGridRows(items).map((item, index) => makeItem(item, index, { column: index % columns, row: Math.floor(index / columns), ...(item.cell || {}) }))
     });
   }
   throw new Error(`${plan.id}.layout is unsupported: ${kind}`);
@@ -417,7 +448,7 @@ export function planSlide(plan, registry = REGISTRY) {
   const titleDecision = titleVariant ?? "house-style";
   const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.ground ? { ground: plan.ground } : {}), ...(content.density.chart !== content.density.resolved ? { chartDensity: content.density.chart } : {}), ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.titlePlacement ? { titlePlacement: plan.titlePlacement } : {}), ...(plan.titleNumeral ? { titleNumeral: plan.titleNumeral } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, ...(plan.sourceForms ? { sourceForms: plan.sourceForms } : {}), note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
+    spec: { id: plan.id, notes: plan.notes || "", ...(plan.choices ? { choices: plan.choices } : {}), density: content.density.resolved, ...(plan.ground ? { ground: plan.ground } : {}), ...(content.density.chart !== content.density.resolved ? { chartDensity: content.density.chart } : {}), ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.titlePlacement ? { titlePlacement: plan.titlePlacement } : {}), ...(plan.titleNumeral ? { titleNumeral: plan.titleNumeral } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, ...(plan.sourceForms ? { sourceForms: plan.sourceForms } : {}), note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
       titleVariant: titleDecision,
       density: content.density,

@@ -63,16 +63,12 @@ const slide=composeSlide({title:'Five findings',points:[
   'Two markets stay open and re-enter at the month-13 gate',
   'The committee approves a gate, not a sequence',
 ]},0);
-const a=find(slide.items,i=>i.id==='s01-points-a'), b=find(slide.items,i=>i.id==='s01-points-b');
-assert.equal(a.props.centre,false); assert.equal(b.props.centre,false);
-// And the renderer honours it: both halves put their first line on one top.
-const list=REGISTRY.get('bullet-list');
-const top=(props,items)=>list.render({id:'l',frame:{x:0,y:100,width:400,height:360},
-  props:{...props,items}}).nodes.filter(n=>n.type==='text').map(n=>n.frame.y).sort((x,y)=>x-y)[0];
-assert.equal(top(a.props,a.props.items),top(b.props,b.props.items));
-// Left to centre itself, the shorter half starts lower - which is the defect.
-const {centre:_drop,...centred}=a.props;
-assert.ok(top(centred,b.props.items)>top(centred,a.props.items));
+// The halves are two lists in one row, each as tall as its points: they start on one top, whatever their lengths.
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
+const drawn=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'h',slides:[{id:'s',title:'Five findings',points:slide.items.flatMap(function walk(i){return i.component==='bullet-list'?i.props.items:(i.items||[]).flatMap(walk);})}]})).deck.slides[0];
+const [a,b]=drawn.componentInstances.filter(i=>i.component==='bullet-list').map(i=>i.frame);
+assert.equal(a.y,b.y); assert.ok(a.height>b.height);
 console.log('{}');
 ''')
 
@@ -87,24 +83,18 @@ import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const exhibit={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 const points=['The first thing the number says','The second thing the number says'];
-const withKpi=composeSlide({title:'T',exhibit,kpi:{value:'$232m',label:'Annual contribution'},points},0);
-assert.equal(find(withKpi.items,i=>i.id==='s01-points').props.centre,false);
-const withInsight=composeSlide({title:'T',exhibit,insight:'Where cost and prize disagree, readiness settles it.',points},0);
-assert.equal(find(withInsight.items,i=>i.id==='s01-points').props.centre,false);
-// Under the column's own heading it also starts at the top: the points read
-// down from "What it means", and the slack belongs at the foot rather than
-// half of it between the heading rule and the first line.
-const headed=composeSlide({title:'T',exhibit,points},0);
-assert.equal(find(headed.items,i=>i.id==='s01-points').props.centre,false);
-// Alone in an unheaded track beside a chart the list spreads to the capped
-// gap and centres what is left: the slack sits round the block, not pooled
-// under the last point.
+// A list that follows another block in its column sits directly under it: the column sets the two as one group.
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
+for (const extra of [{kpi:{value:'$232m',label:'Annual contribution'}},{insight:'Where cost and prize disagree, readiness settles it.'}]) {
+  const slide=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'k',slides:[{id:'s',title:'T',exhibit,points,...extra}]})).deck.slides[0];
+  const listed=slide.componentInstances.find(i=>i.component==='bullet-list'), above=slide.componentInstances.find(i=>i.id==='s-kpi'||i.component==='insight');
+  const gap=listed.frame.y-(above.frame.y+above.frame.height);
+  assert.ok(gap>=15&&gap<=49,'the points start a gap under the block they read from: the column opens its gaps evenly, no wider than the loosest (space.loose)');
+}
+// In a column beside a chart each point is a block as tall as its words; the column places them (test_free_space.py).
 const alone=composeSlide({title:'T',exhibit,points,pointsHeading:false},0);
-const list=find(alone.items,i=>i.id==='s01-points');
-assert.equal(list.props.distribute,true); assert.equal(list.props.centre,true); assert.equal(list.size.height,'fill');
-// Beside a process the list centres too: in a column the process runs its steps down it (registry-process.mjs), not across.
-const strip=composeSlide({title:'T',exhibit:{type:'process',items:['Draft','Plan','Request','Publish']},points,pointsHeading:false},0);
-assert.equal(find(strip.items,i=>i.id==='s01-points').props.centre,true);
+assert.equal(find(alone.items,i=>i.id==='s01-points-0').size.height,'hug');
 console.log('{}');
 ''')
 

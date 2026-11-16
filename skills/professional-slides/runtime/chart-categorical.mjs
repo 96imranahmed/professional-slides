@@ -2,7 +2,7 @@
 // (`categoricalChart`), with what only they set beside their categories - the
 // row labels of a bar chart, icons and logos under or beside a category,
 // deltas, stack labels and the period a chart focuses on by default.
-import { token, rectPrimitive, stableId, ellipsePrimitive, TOKENS, defaultHighlightStyle, linePrimitive, textPrimitive, tokenValue, onFill, shapePrimitive } from "./core.mjs";
+import { token, rectPrimitive, stableId, ellipsePrimitive, TOKENS, defaultHighlightStyle, linePrimitive, textPrimitive, tokenValue, onFill } from "./core.mjs";
 import { formatValue, withUnit } from "./value-format.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";

@@ -1,16 +1,17 @@
 """The two renderers must know the same shapes.
 
 A scene node names its geometry (`rightArrow`, `chevron`, `downArrow`), and two
-independent renderers turn that name into something drawn: the HTML adapter maps
-it to polygon points, the PPTX emitter to a PresentationML preset. Both lists are
-maintained by hand, in different languages, and nothing compared them - so a
-component could add a shape, look right in every HTML-based test in the suite,
-and export a deck with a missing or wrong shape in it. The HTML adapter throws on
-an unknown geometry; python-pptx silently falls back.
+independent renderers turn that name into something drawn. Both now read the
+name from one table (emit/shape-outlines.json), but a few names are still
+handled in code by each (a callout, a custom polygon, an icon's strokes), and
+a component can name a shape neither knows. The HTML adapter throws on an
+unknown geometry, and so does the PPTX emitter - it used to draw a rectangle
+and say nothing.
 
 This asserts the vocabularies agree, and that every geometry a component actually
 emits is in both - read off what each renderer does with a shape, and off the
-geometries the registry's samples, examples and example decks draw.
+geometries the registry's samples, examples and example decks draw. That the
+two draw the same OUTLINE for a name is test_shape_outlines.
 """
 
 from __future__ import annotations
@@ -32,8 +33,8 @@ except ImportError:  # pragma: no cover - exercised only without python-pptx
 
 
 def pptx_shapes() -> set[str]:
-    """The presets the emitter draws a geometry name as; chevron is drawn by name."""
-    return set(Emitter.PRESETS) | {"chevron"}
+    """The named geometries the emitter draws an outline for."""
+    return set(Emitter.OUTLINES)
 
 
 def html_draws(names) -> dict:
@@ -77,12 +78,13 @@ class GeometryParityTests(unittest.TestCase):
         self.assertIs(drawn.pop("noSuchShape"), False, "the HTML adapter no longer refuses an unknown geometry")
         self.assertEqual(
             {name for name, ok in drawn.items() if ok is not True}, set(),
-            "the PPTX emitter lists shapes the HTML adapter cannot draw; add them to SHAPE_POINTS "
-            "or drop them, because a component using one would throw in every HTML test")
+            "the PPTX emitter lists shapes the HTML adapter cannot draw; both read emit/shape-outlines.json, "
+            "so one of them has stopped reading it")
 
     def test_every_geometry_a_component_emits_is_drawable(self):
         emitted, pptx = emitted_geometries(), pptx_shapes()
-        self.assertGreater(len(emitted), 4, "the samples drew almost no shapes; the collection is broken")
+        # The staples: a collection that misses them walked no samples, whatever else it found.
+        self.assertLessEqual({"chevron", "diamond", "trapezoid"}, emitted, "the samples drew almost no shapes; the collection is broken")
         self.assertEqual(emitted - pptx, set(), "geometry emitted but absent from the PPTX emitter")
         drawn = html_draws(emitted)
         self.assertEqual({name for name, ok in drawn.items() if ok is not True}, set(),

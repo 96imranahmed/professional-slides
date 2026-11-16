@@ -23,7 +23,7 @@ import { isMain, runCli } from "../../skills/professional-slides/runtime/cli.mjs
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const runtimeOf = (root) => path.join(root, "skills", "professional-slides", "runtime");
-const SKIPPED = new Set(["node_modules", "__pycache__", "runs", ".git"]);
+const SKIPPED = new Set(["node_modules", "__pycache__", "runs", ".git", "vendor"]);
 
 // Exports kept for callers outside the repository, as `path:name` with why.
 export const PUBLIC_API = Object.freeze({});

@@ -2,18 +2,13 @@
 // callout, the evidence note and the panel, with the measures the composer
 // sizes prose and lists by (`proseMeasure`, `measureProse`, `measureCaption`,
 // `measureInsight`, `measureList`).
-import { tokenValue, token, rectPrimitive, stableId, textPrimitive, ellipsePrimitive, shapePrimitive, emphasisRuns, houseStyle, TOKENS, onFill, reversedFill, reversedType } from "./core.mjs";
-import { measureText, accentRuns, measureTextRuns } from "./text-layout.mjs";
+import { tokenValue, token, rectPrimitive, stableId, ellipsePrimitive, shapePrimitive, emphasisRuns, houseStyle, TOKENS, onFill, reversedFill, reversedType } from "./core.mjs";
+import { accentRuns } from "./text-layout.mjs";
 import { markerSize, numberMarker, iconMarker, stateMarker, MARK_TOKENS } from "./marks.mjs";
-import { measuredTextNode } from "./text-style.mjs";
-import { BODY, FONT, COMPACT, DISPLAY, INK, SURFACE, HAIRLINE, textStyle, boxStyle, PRIMARY, PRIMARY_TINT, MUTED_SURFACE, RULE, WHITE,
+import { setText, drawText, roleMeasure, settingOfAll, TEXT_ROLE_TOKENS } from "./text-roles.mjs";
+import { BODY, INK, SURFACE, HAIRLINE, boxStyle, PRIMARY, PRIMARY_TINT, MUTED_SURFACE, RULE, WHITE,
   SMALL_RADIUS, openLine, SECONDARY, component, simpleList, refineVariantAxes } from "./registry-shared.mjs";
 
-/** Body copy never runs wider than ≈ 80 characters (item 6, measure cap). */
-function paragraphMeasure(frameWidth, props = {}) {
-  if (props.maxMeasure === false) return frameWidth;
-  return Math.min(frameWidth, Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 80));
-}
 
 /**
  * Prose as a paragraph sets it: the widest line a paragraph runs to (the
@@ -23,14 +18,10 @@ function paragraphMeasure(frameWidth, props = {}) {
  * wider than the cap stops short of the track's right edge, and the rest of
  * the track is a strip of nothing down the page.
  */
-export const proseMeasure = () => ({ widest: paragraphMeasure(Infinity), narrowest: Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 45) });
-/** A panel caption's height at a width: compact, the panel's full width (paragraph variant "caption"). */
-export const measureCaption = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: false }).height;
-export const measureProse = (text, width, heading) => {
-  const body = measureText(text, paragraphMeasure(width), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false }).height;
-  const head = paragraphHeading({ heading }, paragraphMeasure(width));
-  return head ? head.layout.height + head.gap + body : body;
-};
+export const proseMeasure = () => ({ widest: roleMeasure("body"), narrowest: Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 45) });
+/** A panel caption's height at a width (paragraph variant "caption"). A caption is the panel's finding, the page's content: a note, at its measure. */
+export const measureCaption = (text, width) => paragraphLayout({ text, variant: "caption" }, width).height;
+export const measureProse = (text, width, heading) => paragraphLayout({ text, heading }, width).height;
 
 /**
  * The runs a paragraph is set in: its own `runs` where it was given them, else
@@ -72,24 +63,29 @@ function insightLayout(frame, props) {
   const bar = props.variant === "statement" ? 5 : 0;
   const marker = bar || ((props.variant ?? "tonal") === "primary" || props.marker === "chevron" ? tokenValue(token("icon.medium")) : 0);
   const markerGap = marker ? tokenValue(token("space.3")) : 0;
-  const bodySize = props.variant === "statement" ? token("type.heading") : BODY;
+  // The insight is the page's finding, set in its roles (text-roles.mjs) at their reading measure: its heading a lead,
+  // its sentence bold body text - a statement on the keynote close, in the display face on the editorial one - and its
+  // findings bold body lines. In a band wider than the measure the sentence keeps the measure, and the band's width past
+  // it is the band's.
+  // The finding is read once, across the exhibit or column it closes: it spans that width (the `band` role), never stopping
+  // at a reading measure with half its ground empty. Its statement variant is display-sized.
+  const bodyRole = props.variant === "statement" ? "statement" : "band";
   const width = frame.width - 2 * paddingX - marker - markerGap;
   if (width <= 0) throw new Error("Insight width cannot contain its theme padding; give the insight a wider frame");
-  const options = { fontFamily: tokenValue(FONT) };
-  const heading = props.heading ? measureText(props.heading, width, { ...options, fontSize: tokenValue(token("type.heading")), bold: true }) : null;
+  const heading = props.heading ? setText("lead", props.heading, width) : null;
   const gap = heading ? tokenValue(token("space.2")) : 0;
   if (list) {
     const bulletGap = tokenValue(token("space.3"));
     const indent = tokenValue(token("space.4"));
     const rowGap = tokenValue(token("space.2"));
-    const lines = list.map((text) => measureText(text, width - indent, { ...options, fontSize: tokenValue(BODY), bold: true }));
+    const lines = list.map((text) => setText("body", text, width - indent, { bold: true }));
     const listHeight = lines.reduce((sum, line) => sum + line.height, 0) + rowGap * (lines.length - 1);
     const contentHeight = listHeight + (heading?.height ?? 0) + gap;
-    return { body: null, lines, indent, bulletGap, rowGap, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY };
+    return { body: null, lines, indent, bulletGap, rowGap, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: Math.max(contentHeight, marker) + 2 * paddingY, texts: [heading, ...lines] };
   }
-  const body = measureText(props.text, width, { ...options, ...(props.variant === "rule" ? { fontFamily: tokenValue(DISPLAY) } : {}), fontSize: tokenValue(bodySize), bold: true });
+  const body = setText(bodyRole, props.text, width, { bold: true, ...(props.variant === "rule" ? { face: "font.display" } : {}) });
   const contentHeight = body.height + (heading?.height ?? 0) + gap;
-  return { body, bodySize, bar, lines: null, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: (bar ? contentHeight : Math.max(contentHeight, marker)) + 2 * paddingY };
+  return { body, bar, lines: null, heading, width, paddingX, paddingY, gap, marker, markerGap, contentHeight, height: (bar ? contentHeight : Math.max(contentHeight, marker)) + 2 * paddingY, texts: [heading, body] };
 }
 
 /**
@@ -117,11 +113,13 @@ function calloutLayout(frame, props) {
   const paddingX = tokenValue(token(outline ? "space.4" : "space.3")), paddingY = tokenValue(token(outline ? "space.4" : "space.2"));
   const width = frame.width - 2 * paddingX;
   if (width <= 0) throw new Error("Callout has no text width; give the callout a wider frame");
-  const options = { fontFamily: tokenValue(FONT), fontSize: tokenValue(outline ? BODY : COMPACT) };
-  const lead = props.lead?.trim() ? measureText(props.lead, width, { ...options, bold: true }) : null;
-  const body = measureText(props.text, width, { ...options, bold: outline });
+  // A callout standing on the page is read as the page's content - how to read it, or its caveat - so it is set as body
+  // text (its lead in bold) at the reading measure, not in caption type. A chart's annotation is the chart's furniture
+  // and is the chart-callout's (chart-annotations.mjs), not this.
+  const lead = props.lead?.trim() ? setText("body", props.lead, width, { bold: true }) : null;
+  const body = setText("body", props.text, width, { bold: outline });
   const gap = lead ? tokenValue(token("space.2")) / 2 : 0;
-  return { lead, body, paddingX, paddingY, gap, outline, height: (lead?.height ?? 0) + gap + body.height + 2 * paddingY };
+  return { lead, body, paddingX, paddingY, gap, outline, height: (lead?.height ?? 0) + gap + body.height + 2 * paddingY, texts: [lead, body] };
 }
 
 function calloutNodes({ id, frame, props }) {
@@ -137,24 +135,12 @@ function calloutNodes({ id, frame, props }) {
   const color = layout.outline ? token("color.accent") : INK;
   const nodes = [rectPrimitive({ id: stableId(id, "surface"), role: "callout-surface", frame: { ...frame, height }, style: layout.outline ? boxStyle(SURFACE, token("color.accent"), HAIRLINE, token("radius.none")) : boxStyle(token("color.calloutTint"), props.tone === "caution" ? token("color.caution") : "none", HAIRLINE, token("radius.none")) })];
   let y = frame.y + layout.paddingY;
+  const column = { x: frame.x + layout.paddingX, width: frame.width - 2 * layout.paddingX };
   if (layout.lead) {
-    nodes.push(
-      textPrimitive({
-        id: stableId(id, "lead"),
-        role: "callout-lead",
-        frame: { x: frame.x + layout.paddingX, y, width: frame.width - 2 * layout.paddingX, height: layout.lead.height },
-        text: layout.lead.text,
-        style: {
-          ...textStyle(layout.outline ? BODY : COMPACT, color, true, "left", "top"),
-          lineHeight: layout.lead.lineHeight,
-          wrap: false
-        },
-        data: { textLayout: layout.lead }
-      })
-    );
+    nodes.push(drawText(stableId(id, "lead"), "callout-lead", { ...column, y }, layout.lead, { color }));
     y += layout.lead.height + layout.gap;
   }
-  nodes.push(textPrimitive({ id: stableId(id, "text"), role: "callout-text", frame: { x: frame.x + layout.paddingX, y, width: frame.width - 2 * layout.paddingX, height: layout.body.height }, text: layout.body.text, style: { ...textStyle(layout.outline ? BODY : COMPACT, color, layout.outline, "left", "top"), lineHeight: layout.body.lineHeight, wrap: false }, data: { textLayout: layout.body } }));
+  nodes.push(drawText(stableId(id, "text"), "callout-text", { ...column, y }, layout.body, { color }));
   return nodes;
 }
 
@@ -200,13 +186,13 @@ function insightNodes({ id, frame, props }) {
   }
   if (layout.lines) {
     if (layout.heading) {
-      nodes.push(textPrimitive({ id: stableId(id, "heading"), role: "insight-heading", frame: { x: textX, y, width: layout.width, height: layout.heading.height }, text: layout.heading.text, style: { ...textStyle(token("type.heading"), foreground, true, props.align ?? "left", "top"), lineHeight: layout.heading.lineHeight }, data: { textLayout: layout.heading } }));
+      nodes.push(drawText(stableId(id, "heading"), "insight-heading", { x: textX, y, width: layout.width }, layout.heading, { color: foreground, align: props.align ?? "left" }));
       y += layout.heading.height + layout.gap;
     }
     const square = tokenValue(token("space.1"));
     layout.lines.forEach((line, index) => {
       nodes.push(rectPrimitive({ id: stableId(id, "bullet", index), role: "insight-bullet", frame: { x: textX, y: y + line.lineHeight / 2 - square / 2, width: square, height: square }, style: boxStyle(foreground, foreground, HAIRLINE, token("radius.none")) }));
-      nodes.push(textPrimitive({ id: stableId(id, "item", index), role: "insight-text", frame: { x: textX + layout.indent, y, width: layout.width - layout.indent, height: line.height }, text: line.text, style: { ...textStyle(BODY, foreground, true, "left", "top"), lineHeight: line.lineHeight }, data: { textLayout: line } }));
+      nodes.push(drawText(stableId(id, "item", index), "insight-text", { x: textX + layout.indent, y, width: layout.width - layout.indent }, line, { color: foreground }));
       y += line.height + layout.rowGap;
     });
     return nodes;
@@ -230,22 +216,9 @@ function insightNodes({ id, frame, props }) {
     // paragraphs on export. The emitter prefers runs over the unwrapped source,
     // so those travel with the layout.
     const sourceRuns = emphasis && measured.source !== undefined ? emphasisRuns(measured.source, props.highlight, fill)?.runs ?? null : null;
-    nodes.push(textPrimitive({ id: stableId(id, part), role: `insight-${part}`, frame: { x: textX, y, width: layout.width, height: measured.height }, text: measured.text,
-      ...(emphasis ? { runs: emphasis.runs } : {}),
-      style: {
-        ...textStyle(
-          part === "heading" ? token("type.heading") : layout.bodySize ?? BODY,
-          part === "heading" && variant !== "primary" ? PRIMARY : foreground,
-          !emphasis || emphasis.accent,
-          props.align ?? "left",
-          "top"
-        ),
-        ...(variant === "rule" && part === "body" ? { fontFamily: DISPLAY } : {}),
-        lineHeight: measured.lineHeight,
-        wrap: false
-      }, data: {
-        textLayout: sourceRuns ? { ...measured, sourceRuns } : measured
-      } }));
+    const node = drawText(stableId(id, part), `insight-${part}`, { x: textX, y, width: layout.width }, sourceRuns ? { ...measured, sourceRuns } : measured,
+      { color: part === "heading" && variant !== "primary" ? PRIMARY : foreground, bold: !emphasis || emphasis.accent, align: props.align ?? "left", runs: emphasis ? emphasis.runs : undefined });
+    nodes.push(node);
     y += measured.height + layout.gap;
   }
   return nodes;
@@ -289,7 +262,7 @@ const stopped = (lead, stop) => (/[.:;!?\u2013\u2014-]$/.test(lead) ? lead : `${
 /** A sub-point's runs: a `{ lead, text }` sub-point sets its lead in bold before a colon; a string is plain (null). */
 const subRuns = (sub) => (typeof sub === "string" ? null
   : [...(sub.lead ? [{ text: `${stopped(sub.lead, ":")}${sub.text ? " " : ""}`, bold: true }] : []), ...(sub.text ? [{ text: sub.text, bold: false }] : [])]);
-const measureSub = (sub, width, font) => { const runs = subRuns(sub); return runs ? measureTextRuns(runs, Math.max(1, width), font) : measureText(sub, Math.max(1, width), font); };
+const measureSub = (sub, width) => { const runs = subRuns(sub); return runs ? setText("body", null, Math.max(1, width), { runs }) : setText("body", sub, Math.max(1, width)); };
 /** The runs a text node carries: bold or accented runs, the accent dropped on a dark ground where it would not read. */
 const drawnRuns = (layout, inverse) => {
   const runs = layout?.runs;
@@ -331,7 +304,8 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   const markerSquare = tokenValue(token("space.1"));
   if (frame.width <= offset) throw new Error("Body bullet list has no text width; give the list a wider frame");
   const width = frame.width - offset;
-  const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY) };
+  // Every item is the page's content: body text at its reading measure (text-roles.mjs), its lead in bold, its
+  // sub-points body text too - a list in a column wider than the measure keeps the measure and leaves the rest as air.
   const subIndent = tokenValue(token("space.5"));
   // `inlineLead`: the lead runs *into* the sentence in the house accent rather
   // than sitting above it in bold - the way a well-made icon list sets the
@@ -351,8 +325,8 @@ function bodyListLayout(frame, itemsIn, props = {}) {
       const runs = leadAccent
         ? accentRuns(joined, highlights, { bold: true, accent: true, strict: false }) || [{ text: joined, bold: false }]
         : [{ text: `${lead} `, bold: true }, ...(accentRuns(item.text, highlights.slice(1), { bold: true, accent: true, strict: false }) || [{ text: item.text, bold: false }])];
-      const block = measureTextRuns(runs, width, font);
-      const subs = item.points.map((sub) => measureSub(sub, width - subIndent, font));
+      const block = setText("body", null, width, { runs });
+      const subs = item.points.map((sub) => measureSub(sub, width - subIndent));
       const subHeight = subs.reduce((sum, sub) => sum + sub.height, 0) + (subs.length ? leadGap * subs.length : 0);
       return { item, lead: null, text: block, subs, textHeight: block.height + subHeight, height: Math.max(block.height + subHeight, markerWidth) };
     }
@@ -362,47 +336,30 @@ function bodyListLayout(frame, itemsIn, props = {}) {
     // a point that does not say the phrase simply does not emphasise it.
     const leadRuns = item.lead ? accentRuns(item.lead, item.highlight, { bold: true, strict: false }) : null;
     const textRuns = item.text && !(leadRuns && leadRuns.some((run) => run.accent)) ? accentRuns(item.text, item.highlight, { bold: houseStyle("style.labelWeight") !== "regular", strict: false }) : null;
-    const lead = item.lead ? (leadRuns && leadRuns.some((run) => run.accent) ? measureTextRuns(leadRuns.map((run) => ({ ...run, bold: true })), width, font) : measureText(item.lead, width, { ...font, bold: true })) : null;
-    const text = item.text ? (textRuns ? measureTextRuns(textRuns, width, font) : measureText(item.text, width, font)) : null;
-    const subs = item.points.map((sub) => measureSub(sub, width - subIndent, font));
+    const lead = item.lead ? (leadRuns && leadRuns.some((run) => run.accent) ? setText("body", null, width, { runs: leadRuns.map((run) => ({ ...run, bold: true })), bold: true }) : setText("body", item.lead, width, { bold: true })) : null;
+    const text = item.text ? (textRuns ? setText("body", null, width, { runs: textRuns }) : setText("body", item.text, width)) : null;
+    const subs = item.points.map((sub) => measureSub(sub, width - subIndent));
     const subHeight = subs.reduce((sum, sub) => sum + sub.height, 0) + (subs.length ? leadGap * subs.length : 0);
     const textHeight = (lead?.height ?? 0) + (lead && text ? leadGap : 0) + (text?.height ?? 0) + subHeight;
     return { item, lead, text, subs, textHeight, height: Math.max(textHeight, markerWidth) };
   });
-  return { marker, offset, gap, leadGap, subIndent, ringed, markerSize: plain ? markerSquare : markerWidth, measured, height: measured.reduce((sum, m) => sum + m.height, 0) + gap * (items.length - 1) };
+  const texts = measured.flatMap((m) => [m.lead, m.text, ...m.subs]);
+  return { marker, offset, gap, leadGap, subIndent, ringed, markerSize: plain ? markerSquare : markerWidth, measured, height: measured.reduce((sum, m) => sum + m.height, 0) + gap * (items.length - 1), texts };
 }
 
 function bodyListNodes({ id, frame, props }) {
   const layout = bodyListLayout(frame, props.items, props);
-  if (layout.height > frame.height + 0.01) throw new Error(`${id} body bullets exceed the allocated height; allocate space or edit copy, never shrink type`);
-  // `distribute: true` (a side column on any deck that is not airy) spreads the
-  // rows down the frame instead of stacking them at the top. The gap is capped
-  // near the height of a two-line item: past that the list reads as a menu, and
-  // the answer to a column that still ends early is more content or a narrower
-  // column, not more air.
-  const spare = Math.max(0, frame.height - layout.height);
-  // The spread opens a reading gap, not a chasm: past about a line of text the
-  // points stop reading as one column and start reading as three labels adrift
-  // in it. A column that still ends high wants another point, not more air -
-  // which is what the column and page floors ask for.
-  const extraGap = props.distribute === true && layout.measured.length > 1 ? Math.min(spare / (layout.measured.length - 1), 24) : 0;
-  // Whatever the cap leaves over is split above and below the list rather than
-  // dropped under it. A column that opens its gaps to the cap and then hugs the
-  // top still ends two fifths up the track, with all the slack in one band at
-  // the foot - which reads as an unfinished page, not as air. Centred, the same
-  // leftover reads as the margin around a block. The gap does the reading work;
-  // the centring stops the remainder pooling in one place.
+  // A list over its height is the author's to cut, so it says by how much, in lines of body text.
+  if (layout.height > frame.height + 0.01) {
+    const over = Math.ceil(layout.height - frame.height), line = (layout.measured[0]?.text ?? layout.measured[0]?.lead)?.lineHeight ?? 20;
+    throw new Error(`${id}: the column holds ${Math.ceil(layout.height)}px of content in ${Math.floor(frame.height)}px - over by ${over}px, about ${Math.ceil(over / line)} line${Math.ceil(over / line) === 1 ? "" : "s"} of body text (${line}px a line); cut that much from its points, or move a point elsewhere`);
+  }
   // On a dark or primary panel the list reads in white: white text, white markers,
   // reversed number discs.
   const inverse = props.tone === "inverse";
   if (props.tone !== undefined && !["standard", "inverse"].includes(props.tone)) throw new Error(`Unknown bullet-list tone: ${props.tone}`);
   const INK_ = inverse ? reversedType() : INK;
-  // `centre: false` keeps the block at the top of its track. The leftover is
-  // only a margin when the list owns the track: under a kpi or an insight it
-  // reads as a gap between the two, and in a two-column split it lands the
-  // halves on different tops.
-  const centred = props.centre !== false;
-  let y = frame.y + (centred && extraGap > 0 ? Math.max(0, spare - extraGap * (layout.measured.length - 1)) / 2 : 0);
+  let y = frame.y;
   const nodes = [];
   layout.measured.forEach((m, index) => {
     const first = m.lead ?? m.text;
@@ -445,83 +402,74 @@ function bodyListNodes({ id, frame, props }) {
       nodes.push(...iconMarker({ id: stableId(id, "marker", index), role: "list-icon", x: frame.x, y: iconY, size: layout.markerSize, icon: m.item.icon || "info", tone: inverse ? "inverse" : layout.ringed || !m.item.icon ? "muted" : "accent" }));
     }
     let ty = layout.ringed && m.textHeight < m.height ? y + (m.height - m.textHeight) / 2 : y;
+    const column = { x: frame.x + layout.offset, width: frame.width - layout.offset };
     if (m.lead) {
-      nodes.push(
-        textPrimitive({
-          id: stableId(id, "lead", index),
-          role: "list-lead",
-          frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.lead.height },
-          text: m.lead.text,
-          ...(m.lead.runs && m.lead.runs.some((run) => run.accent) && !inverse ? { runs: m.lead.runs } : {}),
-          style: { ...textStyle(BODY, INK_, true, "left", "top"), lineHeight: m.lead.lineHeight },
-          data: { textLayout: m.lead }
-        })
-      );
+      nodes.push(drawText(stableId(id, "lead", index), "list-lead", { ...column, y: ty }, m.lead, { color: INK_, runs: m.lead.runs && m.lead.runs.some((run) => run.accent) && !inverse ? m.lead.runs : null }));
       ty += m.lead.height + (m.text ? layout.leadGap : 0);
     }
-    if (m.text)
-      nodes.push(
-        textPrimitive({
-          id: stableId(id, "item", index),
-          role: "list-item",
-          frame: { x: frame.x + layout.offset, y: ty, width: frame.width - layout.offset, height: m.text.height },
-          text: m.text.text,
-          ...drawnRuns(m.text, inverse),
-          style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: m.text.lineHeight },
-          data: { textLayout: m.text }
-        })
-      );
+    if (m.text) nodes.push(drawText(stableId(id, "item", index), "list-item", { ...column, y: ty }, m.text, { color: INK_, runs: drawnRuns(m.text, inverse).runs ?? null }));
     if (m.text) ty += m.text.height;
     m.subs.forEach((sub, k) => {
       ty += layout.leadGap;
       const x = frame.x + layout.offset;
       nodes.push(rectPrimitive({ id: stableId(id, "sub-marker", index, k), role: "list-submarker", frame: { x: x + 4, y: ty + sub.lineHeight / 2 - 0.5, width: tokenValue(token("space.2")), height: 1 }, style: boxStyle(INK_, INK_, HAIRLINE, token("radius.none")) }));
-      nodes.push(textPrimitive({ id: stableId(id, "sub", index, k), role: "list-subitem", frame: { x: x + layout.subIndent, y: ty, width: frame.width - layout.offset - layout.subIndent, height: sub.height }, text: sub.text, ...drawnRuns(sub, inverse), style: { ...textStyle(BODY, INK_, false, "left", "top"), lineHeight: sub.lineHeight }, data: { textLayout: sub } }));
+      nodes.push(drawText(stableId(id, "sub", index, k), "list-subitem", { x: x + layout.subIndent, y: ty, width: frame.width - layout.offset - layout.subIndent }, sub, { color: INK_, runs: drawnRuns(sub, inverse).runs ?? null }));
       ty += sub.height;
     });
-    y += m.height + layout.gap + extraGap;
+    y += m.height + layout.gap;
   });
   return nodes;
+}
+
+/**
+ * A paragraph set in a column `width` wide, by its measurement and its drawing alike: its sentence in its role - `body`,
+ * or `note` for a caption - at the role's reading measure, and its `heading`, where it has one, as a bold lead line of
+ * body text over it. Returns both texts, the gap between them, the height and the width the ink takes.
+ */
+function paragraphLayout(props, width) {
+  const runs = paragraphRuns(props);
+  if (runs && runs.map((r) => r.text).join("") !== props.text) throw new Error("Paragraph emphasis must preserve exact text");
+  const body = setText(props.variant === "caption" ? "band" : "body", props.text, width, runs ? { runs } : {});
+  const head = paragraphHeading(props, width), gap = head ? tokenValue(token("space.1")) : 0;
+  return { head, body, gap, height: (head ? head.height + gap : 0) + body.height, inkWidth: Math.max(body.width, head?.width ?? 0), texts: [head, body] };
 }
 
 function defineParagraph() {
   return component({ id: "paragraph", category: "text", tokens: ["font.body", "type.body", "type.compact", "color.ink", "color.textSecondary"], preferredSize: { width: 520, height: 180 }, sample: { text: "(Insert supporting statement)" }, render: ({ id, frame, props }) => {
     if (typeof props.text !== "string" || !props.text.trim()) throw new Error(`paragraph ${id} requires a non-empty text string; keep geometry in the component frame`);
-    const width = paragraphMeasure(frame.width, props);
-    // `variant: "caption"` is the line under a panel: compact, secondary, the
-    // finding this panel carries. A well-made page captions every panel in a row
-    // instead of closing the page with one shared so-what. It is the panel's
-    // insight, and its role says so: set at the foot of the body it is still
-    // the page's own commentary, not a note in the footer.
-    const caption = props.variant === "caption", runs = paragraphRuns(props);
+    // `variant: "caption"` is the line under a panel: a note, the finding this
+    // panel carries. A well-made page captions every panel in a row instead of
+    // closing the page with one shared so-what. It is the panel's insight, and
+    // its role says so: set at the foot of the body it is still the page's own
+    // commentary, not a note in the footer.
     // `heading`: the paragraph's lead as a bold subheading on its own line
     // above it, so a column of prose reads by its leads before its sentences.
-    const head = paragraphHeading(props, width);
-    const nodes = head ? [textPrimitive({ id: stableId(id, "lead"), role: "paragraph-lead", frame: { x: frame.x, y: frame.y, width, height: head.layout.height }, text: head.layout.text, ...(head.layout.runs ? { runs: head.layout.runs } : {}),
-      style: { ...textStyle(BODY, INK, true, props.align || "left", "top"), lineHeight: head.layout.lineHeight }, data: { textLayout: head.layout } })] : [];
-    const below = head ? head.layout.height + head.gap : 0;
-    nodes.push(measuredTextNode({ id: stableId(id, "text"), role: caption ? "insight-caption" : "paragraph", frame: { ...frame, y: frame.y + below, height: frame.height - below, width }, text: props.text, ...(runs ? { runs } : {}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") }));
+    const layout = paragraphLayout(props, frame.width), align = props.align || "left";
+    // Content is never set below its size to fit: a paragraph its frame cannot hold is one to cut or move.
+    if (layout.height > frame.height + 0.5) throw new Error(`${id} overflows its ${Math.floor(frame.height)}px box by ${Math.ceil(layout.height - frame.height)}px; split the page or cut the copy`);
+    const nodes = layout.head ? [drawText(stableId(id, "lead"), "paragraph-lead", { x: frame.x, y: frame.y, width: frame.width }, layout.head, { align })] : [];
+    const below = layout.head ? layout.head.height + layout.gap : 0;
+    nodes.push(drawText(stableId(id, "text"), props.variant === "caption" ? "insight-caption" : "paragraph", { x: frame.x, y: frame.y + below, width: frame.width }, layout.body, { align, ...(props.variant === "caption" ? { color: token("color.textSecondary") } : {}) }));
     return { nodes };
   } });
 }
 
-/** A paragraph's subheading measured at its width, and the gap under it; null for a paragraph without one. */
+/** A paragraph's subheading set at its width, a bold line of body text; null for a paragraph without one. */
 function paragraphHeading(props, width) {
   const heading = typeof props.heading === "string" ? props.heading.trim() : "";
   if (!heading) return null;
   // A highlight inside the lead is set in the accent on the lead's line, as a point's lead is.
-  const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY) };
   const runs = accentRuns(heading, [props.highlight ?? []].flat().filter((phrase) => typeof phrase === "string"), { bold: true, strict: false });
-  const layout = runs?.some((run) => run.accent) ? measureTextRuns(runs.map((run) => ({ ...run, bold: true })), width, font) : measureText(heading, width, { ...font, bold: true });
-  return { layout, gap: tokenValue(token("space.1")) };
+  return setText("body", heading, width, runs?.some((run) => run.accent) ? { bold: true, runs: runs.map((run) => ({ ...run, bold: true })) } : { bold: true });
 }
 
 function defineBulletList() {
   return component({
     id: "bullet-list",
+    takes: { points: [1, 8] },
     category: "text",
     tokens: [
-      "font.body", "type.compact", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule",
+      "font.body", "type.body", "type.label", "color.ink", "color.accent", "color.componentPrimary", "color.onPrimary", "color.rule",
       "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "radius.none", "radius.round"
     ],
     preferredSize: { width: 540, height: 240 },
@@ -533,6 +481,9 @@ function defineBulletList() {
 function defineInsight() {
   return component({
     id: "insight",
+    // One point, as a statement: it holds a sentence at the page's width, where a paragraph would run too long a line.
+    takes: { points: [1, 1] },
+    reads: { minWidth: 280, maxWidth: 1160 },
     category: "section",
     role: "insight",
     tokens: [
@@ -588,7 +539,7 @@ function defineEvidenceNote() {
 
 function definePanel() {
   return component({
-    id: "panel",
+    id: "panel", sizing: "fill",
     category: "section",
     role: "panel",
     tokens: [
@@ -620,6 +571,9 @@ function definePanel() {
         ? onFill(fill)
         : tone === "primary" || tone === "dark" ? reversedType() : INK;
       const data = seriesColorIndex === undefined ? {} : { seriesKey: props.seriesKey ?? props.heading, colorIndex: seriesColorIndex };
+      const L = panelLayout(frame, props);
+      if (L.height > frame.height + 0.01) throw new Error(`Panel "${props.heading}" needs ${Math.ceil(L.height)}px for its heading and text and has ${Math.floor(frame.height)}px; shorten the text or give the panel more height`);
+      const column = { x: frame.x + PANEL_PAD, width: frame.width - 2 * PANEL_PAD };
       return {
         nodes: [
           rectPrimitive({
@@ -629,26 +583,25 @@ function definePanel() {
             style: boxStyle(fill, tone === "open" && seriesColorIndex === undefined ? RULE : fill, HAIRLINE, token("radius.none")),
             data
           }),
-          textPrimitive({
-            id: stableId(id, "heading"),
-            role: "panel-heading",
-            frame: { x: frame.x + 10, y: frame.y + 10, width: frame.width - 20, height: 30 },
-            text: props.heading,
-            style: textStyle(token("type.heading"), foreground, true),
-            data
-          }),
-          textPrimitive({
-            id: stableId(id, "body"),
-            role: "panel-body",
-            frame: { x: frame.x + 10, y: frame.y + 44, width: frame.width - 20, height: frame.height - 54 },
-            text: props.text,
-            style: textStyle(COMPACT, foreground, false, "left", "top"),
-            data
-          })
+          drawText(stableId(id, "heading"), "panel-heading", { ...column, y: frame.y + PANEL_PAD }, L.heading, { color: foreground, data }),
+          ...(L.body ? [drawText(stableId(id, "body"), "panel-body", { ...column, y: frame.y + PANEL_PAD + L.heading.height + L.gap }, L.body, { color: foreground, data })] : [])
         ]
       };
     }
   });
+}
+
+// A panel's heading is its lead and its text body copy, each at its reading measure (text-roles.mjs), inside the
+// panel's padding: the panel is as tall as they are, and a frame shorter than that is refused rather than its text
+// set in caption type to fit.
+const PANEL_PAD = 10;
+function panelLayout(frame, props) {
+  if (typeof props.heading !== "string" || !props.heading.trim()) throw new Error("A panel requires a heading");
+  const width = frame.width - 2 * PANEL_PAD;
+  const heading = setText("lead", props.heading, width);
+  const body = typeof props.text === "string" && props.text.trim() ? setText("body", props.text, width) : null;
+  const gap = body ? tokenValue(token("space.1")) : 0;
+  return { heading, body, gap, height: 2 * PANEL_PAD + heading.height + gap + (body?.height ?? 0), texts: [heading, body] };
 }
 
 /** Text blocks: the paragraph, bullet list, insight, callout, evidence note and panel. */
@@ -666,19 +619,22 @@ export function registerTextBlocks(registry) {
       };
       definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "body" ? definition.measureContent(input) : null;
     }
-    if (definition.id === "paragraph") definition.measureContent = ({ frame, props }) => {
-      // Geometry-only layout probes have no copy yet; rendering still requires it.
-      if (!Object.hasOwn(props ?? {}, "text")) return null;
-      if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
-      const runs = paragraphRuns(props);
-      if (runs && runs.map((r) => r.text).join("") !== props.text) throw new Error("Paragraph emphasis must preserve exact text");
-      const width = paragraphMeasure(frame.width, props);
-      const body = (runs ? measureTextRuns : measureText)(runs || props.text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false });
-      const head = paragraphHeading(props, width);
-      return head ? { ...body, height: head.layout.height + head.gap + body.height } : body;
-    };
+    if (definition.id === "paragraph") {
+      definition.measureContent = ({ frame, props }) => {
+        // Geometry-only layout probes have no copy yet; rendering still requires it.
+        if (!Object.hasOwn(props ?? {}, "text")) return null;
+        if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
+        const { body, height, inkWidth } = paragraphLayout(props, frame.width);
+        return { ...body, height, inkWidth };
+      };
+      // How its lines break at a width (text-roles.mjs settingOf), for the engine weighing where it is set.
+      definition.setting = ({ props, width }) => (typeof props?.text === "string" && props.text.trim() ? settingOfAll(paragraphLayout(props, width).texts) : null);
+    }
     if (["insight", "evidence-note"].includes(definition.id)) definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
     if (definition.id === "callout") definition.measureContent = ({ frame, props }) => calloutLayout(frame, props);
+    // Geometry-only layout probes have no copy yet; rendering still requires it.
+    if (definition.id === "panel") definition.measureContent = ({ frame, props }) => (Object.hasOwn(props ?? {}, "heading") ? panelLayout(frame, props) : null);
+    definition.tokens = [...new Set([...definition.tokens, ...TEXT_ROLE_TOKENS])];
     registry.set(definition.id, definition);
   }
   return registry;

@@ -8,6 +8,7 @@ import { token, linePrimitive, assertSectionHeadingProps, tokenValue, stableId, 
   rectPrimitive, shapePrimitive, reversedType } from "./core.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
+import { setText, drawText } from "./text-roles.mjs";
 
 export const FONT = token("font.body");
 export const DISPLAY = token("font.display");
@@ -50,8 +51,19 @@ export const openLine = (id, x1, y1, x2, y2, role = "rule", stroke = RULE, lineW
   data
 });
 
-export const component = ({ id, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render, measureContent }) => ({
+// `sizing: "fill"`: the component draws to whatever frame it is given (a chart, a picture, a toned panel); without it, it
+// has a size of its own, which it measures or the engine reads off what it draws.
+// `takes`: the page content the component can set, and how many items of it ({ points: [1, 1] } - one point, no more);
+// `reads`: the widths it reads at ({ minWidth, maxWidth }, px). Both are requirements the engine weighs when it chooses
+// between ways of setting a page (tasteful-layout), so a new way to set content is a component that says what it takes.
+// `anchor: "top"`: the component is read from its head (a table from its header row), so where it leaves height it
+// keeps the top of its frame and the page's own top line from one such page to the next.
+export const component = ({ id, sizing, takes, reads, anchor, category, role = category, tokens, preferredSize, sample, variants, defaultVariant, render, measureContent }) => ({
   id,
+  ...(sizing ? { sizing } : {}),
+  ...(takes ? { takes } : {}),
+  ...(reads ? { reads } : {}),
+  ...(anchor ? { anchor } : {}),
   version: "2.0.0",
   category,
   role,
@@ -114,51 +126,53 @@ export function contentRailInsets(props = {}) {
     : 18;
 }
 
-export function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY, marker = "circle", distribute = false, rolePrefix = "list" }) {
-  const defaultGap = tokenValue(token("space.3"));
-  const minimumGap = tokenValue(token("space.1"));
-  const markerSize = numbered ? 24 : ["square", "circle"].includes(marker) ? 6 : 18;
-  const textOffset = numbered ? 36 : ["square", "circle"].includes(marker) ? 18 : 36;
+/**
+ * A plain list measured in a column `frame.width` wide: each item body text at its reading measure (text-roles.mjs), its
+ * marker - a dot, a square, a small arrow or a numbered disc - at its first line, the items a gap apart. Returns the
+ * measured texts (`sets`), each row's height and the height the list draws.
+ */
+export function listLayout(frame, items, { numbered = false, marker = "circle" } = {}) {
+  const dot = ["square", "circle"].includes(marker);
+  const markerSize = numbered ? 24 : dot ? 6 : 18;
+  const textOffset = numbered ? 36 : dot ? 18 : 36;
   const textWidth = Math.max(1, frame.width - textOffset);
-  // Each item measured, and drawn in the lines it was measured to (a chevron's details keep them in the PPTX too,
-  // emit_pptx.py LABEL_ROLES): estimated from a character count and wrapped again by PowerPoint, a 30-character detail took
-  // two lines' room and was drawn on one, so a column of details was spaced unevenly.
-  const layouts = items.map((item) => measureText(String(item), textWidth, { fontSize: tokenValue(COMPACT), wrapWidthRatio: ENGINE_RESERVE }));
-  let heights = layouts.map((layout) => Math.max(28, layout.lines.length * 20));
-  let gap = defaultGap;
-  if (distribute) {
-    const distributedHeight = (frame.height - defaultGap * Math.max(0, items.length - 1)) / Math.max(1, items.length);
-    heights = items.map(() => distributedHeight);
-  } else {
-    const desiredHeight = heights.reduce((sum, value) => sum + value, 0) + gap * Math.max(0, items.length - 1);
-    if (desiredHeight > frame.height && items.length > 1) {
-      gap = minimumGap;
-      const available = Math.max(items.length * 20, frame.height - gap * (items.length - 1));
-      const scale = Math.min(1, available / heights.reduce((sum, value) => sum + value, 0));
-      heights = heights.map((value) => Math.max(20, value * scale));
-    }
-  }
-  const nodes = [];
-  let cursor = frame.y;
-  items.forEach((item, index) => {
-    const height = heights[index];
-    const y = cursor;
-    if (numbered) {
-      nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: frame.x, y: y + 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.round")) }));
-      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: `${rolePrefix}-marker-label`, frame: { x: frame.x, y: y + 2, width: markerSize, height: markerSize }, text: String(index + 1), style: textStyle(LABEL, WHITE, true, "center") }));
-    } else if (marker === "circle") {
-      const firstLineHeight = tokenValue(COMPACT) * 1.2;
-      nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: frame.x + 2, y: y + (firstLineHeight - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.round")) }));
-    } else if (marker === "square") {
-      nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: frame.x + 2, y: y + 9, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
+  const sets = items.map((item) => setText("body", String(item), textWidth));
+  const rows = sets.map((set) => Math.max(numbered ? markerSize + 4 : 0, set.height)), gap = tokenValue(token("space.3"));
+  return { numbered, marker, markerSize, textOffset, textWidth, sets, rows, gap, height: rows.reduce((sum, row) => sum + row, 0) + gap * Math.max(0, rows.length - 1) };
+}
+
+/** The list `listLayout` measured, drawn from (`x`, `y`). */
+export function listNodes({ id, x, y, layout, markerColor = PRIMARY, rolePrefix = "list" }) {
+  const nodes = [], { markerSize } = layout;
+  let cursor = y;
+  layout.sets.forEach((set, index) => {
+    const top = cursor, line = set.lineHeight;
+    if (layout.numbered) {
+      const disc = { x, y: top + 2, width: markerSize, height: markerSize };
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: disc, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.round")) }));
+      const number = setText("mark", String(index + 1), markerSize);
+      nodes.push(drawText(stableId(id, "marker-label", index), `${rolePrefix}-marker-label`, { x, y: disc.y + (markerSize - number.height) / 2, width: markerSize }, number, { color: WHITE, align: "center" }));
+    } else if (layout.marker === "circle") {
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: x + 2, y: top + (line - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.round")) }));
+    } else if (layout.marker === "square") {
+      nodes.push(rectPrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, frame: { x: x + 2, y: top + (line - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
     } else {
-      nodes.push(shapePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, geometry: "rightArrow", frame: { x: frame.x + 2, y: y + 5, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
+      nodes.push(shapePrimitive({ id: stableId(id, "marker", index), role: `${rolePrefix}-marker`, geometry: "rightArrow", frame: { x: x + 2, y: top + (line - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(markerColor, markerColor, HAIRLINE, token("radius.none")) }));
     }
-    const layout = layouts[index];
-    nodes.push(textPrimitive({ id: stableId(id, "item", index), role: `${rolePrefix}-item`, frame: { x: frame.x + textOffset, y, width: textWidth, height }, text: layout.text, style: { ...textStyle(COMPACT, INK, false, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
-    cursor += height + gap;
+    nodes.push(drawText(stableId(id, "item", index), `${rolePrefix}-item`, { x: x + layout.textOffset, y: top, width: layout.textWidth }, set));
+    cursor += layout.rows[index] + layout.gap;
   });
   return nodes;
+}
+
+/**
+ * A plain list in `frame`, measured and drawn (listLayout, listNodes). A list taller than its frame is refused with what
+ * it needs: its text is never squeezed into rows shorter than its lines.
+ */
+export function simpleList({ id, frame, items, numbered = false, markerColor = PRIMARY, marker = "circle", rolePrefix = "list" }) {
+  const layout = listLayout(frame, items, { numbered, marker });
+  if (layout.height > frame.height + 0.01) throw new Error(`${id}: the list needs ${Math.ceil(layout.height)}px and its frame has ${Math.floor(frame.height)}px; cut an item or give the list more height`);
+  return listNodes({ id, x: frame.x, y: frame.y, layout, markerColor, rolePrefix });
 }
 
 export function lightChevronNode(id, frame) {

@@ -1,0 +1,2007 @@
+[
+ {
+  "id": "scorecard-bars",
+  "type": "scorecard",
+  "form": "bars",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Wheels, of all parts, hold up our boards: a third of orders arrive late",
+  "subtitle": "Late deliveries and defects by supplier, January to September 2026",
+  "exhibit": {
+   "columns": [
+    "Supplier",
+    "Part",
+    "Main problem",
+    {
+     "label": "Late deliveries",
+     "unit": "% of orders",
+     "bar": true
+    },
+    {
+     "label": "Defects",
+     "unit": "per 1,000 parts",
+     "bar": true
+    }
+   ],
+   "rows": [
+    [
+     "Gumball Urethane",
+     "54 mm wheels",
+     "Hardness batches fail the bounce test",
+     31,
+     9.4
+    ],
+    [
+     "Grindline Trucks",
+     "Aluminium trucks",
+     "Castings queue behind a bigger customer",
+     22,
+     6.8
+    ],
+    [
+     "Softride Bushings",
+     "Bushings",
+     "One press, no back-up tooling",
+     18,
+     {
+      "value": 4,
+      "text": "4.0"
+     }
+    ],
+    [
+     "Boltcutter Hardware",
+     "Mounting bolts",
+     "Ships only in full containers",
+     12,
+     3.5
+    ],
+    [
+     "Kickflip Bearings",
+     "Bearings",
+     "Customs paperwork at the port",
+     9,
+     1.2
+    ],
+    [
+     "Sandpaper Sky",
+     "Grip tape",
+     "Rolls cut short on night shifts",
+     6,
+     0.8
+    ],
+    [
+     "Northwoods Veneer",
+     "Maple plies",
+     "Kiln drying in the wet months",
+     5,
+     2.6
+    ],
+    [
+     "Ridgeback Press",
+     "Pressed decks",
+     "Rarely late; a model to copy",
+     4,
+     2.1
+    ]
+   ],
+   "highlightRow": "Gumball Urethane"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the goods-in whiteboard"
+ },
+ {
+  "id": "scorecard-binary",
+  "type": "scorecard",
+  "form": "binary",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Eight of ten modules pass every launch test; the spa and gift shop do not",
+  "subtitle": "Yes / no grid of pre-launch tests for each hotel module, October 2026",
+  "exhibit": {
+   "columns": [
+    "Module",
+    "What guests get",
+    {
+     "label": "Pressure-tested?"
+    },
+    {
+     "label": "Crew trained?"
+    },
+    {
+     "label": "Insured?"
+    },
+    {
+     "label": "Guest-ready?"
+    }
+   ],
+   "scales": {
+    "yn": {
+     "type": "binary",
+     "label": "Launch test",
+     "test": "The module passes the launch test",
+     "legend": false,
+     "labelDisplay": "state",
+     "states": {
+      "yes": "Yes",
+      "no": "No",
+      "missing": "Not assessed"
+     }
+    }
+   },
+   "rows": [
+    [
+     "Sleeping pods",
+     "Twelve pods, each with an Earth-facing window",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Observation dome",
+     "A 360-degree view of sunrise, sixteen times a day",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Galley and bar",
+     "Freeze-dried tasting menu and bubble-free fizz",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Docking port",
+     "Shuttle arrivals twice a week from the coast",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Escape capsules",
+     "Four capsules, splashdown inside forty minutes",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Medical bay",
+     "A flight surgeon and a video link to a ground clinic",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Fitness ring",
+     "A treadmill that keeps your bones on speaking terms",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    [
+     "Laundry",
+     "Socks in, socks out; mostly the same socks",
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     },
+     {
+      "type": "binary",
+      "value": "yes",
+      "scale": "yn"
+     }
+    ],
+    {
+     "style": "accented",
+     "cells": [
+      "Zero-g spa",
+      "Floating massage and a very slow sauna",
+      {
+       "type": "binary",
+       "value": "yes",
+       "scale": "yn"
+      },
+      {
+       "type": "binary",
+       "value": "no",
+       "scale": "yn"
+      },
+      {
+       "type": "binary",
+       "value": "no",
+       "scale": "yn"
+      },
+      {
+       "type": "binary",
+       "value": "yes",
+       "scale": "yn"
+      }
+     ]
+    },
+    {
+     "style": "accented",
+     "cells": [
+      "Gift shop",
+      "Snow globes that do not work up here",
+      {
+       "type": "binary",
+       "value": "no",
+       "scale": "yn"
+      },
+      {
+       "type": "binary",
+       "value": "yes",
+       "scale": "yn"
+      },
+      {
+       "type": "binary",
+       "value": "no",
+       "scale": "yn"
+      },
+      {
+       "type": "binary",
+       "value": "no",
+       "scale": "yn"
+      }
+     ]
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; mission control's launch binder"
+ },
+ {
+  "id": "scorecard-check",
+  "type": "scorecard",
+  "form": "check",
+  "commentary": "below",
+  "takeaway": false,
+  "title": "Only Funchal and Cairns tick all five boxes for the next parrot hotel",
+  "subtitle": "Ticks and crosses against five site conditions, seven shortlisted cities, 2026",
+  "exhibit": {
+   "columns": [
+    "City",
+    "The site",
+    {
+     "label": "Warm all year",
+     "type": "check"
+    },
+    {
+     "label": "Fruit market",
+     "type": "check"
+    },
+    {
+     "label": "Bird vet",
+     "type": "check"
+    },
+    {
+     "label": "Quiet skies",
+     "type": "check"
+    },
+    {
+     "label": "Consent",
+     "type": "check"
+    }
+   ],
+   "rows": [
+    [
+     "Funchal",
+     "An old banana warehouse above the busy harbour",
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
+    [
+     "Cairns",
+     "A rainforest lodge with a fruit-bat problem",
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
+    [
+     "San Juan",
+     "A rooftop right beside the airport's main runway",
+     true,
+     true,
+     true,
+     false,
+     true
+    ],
+    [
+     "Mombasa",
+     "A coral-stone mansion in the old town, near the port",
+     true,
+     true,
+     false,
+     true,
+     true
+    ],
+    [
+     "Darwin",
+     "A mango farm with no planning consent yet",
+     true,
+     false,
+     true,
+     true,
+     false
+    ],
+    [
+     "Seville",
+     "An orange-grove villa, surprisingly chilly in January",
+     false,
+     true,
+     true,
+     false,
+     true
+    ],
+    [
+     "Lisbon",
+     "A tiled palace, damp from November to March",
+     false,
+     true,
+     false,
+     false,
+     true
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the head concierge's feather-bound notebook",
+  "pointsHeading": "Next moves for the flock",
+  "points": [
+   {
+    "text": "Sign the Funchal lease first: the banana market is next door, and the planning consent runs out in March.",
+    "highlight": "Sign the Funchal lease first"
+   },
+   {
+    "text": "Hold Cairns as the second site while the local bird vet agrees a weekend rota for the whole flock.",
+    "highlight": "Hold Cairns"
+   },
+   {
+    "text": "Ask San Juan's airport for a quieter departure path before we drop the rooftop from the shortlist.",
+    "highlight": "quieter departure path"
+   },
+   {
+    "text": "Drop Lisbon and Seville: winters dip below 10°C, and our macaws flatly refuse to wear jumpers.",
+    "highlight": "Drop Lisbon and Seville"
+   }
+  ]
+ },
+ {
+  "id": "scorecard-dot",
+  "type": "scorecard",
+  "form": "dot",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Only the Howler and Toucan lines offer all five extras guests ask for",
+  "subtitle": "Guest extras offered on each zip-line, 2026 season",
+  "exhibit": {
+   "columns": [
+    "Zip-line",
+    "Signature sight",
+    {
+     "label": "Night rides",
+     "type": "dot"
+    },
+    {
+     "label": "Tandem riders",
+     "type": "dot"
+    },
+    {
+     "label": "Kids from six",
+     "type": "dot"
+    },
+    {
+     "label": "Sloth deck",
+     "type": "dot"
+    },
+    {
+     "label": "Rain cover",
+     "type": "dot"
+    }
+   ],
+   "rows": [
+    {
+     "style": "accented",
+     "cells": [
+      "Howler",
+      "Howler monkeys at breakfast, 30 metres up",
+      true,
+      true,
+      true,
+      true,
+      true
+     ]
+    },
+    {
+     "style": "accented",
+     "cells": [
+      "Toucan Run",
+      "Nesting toucans in the old fig canopy",
+      true,
+      true,
+      true,
+      true,
+      true
+     ]
+    },
+    [
+     "Canopy Loop",
+     "A full 510-metre circuit above the treetops",
+     true,
+     true,
+     true,
+     false,
+     false
+    ],
+    [
+     "Sloth Glide",
+     "A slow glide past three resident sloths",
+     false,
+     true,
+     true,
+     true,
+     false
+    ],
+    [
+     "Waterfall Drop",
+     "A 60-metre plunge beside the falls",
+     true,
+     false,
+     false,
+     false,
+     true
+    ],
+    [
+     "Orchid Hop",
+     "Wild orchids within arm's reach of the line",
+     false,
+     true,
+     true,
+     true,
+     false
+    ],
+    [
+     "Fern Gully",
+     "A low, gentle ride through giant ferns",
+     false,
+     true,
+     true,
+     false,
+     false
+    ],
+    [
+     "Jaguar Leap",
+     "The park's fastest line, at 70 km an hour",
+     false,
+     false,
+     false,
+     false,
+     true
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the head ranger's clipboard",
+  "bar": "Roof the Canopy Loop before the wet season: it already has the lights, and rain shut it for 41 days in 2026.",
+  "highlight": "41 days"
+ },
+ {
+  "id": "scorecard-harvey",
+  "type": "scorecard",
+  "form": "harvey",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Rooster Tail tops safety and fleet; sign it for the main beach",
+  "subtitle": "Six bidders scored by the resort's watersports panel, 2027 beach tender",
+  "exhibit": {
+   "columns": [
+    "Bidder",
+    {
+     "label": "Safety record",
+     "type": "harvey"
+    },
+    {
+     "label": "Fleet age",
+     "type": "harvey"
+    },
+    {
+     "label": "Instructor cover",
+     "type": "harvey"
+    },
+    {
+     "label": "Quiet engines",
+     "type": "harvey"
+    },
+    {
+     "label": "Price",
+     "type": "harvey"
+    },
+    {
+     "label": "Skis offered",
+     "unit": "count"
+    }
+   ],
+   "rows": [
+    [
+     "Rooster Tail Rentals",
+     {
+      "type": "harvey",
+      "value": 4,
+      "text": "Full"
+     },
+     {
+      "type": "harvey",
+      "value": 4,
+      "text": "Full"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     "24"
+    ],
+    [
+     "Brine Time",
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 4,
+      "text": "Full"
+     },
+     "18"
+    ],
+    [
+     "Foam Sweet Foam",
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 4,
+      "text": "Full"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     "15"
+    ],
+    [
+     "Wake Me Up Watersports",
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 4,
+      "text": "Full"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     "20"
+    ],
+    [
+     "Jet Set Go",
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 1,
+      "text": "Weak"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 1,
+      "text": "Weak"
+     },
+     {
+      "type": "harvey",
+      "value": 4,
+      "text": "Full"
+     },
+     "30"
+    ],
+    [
+     "Spray Day",
+     {
+      "type": "harvey",
+      "value": 1,
+      "text": "Weak"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 1,
+      "text": "Weak"
+     },
+     {
+      "type": "harvey",
+      "value": 2,
+      "text": "Partial"
+     },
+     {
+      "type": "harvey",
+      "value": 3,
+      "text": "Strong"
+     },
+     "12"
+    ]
+   ],
+   "highlightRow": "Rooster Tail Rentals"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the panel's clipboards, slightly damp",
+  "bar": "Sign Rooster Tail for the main beach and keep the cheaper Brine Time as back-up for the quiet cove.",
+  "highlight": "Brine Time as back-up",
+  "note": "Note: Price is scored as value for money: a full ball is the cheapest half-hour on the water."
+ },
+ {
+  "id": "scorecard-heatmap",
+  "type": "scorecard",
+  "form": "heatmap",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Summer belongs to Essaouira and Prasonisi; from September, Cumbuco takes the wind",
+  "subtitle": "Kiteable days a month, wind above 15 knots, April to October 2026",
+  "exhibit": {
+   "columns": [
+    "Beach",
+    {
+     "label": "Apr",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    {
+     "label": "May",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    {
+     "label": "Jun",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    {
+     "label": "Jul",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    {
+     "label": "Aug",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    {
+     "label": "Sep",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    {
+     "label": "Oct",
+     "heat": true,
+     "domain": [
+      3,
+      27
+     ]
+    },
+    "Best for"
+   ],
+   "rows": [
+    [
+     "Essaouira, Morocco",
+     15,
+     18,
+     21,
+     24,
+     23,
+     17,
+     12,
+     "Strong, steady trade winds"
+    ],
+    [
+     "Prasonisi, Greece",
+     8,
+     12,
+     17,
+     23,
+     24,
+     18,
+     9,
+     "Two bays: flat water and waves"
+    ],
+    [
+     "Tarifa, Spain",
+     14,
+     16,
+     19,
+     20,
+     19,
+     15,
+     12,
+     "Gusty Levante for the experienced"
+    ],
+    [
+     "Le Morne, Mauritius",
+     11,
+     15,
+     18,
+     19,
+     20,
+     20,
+     17,
+     "Lagoon lessons for beginners"
+    ],
+    [
+     "Lake Garda, Italy",
+     10,
+     14,
+     18,
+     20,
+     19,
+     14,
+     8,
+     "Morning lake thermals"
+    ],
+    [
+     "Leucate, France",
+     13,
+     12,
+     10,
+     9,
+     8,
+     11,
+     14,
+     "Spring and autumn camps"
+    ],
+    [
+     "Rhosneigr, Wales",
+     12,
+     10,
+     7,
+     6,
+     7,
+     11,
+     15,
+     "Hardy locals in thick wetsuits"
+    ],
+    [
+     "Cumbuco, Brazil",
+     4,
+     3,
+     6,
+     12,
+     22,
+     26,
+     27,
+     "Warm lagoons when Europe fades"
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the instructors' wind diaries and one very windswept anemometer"
+ },
+ {
+  "id": "scorecard-lights",
+  "type": "scorecard",
+  "form": "lights",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Three of seven submarine routes are cleared to dive daily from March",
+  "subtitle": "Traffic-light lamps for each route's readiness, Sydney Harbour, October 2026",
+  "exhibit": {
+   "columns": [
+    "Route",
+    "The crossing",
+    {
+     "label": "Depth clearance",
+     "type": "lights"
+    },
+    {
+     "label": "Pilot cover",
+     "type": "lights"
+    },
+    {
+     "label": "Dock slots",
+     "type": "lights"
+    },
+    {
+     "label": "Demand",
+     "type": "lights"
+    }
+   ],
+   "rows": [
+    [
+     "Circular Quay – Manly",
+     "Under the ferry lanes and out past the Heads",
+     "green",
+     "green",
+     "green",
+     "green"
+    ],
+    [
+     "Barangaroo – Balmain",
+     "A short hop beneath the busiest moorings",
+     "green",
+     "green",
+     "green",
+     "green"
+    ],
+    [
+     "Watsons Bay – Shark Island",
+     "Shallow sandbars, then a reef-side glide",
+     "green",
+     "green",
+     "green",
+     "green"
+    ],
+    [
+     "Rose Bay – Darling Harbour",
+     "The long run under both bridges",
+     "green",
+     "amber",
+     "green",
+     "green"
+    ],
+    [
+     "Mosman Bay – Cockatoo Island",
+     "Tight turns around the dry docks",
+     "amber",
+     "green",
+     "amber",
+     "green"
+    ],
+    [
+     "Manly – North Head reef",
+     "Open-sea swell over the reef shelf",
+     "red",
+     "amber",
+     "green",
+     "amber"
+    ],
+    [
+     "Middle Harbour – The Spit",
+     "Silt and a low road bridge",
+     "red",
+     "red",
+     "amber",
+     "red"
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the harbourmaster's sonar log",
+  "bar": "Launch the three all-green routes in March; two more pilots would open Rose Bay, the busiest of the rest.",
+  "highlight": "two more pilots"
+ },
+ {
+  "id": "scorecard-progress",
+  "type": "scorecard",
+  "form": "progress",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Every fortune collection is past halfway except lucky numbers, at 15%",
+  "subtitle": "Progress bars: share of each collection written for the January 2027 bake, October 2026",
+  "exhibit": {
+   "columns": [
+    "Collection",
+    "A fortune from the batch",
+    {
+     "label": "Fortunes due",
+     "align": "right"
+    },
+    {
+     "label": "Written",
+     "type": "progress"
+    }
+   ],
+   "columnWidths": [
+    0.17,
+    0.42,
+    0.11,
+    0.3
+   ],
+   "rows": [
+    [
+     "Romance",
+     "Someone is thinking of you. Probably about lunch.",
+     "4,000",
+     {
+      "type": "progress",
+      "value": 92,
+      "text": "92%"
+     }
+    ],
+    [
+     "Career",
+     "Your next promotion is hiding in your inbox.",
+     "3,500",
+     {
+      "type": "progress",
+      "value": 85,
+      "text": "85%"
+     }
+    ],
+    [
+     "Travel",
+     "A long journey awaits. Pack a jumper.",
+     "2,500",
+     {
+      "type": "progress",
+      "value": 78,
+      "text": "78%"
+     }
+    ],
+    [
+     "Polite warnings",
+     "Avoid ladders on Tuesdays, just in case.",
+     "2,000",
+     {
+      "type": "progress",
+      "value": 70,
+      "text": "70%"
+     }
+    ],
+    [
+     "Vague prophecies",
+     "Something will happen, and you will be there.",
+     "3,000",
+     {
+      "type": "progress",
+      "value": 64,
+      "text": "64%"
+     }
+    ],
+    [
+     "Wisdom",
+     "The cookie is temporary. The crumbs are forever.",
+     "2,500",
+     {
+      "type": "progress",
+      "value": 55,
+      "text": "55%"
+     }
+    ],
+    [
+     "Lucky numbers",
+     "Your lucky numbers are 4, 8, 15 and 23.",
+     "5,000",
+     {
+      "type": "progress",
+      "value": 15,
+      "text": "15%"
+     }
+    ]
+   ],
+   "highlightRow": "Lucky numbers"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the guild's quill tally",
+  "bar": "Move three romance writers onto lucky numbers now: 5,000 numbers are due and only 750 are drawn.",
+  "highlight": "only 750 are drawn"
+ },
+ {
+  "id": "scorecard-rag",
+  "type": "scorecard",
+  "form": "rag",
+  "commentary": "none",
+  "takeaway": "Book the zero-gravity test kitchen for October, or the soup course comes off the banquet menu.",
+  "title": "Two of eight milestones are at risk, and both involve soup that floats",
+  "subtitle": "Red / amber / green status of the banquet catering contract, August and September 2026",
+  "exhibit": {
+   "columns": [
+    "Banquet milestone",
+    "Owner",
+    "Due",
+    {
+     "label": "August",
+     "type": "rag"
+    },
+    {
+     "label": "September",
+     "type": "rag"
+    }
+   ],
+   "rows": [
+    [
+     "Menu tasting with the Ambassador",
+     "Head chef",
+     "Nov 2026",
+     {
+      "type": "rag",
+      "value": "complete",
+      "text": "Complete"
+     },
+     {
+      "type": "rag",
+      "value": "complete",
+      "text": "Complete"
+     }
+    ],
+    [
+     "Allergen screen for four species",
+     "Xeno-dietitian",
+     "Dec 2026",
+     {
+      "type": "rag",
+      "value": "on-track",
+      "text": "On track"
+     },
+     {
+      "type": "rag",
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Cold chain held at minus 80°C",
+     "Logistics lead",
+     "Dec 2026",
+     {
+      "type": "rag",
+      "value": "on-track",
+      "text": "On track"
+     },
+     {
+      "type": "rag",
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Twelve-limb cutlery delivered",
+     "Procurement",
+     "Jan 2027",
+     {
+      "type": "rag",
+      "value": "on-track",
+      "text": "On track"
+     },
+     {
+      "type": "rag",
+      "value": "behind",
+      "text": "Behind"
+     }
+    ],
+    [
+     "Zero-gravity soup trials",
+     "Development kitchen",
+     "Feb 2027",
+     {
+      "type": "rag",
+      "value": "behind",
+      "text": "Behind"
+     },
+     {
+      "type": "rag",
+      "value": "at-risk",
+      "text": "At risk"
+     }
+    ],
+    [
+     "Floating-broth spill permit",
+     "Protocol office",
+     "Feb 2027",
+     {
+      "type": "rag",
+      "value": "at-risk",
+      "text": "At risk"
+     },
+     {
+      "type": "rag",
+      "value": "at-risk",
+      "text": "At risk"
+     }
+    ],
+    [
+     "Translator-waiters hired",
+     "People team",
+     "Mar 2027",
+     {
+      "type": "rag",
+      "value": "not-started",
+      "text": "Not started"
+     },
+     {
+      "type": "rag",
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Full banquet dress rehearsal",
+     "Head chef",
+     "Apr 2027",
+     {
+      "type": "rag",
+      "value": "not-started",
+      "text": "Not started"
+     },
+     {
+      "type": "rag",
+      "value": "not-started",
+      "text": "Not started"
+     }
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the embassy's galley log"
+ },
+ {
+  "id": "scorecard-trend",
+  "type": "scorecard",
+  "form": "trend",
+  "commentary": "in-exhibit",
+  "takeaway": false,
+  "title": "Tournaments lift covers at four of seven cafés; Vienna's queue keeps growing",
+  "subtitle": "Trend on each row: direction of each measure, FY24 to FY26",
+  "exhibit": {
+   "columns": [
+    "Café",
+    {
+     "label": "Covers",
+     "type": "trend"
+    },
+    {
+     "label": "Spend",
+     "type": "trend"
+    },
+    {
+     "label": "Tournaments",
+     "type": "trend"
+    },
+    {
+     "label": "Board queue",
+     "type": "trend",
+     "better": "down"
+    },
+    {
+     "label": "What it means",
+     "implication": true
+    }
+   ],
+   "rows": [
+    [
+     "Tbilisi",
+     "up",
+     "up",
+     "up",
+     "flat",
+     "The model café: weekly blitz nights fill tables and lift spend"
+    ],
+    [
+     "Buenos Aires",
+     "up",
+     "flat",
+     "up",
+     "flat",
+     "Copy Tbilisi's blitz nights to lift spend as well as covers"
+    ],
+    [
+     "Reykjavík",
+     "up",
+     "up",
+     "up",
+     "down",
+     "Growing fast with short queues; room for a second room"
+    ],
+    [
+     "Chennai",
+     "up",
+     "flat",
+     "up",
+     "up",
+     "Add twelve boards before the queue starts costing covers"
+    ],
+    [
+     "Vienna",
+     "flat",
+     "up",
+     "flat",
+     "up",
+     "Busy but stuck: players linger, so set a 90-minute clock"
+    ],
+    [
+     "Montreal",
+     "flat",
+     "up",
+     "down",
+     "flat",
+     "Tournaments are fading; bring back the Friday rapid league"
+    ],
+    [
+     "Lviv",
+     "down",
+     "down",
+     "flat",
+     "flat",
+     "Losing guests; relaunch with a junior league on Saturdays"
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the head arbiter's scoresheets"
+ },
+ {
+  "id": "statement-quotes-avatars",
+  "type": "statement",
+  "form": "quotes",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Customers love the rain alerts but not an umbrella that nags them",
+  "subtitle": "Owner interviews, first year on sale, 2026",
+  "exhibit": {
+   "quotes": [
+    {
+     "quote": "It buzzed at 8:02, so I took it with me, grumbling about the clear blue sky. By 8:40 it was pouring and I was the only dry person at the bus stop. Three of my neighbours have ordered one since then.",
+     "attribution": "Commuter, Manchester",
+     "detail": "Owner since March 2026",
+     "avatarText": "CM"
+    },
+    {
+     "quote": "The rain alert is brilliant. It was right on 19 of my 20 wet days this spring, and it buzzes early enough to matter when you ride a bike through the city for a living. I'd pay the subscription for that alone.",
+     "attribution": "Cycle courier, Leeds",
+     "detail": "Owner since February 2026",
+     "avatarText": "CL"
+    },
+    {
+     "quote": "I love the forecast. I do not love a calm voice from my hallway saying 'I did warn you' when I've left it at home and come back soaked to the skin. That isn't a feature, it's a smug flatmate with a handle.",
+     "attribution": "Graphic designer, Glasgow",
+     "detail": "Owner since January 2026",
+     "avatarText": "GD"
+    },
+    {
+     "quote": "The app nags me to charge it every Sunday night, and it sulks with a red light whenever I forget. It's an umbrella. It should be the one thing in my bag that never needs a charger of its own.",
+     "attribution": "Retired nurse, Cardiff",
+     "detail": "Owner since May 2026",
+     "avatarText": "RN"
+    }
+   ],
+   "treatment": "contained",
+   "arrangement": "grid",
+   "attributionPlacement": "below-left",
+   "avatar": true
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the umbrella's own complaints log"
+ },
+ {
+  "id": "statement-quotes-callout",
+  "type": "statement",
+  "form": "quotes",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Staff agree the pancake queue starts at the flip, not the batter",
+  "subtitle": "Crew debrief after the 2026 festival weekend",
+  "exhibit": {
+   "quotes": [
+    {
+     "quote": "We can mix batter for 900 pancakes an hour without breaking a sweat. Then three of us flip by hand, one griddle each, and the whole field waits on our wrists. By nine the queue reaches the bandstand.",
+     "attribution": "Head flipper, griddle row B",
+     "detail": "Festival crew since 2019"
+    },
+    {
+     "quote": "The batter tent finishes its morning run by half past nine. We are still flipping the seven o'clock orders at ten, with the syrup going cold on the counter and the batter jugs skinning over in the summer heat.",
+     "attribution": "Batter-tent supervisor",
+     "detail": "Festival crew since 2021"
+    },
+    {
+     "quote": "Give me two more griddles and a fourth flipper, and I promise you the morning queue is gone before the brass band has even finished tuning up. Honestly, it is the cheapest fix on the whole festival field.",
+     "attribution": "Shift lead, east griddles",
+     "detail": "Festival crew since 2022"
+    },
+    {
+     "quote": "Nobody has ever complained about the batter. Every complaint card in the box this year is about forty minutes spent standing in the sun, watching three very tired people flip pancakes by hand.",
+     "attribution": "Ticket-booth volunteer",
+     "detail": "First festival, 2026"
+    }
+   ],
+   "treatment": "callout",
+   "arrangement": "grid",
+   "attributionPlacement": "below-center"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the batter tent's whiteboard"
+ },
+ {
+  "id": "statement-quotes-contained",
+  "type": "statement",
+  "form": "quotes",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Guests rebook for the kraken they nearly saw, not the one they saw",
+  "subtitle": "Exit interviews, North Atlantic sailings, summer 2026",
+  "exhibit": {
+   "quotes": [
+    {
+     "quote": "We saw a tentacle the size of a lamppost for about four seconds, then it was gone. I've already booked September to see the rest of it.",
+     "attribution": "Retired geography teacher",
+     "detail": "Cabin 14, Bergen sailing"
+    },
+    {
+     "quote": "The full sighting on day three was wonderful, honestly. But having seen the whole kraken once, I'm not sure I need to see it a second time.",
+     "attribution": "First-time guest",
+     "detail": "Reykjavik sailing"
+    },
+    {
+     "quote": "The captain's log said 'disturbance, port side, 02:40'. That one line is the reason my whole family is coming back with me next July.",
+     "attribution": "Repeat guest, fourth voyage",
+     "detail": "Faroes sailing"
+    },
+    {
+     "quote": "You go home with a blurry photo and a theory about what was in it. Then you simply have to sail back out and prove it to the whole family.",
+     "attribution": "Sonar-deck regular",
+     "detail": "Shetland sailing"
+    },
+    {
+     "quote": "Bubbles the size of a dinghy came up beside the ship at dawn, then nothing at all. I won't rest until I know what was down there with us.",
+     "attribution": "Marine-biology student",
+     "detail": "Tromsø sailing"
+    }
+   ],
+   "treatment": "contained",
+   "placement": "full-field",
+   "attributionPlacement": "inside",
+   "attributionAlign": "right"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the purser's comment cards"
+ },
+ {
+  "id": "statement-quotes-speech-bubble",
+  "type": "statement",
+  "form": "quotes",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Regulars want hotter broth and bigger bowls, not a longer menu",
+  "subtitle": "Comment book, winter season 2026",
+  "exhibit": {
+   "quotes": [
+    {
+     "quote": "After nine hours on the ice I don't want twelve choices on a menu. I want one bowl of broth, very hot and very big, and a warm seat by the heater to eat it.",
+     "attribution": "Glaciologist",
+     "detail": "Station 4"
+    },
+    {
+     "quote": "The miso was perfect in March. By June it reached the table lukewarm, because the corridor from the kitchen is minus five and the trays have no lids at all.",
+     "attribution": "Winter-over mechanic",
+     "detail": "Station 2"
+    },
+    {
+     "quote": "Bigger bowls, please. We burn 5,000 calories a day hauling sledges out to the penguin colonies, and down here the small bowl is barely a starter for one.",
+     "attribution": "Penguin-count field lead",
+     "detail": "Station 7"
+    },
+    {
+     "quote": "Nobody has ordered the seasonal salad since April, and the lettuce only flies in once a month. Put that effort into the broth instead, and keep a lid on it.",
+     "attribution": "Station doctor",
+     "detail": "Station 4"
+    }
+   ],
+   "treatment": "speech-bubble",
+   "arrangement": "grid"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the noodle bar's frost-stained comment book"
+ },
+ {
+  "id": "statement-quotes-staggered",
+  "type": "statement",
+  "form": "quotes",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Fans want the frog choir recorded live in the rain, not in a studio",
+  "subtitle": "Listener survey of vinyl subscribers, spring 2026",
+  "exhibit": {
+   "quotes": [
+    {
+     "quote": "The studio album sounds like a choir of polite frogs. I want the real pond: rain on the reeds, traffic far off, and the bullfrog who comes in late.",
+     "attribution": "Vinyl subscriber since 2021, and owner of all nine of the pond albums"
+    },
+    {
+     "quote": "On the dawn chorus record you can hear a heron land on track three, and nobody cut it out. That one moment is exactly why I bought the record twice.",
+     "attribution": "Hospital porter in Ghent, who has subscribed to the label since 2023"
+    },
+    {
+     "quote": "Release the swamp tapes as they are, thunder and all. When it rained in July the frogs sang louder. The crackle is half the music; rain is the rest.",
+     "attribution": "Record-shop owner in Lyon, who has stocked the label since 2019"
+    }
+   ],
+   "treatment": "speech-bubble",
+   "placement": "full-field",
+   "arrangement": "staggered"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the label's pond-side mailbag"
+ },
+ {
+  "id": "statement-statement",
+  "type": "statement",
+  "form": "statement",
+  "commentary": "none",
+  "takeaway": false,
+  "tone": "dark",
+  "title": "Clubs that cheer the drop keep twice as many junior jugglers",
+  "text": "Clubs that cheer the drop keep twice as many junior jugglers for a second season.",
+  "accent": "cheer the drop",
+  "subtext": "Drop-friendly clubs kept 68% of their 2025 juniors; drill-first clubs kept 34%.",
+  "image": {
+   "alt": "An illustrated fairground: striped circus tents and a Ferris wheel on a cream sky"
+  }
+ },
+ {
+  "id": "summary-executive-summary",
+  "type": "summary",
+  "form": "executive-summary",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Lanternhour can double to 240,000 members by 2028 through night-shift employers",
+  "highlight": "over half of the 120,000 new members",
+  "points": [
+   {
+    "lead": "Night workers are badly served",
+    "text": "1.9 million people in our six cities work between 10pm and 6am. Rival branches are shut when they are paid, so 31% still cash their wage cheques at kiosks that charge 4%."
+   },
+   {
+    "lead": "Employers are the cheapest door",
+    "text": "Payroll partnerships with hospitals, depots and bakeries add 55,000 members at £18 each, and a referral bonus 10,000 more: over half of the 120,000 new members that take Lanternhour to 240,000 by 2028."
+   },
+   {
+    "lead": "Branches come last, not first",
+    "text": "A 24-hour branch costs £200 for each member it wins. Video tellers and pop-up desks reach 37,000 more for £2.6m, so new branches open only where both are already full."
+   }
+  ],
+  "exhibit": {
+   "type": "table",
+   "columns": [
+    "Growth lever",
+    {
+     "label": "Added by 2028",
+     "unit": "members",
+     "bar": true
+    },
+    "Cost to 2028",
+    "Cost per member"
+   ],
+   "rows": [
+    [
+     "Employer payroll deals",
+     {
+      "value": 55000,
+      "text": "55,000"
+     },
+     "£1.0m",
+     "£18"
+    ],
+    [
+     "Refer-a-shift-mate bonus",
+     {
+      "value": 10000,
+      "text": "10,000"
+     },
+     "£0.4m",
+     "£40"
+    ],
+    [
+     "3am video tellers",
+     {
+      "value": 25000,
+      "text": "25,000"
+     },
+     "£2.0m",
+     "£80"
+    ],
+    [
+     "Night-market pop-ups",
+     {
+      "value": 12000,
+      "text": "12,000"
+     },
+     "£0.6m",
+     "£50"
+    ],
+    [
+     "Two 24-hour branches",
+     {
+      "value": 18000,
+      "text": "18,000"
+     },
+     "£3.6m",
+     "£200"
+    ],
+    {
+     "style": "total",
+     "cells": [
+      "Total",
+      {
+       "type": "text",
+       "text": "120,000",
+       "bold": true
+      },
+      "£7.6m",
+      "£63"
+     ]
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the 3am branch manager's ledger"
+ },
+ {
+  "id": "summary-takeaways",
+  "type": "summary",
+  "form": "takeaways",
+  "commentary": "none",
+  "takeaway": false,
+  "tone": "dark",
+  "title": "Five habits keep a twelve-time-zone team awake at the right hour",
+  "items": [
+   "Rotate the pain: move the weekly all-hands by eight hours a month, so no office takes the 3am slot twice running.",
+   "Guard the golden hour: keep 14:00 to 15:00 UTC for live decisions, the only hour all four hubs are awake.",
+   "Write before you meet: a one-page brief sent 12 hours ahead cut meetings by 35% in the Lisbon pilot.",
+   "Hand off at sunset: each hub ends its day with a five-line note to the next hub west, so the work follows the sun.",
+   "Give every hub a clock-keeper: one person who can veto any meeting set outside 08:00 to 19:00 local time."
+  ],
+  "image": {
+   "alt": "An illustrated lighthouse on a small island, its beam sweeping over blue waves"
+  }
+ },
+ {
+  "id": "table-bubble-column",
+  "type": "lookup",
+  "form": "table",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Ghost-pepper honey grew 64% a year since 2020; the classic jalapeño cooled to 3%",
+  "subtitle": "Eight sauces in the Ember & Ash subscription box, 2020 to 2025",
+  "highlight": "ghost-pepper honey",
+  "bar": "Give ghost-pepper honey and smoked mango the front of the 2027 box, and rest the classic jalapeño to every other month.",
+  "exhibit": {
+   "columns": [
+    "Sauce",
+    {
+     "label": "Heat",
+     "unit": "k Scoville"
+    },
+    {
+     "label": "Subscribers, 2025",
+     "unit": "thousand"
+    },
+    {
+     "label": "Growth, 2020-25",
+     "unit": "% a year",
+     "bubble": true
+    },
+    {
+     "label": "Reorder rate",
+     "unit": "%"
+    },
+    "Best poured on"
+   ],
+   "rows": [
+    [
+     "Ghost-pepper honey",
+     "850",
+     "41.2",
+     "+64%",
+     "71",
+     "Fried chicken and regret"
+    ],
+    [
+     "Smoked mango habanero",
+     "320",
+     "36.8",
+     "+38%",
+     "68",
+     "Fish tacos"
+    ],
+    [
+     "Fermented yuzu chilli",
+     "45",
+     "22.5",
+     "+29%",
+     "74",
+     "Noodles at midnight"
+    ],
+    [
+     "Black-garlic sriracha",
+     "12",
+     "30.1",
+     "+21%",
+     "66",
+     "Fried eggs"
+    ],
+    [
+     "Scotch bonnet jerk",
+     "260",
+     "18.4",
+     "+14%",
+     "59",
+     "Barbecue"
+    ],
+    [
+     "Chipotle maple",
+     "8",
+     "25.7",
+     "+9%",
+     "62",
+     "Pancakes, bravely"
+    ],
+    [
+     "Peri-peri lemon",
+     "60",
+     "19.9",
+     "+6%",
+     "55",
+     "Roast chicken"
+    ],
+    [
+     "Classic jalapeño",
+     "5",
+     "48.3",
+     "+3%",
+     "47",
+     "Everything, politely"
+    ]
+   ],
+   "highlightRow": "Ghost-pepper honey"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the club's order book and a very brave taste panel"
+ },
+ {
+  "id": "table-categories",
+  "type": "lookup",
+  "form": "table",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Minis fill the tills; at 60% margin, the giants fill the bank",
+  "subtitle": "Pots sold, price and gross margin by cactus family, 2026",
+  "exhibit": {
+   "treatment": "categories",
+   "columns": [
+    {
+     "label": "Family",
+     "type": "category"
+    },
+    {
+     "label": "Cactus",
+     "type": "text"
+    },
+    "Who buys it",
+    {
+     "label": "Pots sold",
+     "unit": "thousand"
+    },
+    {
+     "label": "Price",
+     "unit": "£ a pot"
+    },
+    {
+     "label": "Gross margin",
+     "unit": "%"
+    },
+    {
+     "label": "Sales vs 2025",
+     "type": "trend"
+    }
+   ],
+   "rows": [
+    [
+     {
+      "type": "category",
+      "text": "Windowsill minis",
+      "rowSpan": 3,
+      "icon": "leaf"
+     },
+     "Bunny-ear mini",
+     "Students and first-flat renters",
+     "48.0",
+     "4.50",
+     "38",
+     "up"
+    ],
+    [
+     null,
+     "Golden barrel, 6cm",
+     "Office desks and reception",
+     "36.0",
+     "5.00",
+     "41",
+     "up"
+    ],
+    [
+     null,
+     "Pincushion trio",
+     "Gift shoppers before birthdays",
+     "22.0",
+     "9.00",
+     "44",
+     "flat"
+    ],
+    [
+     {
+      "type": "category",
+      "text": "Statement giants",
+      "rowSpan": 2,
+      "icon": "growth"
+     },
+     "Column cactus, 1m",
+     "Hotel lobbies and restaurants",
+     "3.2",
+     "85.00",
+     {
+      "text": "62",
+      "highlight": true
+     },
+     "up"
+    ],
+    [
+     null,
+     "Old-man cactus, 60cm",
+     "Collectors and garden designers",
+     "2.1",
+     "64.00",
+     {
+      "text": "58",
+      "highlight": true
+     },
+     "flat"
+    ],
+    [
+     {
+      "type": "category",
+      "text": "Flowering",
+      "rowSpan": 2,
+      "icon": "star"
+     },
+     "Holiday cactus",
+     "Grandparents, every November",
+     "18.0",
+     "12.00",
+     "46",
+     "down"
+    ],
+    [
+     null,
+     "Moon cactus",
+     "Supermarket impulse buyers",
+     "14.0",
+     "7.50",
+     "33",
+     "down"
+    ],
+    [
+     {
+      "type": "category",
+      "text": "Gift sets",
+      "rowSpan": 2,
+      "icon": "handshake"
+     },
+     "Desk-buddy kit",
+     "Corporate gifting teams",
+     "9.0",
+     "18.00",
+     "51",
+     "up"
+    ],
+    [
+     null,
+     "Terrarium jar",
+     "Wedding-favour planners",
+     "6.0",
+     "28.00",
+     "55",
+     "up"
+    ]
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the potting-shed sales book, handled with gloves"
+ }
+]

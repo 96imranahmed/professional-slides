@@ -138,7 +138,11 @@ console.log(JSON.stringify({columnSpan:span(column),stripSpan:span(strip),detail
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const render=height=>REGISTRY.get('process').render({id:'steps',frame:{x:0,y:0,width:600,height},props:{items:[{label:'Assess',detail:'Confirm the operating constraints.'},{label:'Select',detail:'Choose the design priorities.'}]}});
 let error=null;try{render(50);}catch(e){error=e.message;}
-console.log(JSON.stringify({text:render(240).nodes.filter(n=>n.role==='process-label').map(n=>n.text),error}));
+const nodes=render(240).nodes;
+console.log(JSON.stringify({labels:nodes.filter(n=>n.role==='process-label').map(n=>n.text),details:nodes.filter(n=>n.role==='process-detail').map(n=>n.text.replace(/\\n/g,' ')),error}));
 """)
-        self.assertIn("Confirm the operating constraints.", result["text"][0])
-        self.assertIn("complete label", result["error"])
+        # The label and its detail are each drawn, the detail as a note under the label (text-roles.mjs), and a frame too
+        # low for them is refused with what the stage needs.
+        self.assertEqual(result["labels"][0], "Assess")
+        self.assertIn("Confirm the operating constraints.", result["details"][0])
+        self.assertIn("needs", result["error"])
