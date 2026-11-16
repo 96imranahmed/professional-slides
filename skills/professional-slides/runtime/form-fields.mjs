@@ -208,7 +208,7 @@ export const KINDS = Object.freeze({
   spectrum: { data: { items: "[{ left, right, value: 0-1, text?, quotes?: { left?, right? } }] 3-6 - or with `segments` 3-7: { left, right?, level }, or with `markers`: { left, right, values: { <marker id>: 0-1 } }" },
     options: { segments: "int 3-7", scale: "string[one per segment]", markers: "[{ id, label }] 2-3 - the first the subject" } },
   process: { data: { items: "(string | { label, period?, maturity?, detail? })[] 3+" }, options: { active: "index" } },
-  "chevron-process": { data: { items: "[{ heading?, label, details?: [string] }] 3+" }, options: { emphasizeFirst: "boolean", detailStyle: "\"circled-number\"" } },
+  "chevron-process": { data: { items: "[{ heading?, label, details?: [string] }] 3+" }, options: { emphasizeFirst: "boolean", active: "index | label | heading, or a list of them - the steps that take the accent (a heading names every step under it: \"Opportunity\")", detailStyle: "\"circled-number\"" } },
   "zone-matrix": { data: { xAxis: "{ label, low?, high? } - required", yAxis: "{ label, low?, high? } - required", points: "[{ label, x: 0-1, y: 0-1, highlight? }] 3-15" }, options: { size: "2 | 3 | 4 zones a side", zoneLabels: "{ low?, high? }" } },
   "rank-flow": { data: { periods: "string[2-6]", entities: "[{ name, ranks: int[one per period] }] 3-15 - each period ranks every entity once" }, options: { highlight: "entity name[]" } },
   organization: { data: { root: "string - required", children: "string[] 3+" }, options: { highlight: "child index", nodes: "[{ id, label, detail?, x, y, width, height (fractions), tone? }] with `connectors: [{ from, to }]` - laid out by hand instead" } },

@@ -85,5 +85,26 @@ console.log(JSON.stringify({
         self.assertIn('Rollout row "A" needs', result['rollout'])
 
 
+class ChevronAccentTests(unittest.TestCase):
+    def test_the_steps_named_active_take_the_accent_by_index_label_or_heading(self):
+        result = run_node('''
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { token, tokenValue } from './skills/professional-slides/runtime/core.mjs';
+const items = [{ heading: 'Live', label: 'Qualify', details: ['One'] }, { heading: 'Live', label: 'Meet', details: ['Two'] }, { heading: 'Next', label: 'Enrol', details: ['Three'] }, { heading: 'Next', label: 'Learn', details: ['Four'] }];
+const fills = (active) => REGISTRY.get('chevron-process').render({ id: 'c', frame: { x: 0, y: 0, width: 1160, height: 360 }, props: { items, active } }).nodes
+  .filter((n) => n.role === 'process-band').map((n) => n.style.fill);
+const accent = tokenValue(token('color.accent'));
+const marked = (active) => fills(active).map((fill) => (typeof fill === 'string' ? fill : tokenValue(fill)) === accent);
+let refused = null;
+try { fills('Later'); } catch (error) { refused = error.message; }
+console.log(JSON.stringify({ heading: marked('Next'), index: marked(1), list: marked([0, 'Learn']), none: marked(undefined), refused }));
+''')
+        self.assertEqual(result['heading'], [False, False, True, True])
+        self.assertEqual(result['index'], [False, True, False, False])
+        self.assertEqual(result['list'], [True, False, False, True])
+        self.assertEqual(result['none'], [False, False, False, False])
+        self.assertIn('is not a step', result['refused'])
+
+
 if __name__ == '__main__':
     unittest.main()

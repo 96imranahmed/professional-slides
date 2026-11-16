@@ -471,7 +471,7 @@ function defineChevronProcess() {
     category: "relationship",
     role: "process",
     tokens: [
-      "color.ink", "color.componentPrimary", "color.surface", "color.surfaceMuted", "color.onPrimary", "font.body", "type.heading",
+      "color.ink", "color.componentPrimary", "color.accent", "color.surface", "color.surfaceMuted", "color.onPrimary", "font.body", "type.heading",
       "type.body", "type.compact", "type.label", "line.hairline", "radius.none", "radius.round", "space.1", "space.3", "space.4"
     ],
     preferredSize: { width: 1160, height: 360 },
@@ -518,15 +518,21 @@ function chevronProcessLayout(frame, props) {
 
 function chevronProcessNodes({ id, frame, props }) {
   const L = chevronProcessLayout(frame, props);
+  for (const name of [props.active ?? []].flat()) if (!L.items.some((item, index) => (typeof name === "number" ? name === index : [item.label, item.heading].includes(String(name)))))
+    throw new Error(`Chevron process active ${JSON.stringify(name)} is not a step's index, label or heading`);
   if (L.natural > frame.height + 0.01) {
     const at = L.lists.reduce((best, list, index) => (list.height > L.lists[best].height ? index : best), 0);
     throw new Error(`The chevron process needs ${Math.ceil(L.natural)}px and has ${Math.floor(frame.height)}px: step ${at + 1}, "${L.items[at].label}", lists ${L.lists[at].sets.length} details taking ${Math.ceil(L.lists[at].height)}px; cut its details, or give the process more height`);
   }
+  // The steps a page points to (`active`: a step's index, its label or its heading, or a list of them - "Opportunity" names
+  // every step under that heading) take the accent; the rest stay the process's own colour.
+  const named = [props.active ?? []].flat();
+  const active = (item, index) => named.some((name) => (typeof name === "number" ? name === index : [item.label, item.heading].includes(String(name))));
   const nodes = [];
   L.items.forEach((item, index) => {
     const x = frame.x + index * L.span;
     if (L.headings[index]) nodes.push(drawText(stableId(id, "heading", index), "process-heading", { x: x + 8, y: frame.y + L.headingHeight - v("space.3") - L.headings[index].height, width: L.span - 16 }, L.headings[index]));
-    nodes.push(shapePrimitive({ id: stableId(id, "band", index), role: "process-band", geometry: "chevron", frame: { x, y: frame.y + L.headingHeight, width: L.bandWidth(index), height: CHEVRON_HEIGHT }, style: boxStyle(index === 0 && props.emphasizeFirst ? PRIMARY : INK, SURFACE, HAIRLINE, token("radius.none")) }));
+    nodes.push(shapePrimitive({ id: stableId(id, "band", index), role: "process-band", geometry: "chevron", frame: { x, y: frame.y + L.headingHeight, width: L.bandWidth(index), height: CHEVRON_HEIGHT }, style: boxStyle(active(item, index) ? token("color.accent") : index === 0 && props.emphasizeFirst ? PRIMARY : INK, SURFACE, HAIRLINE, token("radius.none")) }));
     const { layout: label, width: labelWidth } = L.labels[index];
     nodes.push(drawText(stableId(id, "label", index), "process-label", { x: x + 36, y: frame.y + L.headingHeight + CHEVRON_HEIGHT / 2 - label.height / 2, width: labelWidth }, label, { color: WHITE, align: "center" }));
     nodes.push(...listNodes({ id: stableId(id, "details", index), x: x + 10, y: frame.y + L.detailsTop, layout: L.lists[index], rolePrefix: "process-detail" }));
