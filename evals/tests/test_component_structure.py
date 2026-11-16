@@ -75,8 +75,10 @@ console.log(JSON.stringify({
         # (the style classification): stat-list, flow, spectrum, layers, placement,
         # rank-flow, sankey, pictogram, arrow-rows, capsules, fact-grid,
         # zone-matrix, device-frame, worksheet, speech and side-statement.
-        self.assertEqual(result["registry"], 111)
-        self.assertEqual(result["components"], 84)
+        # agenda-rows, the page an author writes an agenda on, makes 112;
+        # icon-rows, parallel reasons each led by an icon tile, 113.
+        self.assertEqual(result["registry"], 113)
+        self.assertEqual(result["components"], 86)
         self.assertEqual(result["charts"], 27)
         self.assertEqual(result["layoutFixtures"], 76)
         self.assertGreater(result["componentBoards"], 0)
@@ -199,8 +201,9 @@ console.log(JSON.stringify({
         )
         self.assertAlmostEqual(result["widths"]["fixed"], 100)
         self.assertAlmostEqual(result["widths"]["hug"], 400)
-        self.assertAlmostEqual(result["widths"]["percent"], 190.4)
-        self.assertAlmostEqual(result["widths"]["fraction"], 261.6)
+        # A percentage is of the container's width, as CSS reads one.
+        self.assertAlmostEqual(result["widths"]["percent"], 200)
+        self.assertAlmostEqual(result["widths"]["fraction"], 252)
         self.assertAlmostEqual(result["widthTotal"], 1000)
         self.assertAlmostEqual(result["nestedFirst"], 496)
         # An "open" section carries no padding, so a hugging section is exactly

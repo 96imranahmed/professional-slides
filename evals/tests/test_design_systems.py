@@ -79,7 +79,7 @@ const out = {};
 for (const design of ['consulting', 'editorial', 'journal', 'keynote']) {
   const plan = toDeckPlan({ schema: 'professional-slides.deck/v3', id: 'd', design, slides: [page] }, '.');
   const slide = plan.slides[0], items = walk(slide.items);
-  const row = items.find(i => i.layout === 'flow.row');
+  const row = items.find(i => i.layout === 'grid');
   out[design] = { first: row?.items?.[0]?.id ?? null, takeaway: items.find(i => i.component === 'insight')?.props?.variant ?? null,
     subtitle: slide.subtitle ?? null, stacked: items.some(i => i.id === 'd01-below' || /-below$/.test(i.id || '')),
     // An open section is a region, not a panel: the column is one now that it

@@ -10,8 +10,9 @@ import { deadExports } from "./dead_exports.mjs";
 const root = process.cwd();
 const runtimeNode = process.env.RUNTIME_NODE || process.execPath, runtimePython = pythonBin();
 const sourceRoots = ["skills/professional-slides/runtime", "evals/scripts", "evals/support", "evals/point-change"];
-// Generated or cached, never authored: the quality eval's kept runs and bytecode.
-const SKIPPED_DIRECTORIES = new Set(["runs", "__pycache__", "node_modules"]);
+// Generated, cached or vendored, never authored here: the quality eval's kept runs, bytecode, and the layout engine's
+// own files (runtime/vendor, pinned by its VERSION.json).
+const SKIPPED_DIRECTORIES = new Set(["runs", "__pycache__", "node_modules", "vendor"]);
 
 async function walk(directory) {
   const files = [];

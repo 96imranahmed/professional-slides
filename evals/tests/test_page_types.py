@@ -416,7 +416,7 @@ console.log(JSON.stringify({{ fits: fits.blocking.map((f) => f.code),
 ''')
         self.assertEqual(result['fits'], [])
         self.assertEqual(len(result['overflow']), 1)
-        self.assertRegex(result['overflow'][0], r'-side: the column holds \d+px of content in \d+px - over by \d+px, about \d+ lines? of body text')
+        self.assertRegex(result['overflow'][0], r'the column holds \d+px of content in \d+px - over by \d+px, about \d+ lines? of body text')
 
 class EvidenceDepthTests(unittest.TestCase):
     """What a page plots, counted, and the forms built for many values."""
@@ -606,7 +606,7 @@ console.log(JSON.stringify({{ out, radar: radar?.then.properties.commentary.enum
         self.assertIn('model-page', result['out']['trend/model']['drawn'])
         # A radar is square: beside its points it holds the body's height, where
         # over points below it sat small between two white margins.
-        self.assertEqual(result['radar'], ['beside', 'beside-left', 'rail', 'below', 'none'])
+        self.assertEqual(result['radar'], ['beside', 'beside-left', 'rail', 'below', 'auto', 'none'])
 
     def test_a_form_refuses_only_what_it_cannot_draw(self):
         """Rebuilt fifty-page deck: a form refuses what it cannot draw."""

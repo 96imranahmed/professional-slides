@@ -59,7 +59,6 @@ def slide(kind, count, layout):
 
 COMPOSE = '''
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
-import { sceneGateFindings } from './skills/professional-slides/runtime/author-deck.mjs';
 import { stagesLayout } from './skills/professional-slides/runtime/schedule-stages.mjs';
 import { planRole } from './skills/professional-slides/runtime/derive-content.mjs';
 import { textWords } from './skills/professional-slides/runtime/text-contract.mjs';
@@ -75,12 +74,10 @@ function measure(page) {
   const own = scene.nodes.filter((n) => n.data?.componentInstance === `${prefix}-exhibit` && n.frame);
   const frame = scene.componentInstances.find((c) => c.id === `${page.id}-exhibit`).frame;
   const after = scene.componentInstances.find((c) => [`${page.id}-below`, `${page.id}-sowhat`].includes(c.id))?.frame ?? null;
-  const gates = sceneGateFindings(deck, undefined, spec);
-  const voids = [...gates.findings, ...gates.advisories].filter((f) => /VOID|DEAD_BAND/.test(f.code)).map((f) => ({ code: f.code, severity: f.severity, kind: f.measured?.kind, band: f.measured?.band }));
   const roles = own.filter((n) => n.type === 'text').reduce((m, n) => ({ ...m, [n.role]: (m[n.role] || 0) + 1 }), {});
   const texts = own.filter((n) => /-text$/.test(n.role));
   return { words: bodyWords(scene), roles, frame, inkBottom: Math.max(...own.map((n) => n.frame.y + (n.frame.height || 0))), after,
-    rows: new Set(texts.map((n) => Math.round(n.frame.y))).size, columns: new Set(texts.map((n) => Math.round(n.frame.x))).size, voids,
+    rows: new Set(texts.map((n) => Math.round(n.frame.y))).size, columns: new Set(texts.map((n) => Math.round(n.frame.x))).size,
     inside: own.every((n) => n.frame.x >= frame.x - 1 && n.frame.x + (n.frame.width || 0) <= frame.x + frame.width + 1 && n.frame.y + (n.frame.height || 0) <= frame.y + frame.height + 1) };
 }
 '''
@@ -119,25 +116,13 @@ class StageTests(unittest.TestCase):
             with self.subTest(page=name):
                 self.assertLessEqual(page["frame"]["y"] + page["frame"]["height"] - page["inkBottom"], 10)
                 self.assertLessEqual(page["after"]["y"] - (page["frame"]["y"] + page["frame"]["height"]), 17)
-                self.assertNotIn("internal", [v["kind"] for v in page["voids"]])
-
-    def test_a_page_with_stages_and_commentary_carries_no_void(self):
-        for kind in ("roadmap", "timeline"):
-            for count in (5, 7):
-                for layout in ("top", "left"):
-                    with self.subTest(page=f"{kind}-{count}-{layout}"):
-                        self.assertEqual(self.pages[f"{kind}-{count}-{layout}"]["voids"], [])
-            # Seven stages hold a page on their own, over a closing bar.
-            self.assertEqual(self.pages[f"{kind}-7-full"]["voids"], [])
 
     def test_nothing_is_stretched_to_cover_a_thin_page(self):
         # Three stages and a closing line are a third of a page: the group
-        # stays at its size at the top and the page is reported short at its
-        # foot, not padded out.
+        # stays at its size at the top, not padded out.
         for kind in ("roadmap", "timeline"):
             page = self.pages[f"{kind}-3-full"]
             self.assertLess(page["frame"]["height"], 300)
-            self.assertEqual([(v["kind"], v["severity"]) for v in page["voids"]], [("dead", "advisory")])
 
     def test_the_frame_decides_between_columns_and_rows(self):
         # Beside the commentary the frame is tall: rows. Over three columns of

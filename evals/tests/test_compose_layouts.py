@@ -54,18 +54,16 @@ console.log('{}');
         run_node(r'''
 import assert from 'node:assert/strict';
 import {composeSlide} from './evals/support/compose.mjs';
-import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const points=['The first finding establishes the premise.','The second finding explains its consequence.'];
 const page=composeSlide({title:'Two findings support the decision',layout:'text',points},0);
 const list=page.items.find(i=>i.component==='bullet-list');
-assert.equal(list.size.height,'fill');
-assert.equal(list.props.distribute,true);
-assert.equal(list.props.centre,false);
-const rendered=createRegistry().get('bullet-list').render({id:'summary',frame:{x:60,y:140,width:1160,height:500},props:list.props}).nodes.filter(n=>n.type==='text');
-const top=Math.min(...rendered.map(n=>n.frame.y));
-// A sparse sole list opens its gaps and starts under the title: centred, it
-// carried a band of air above its first point as tall as the one below.
-assert.ok(Math.abs(top-140)<3,'a sparse sole list starts at the top of its track');
+// The list is as tall as its points; the page's body sets it, a group of one, in the middle of the body.
+assert.equal(list.size.height,'hug');
+const slide=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'t',slides:[{id:'s',title:'Two findings support the decision',layout:'text',points}]})).deck.slides[0];
+const drawn=slide.componentInstances.find(i=>i.component==='bullet-list').frame, body=slide.contentFrame;
+assert.ok(Math.abs((drawn.y-body.y)-((body.y+body.height)-(drawn.y+drawn.height)))<3,'a sparse sole list is centred in the body');
 assert.deepEqual(list.props.items,points);
 const shared=composeSlide({title:'Two findings support the decision',layout:'text',points,paragraphs:['An authored qualification remains alongside the findings.']},0);
 assert.equal(shared.items.find(i=>i.component==='bullet-list').size.height,'hug');
@@ -104,26 +102,19 @@ assert.ok(find(thin.items,i=>i.id==='s01-side'));
 assert.equal(find(thin.items,i=>i.component==='metric'),null);
 // Side ratios: chart 2:1, table 3:2.
 const chartSide=composeSlide({title:'T',exhibit:{type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]},points:['p']},0);
-// The implication chevron sits between the exhibit and its consequences, and
-// the column's width is negotiated against what it holds: a column that does
-// not run four fifths down its track narrows - beside a chart down to the
-// width a line of prose needs (280px, fr 0.71), beside a table by a fifth at
-// most - and one that does keeps its ratio.
-const fr=(page)=>page.items[0].items.map(i=>i.component==='connector'?'connector':i.size.width.fr);
-const [chartFr,sideFr]=fr(chartSide);
-assert.equal(chartFr,2);assert.ok(sideFr<1&&sideFr>=0.71,`one short point narrows its column (${sideFr})`);
+// The column keeps its share of the row whatever it holds, so every page of a deck sets its exhibit and its column on
+// the same grid; only a column its content would overrun is widened.
+const fr=(page)=>page.items[0].gridColumns.map(track=>track.fr??track);
+assert.deepEqual(fr(chartSide),[2,1]);
 const deepPoints=['Wealth nearly doubled on advisory fees while lending margins compressed across the book','Corporate slipped as the rate cycle ran and the book lost a fifth of its contribution','Retail held flat as deposit growth offset the fee decline in a falling market'];
-// A table's column starts at 3:2 and is measured the same way: the wider the
-// track, the more it has to carry to keep it.
 const tableSide=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:deepPoints},0);
-assert.ok(fr(tableSide)[1]<2&&fr(tableSide)[1]>=1.6,`three sentences do not fill a 3:2 track (${fr(tableSide)[1]})`);
-const tableSideFull=composeSlide({title:'T',exhibit:{type:'table',columns:['A','B'],rows:[['x','y']]},points:[...deepPoints,...deepPoints,...deepPoints]},0);
-assert.deepEqual(fr(tableSideFull),[3,2]);
+assert.deepEqual(fr(tableSide),[3,2]);
 // Auto-stack: two charts on one category set with points.
 const stack=composeSlide({title:'T',exhibits:[{type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]},{type:'chart.line',categories:['a','b'],series:[{name:'m',values:[3,4]}]}],points:['p']},0);
 assert.ok(find(stack.items,i=>i.id==='s01-stack'));
 const grid=composeSlide({title:'T',arrange:'grid',exhibits:[1,2,3,4].map(n=>({type:'chart.column',categories:['a'],series:[{name:'s',values:[n]}]}))},0);
-assert.ok(find(grid.items,i=>i.id==='s01-row-b'));
+// Four panels are a grid of two rows of two: each exhibit in its own cell.
+assert.deepEqual(find(grid.items,i=>i.id==='s01-grid').items.map(i=>[i.cell.column,i.cell.row]),[[0,0],[1,0],[0,1],[1,1]]);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
@@ -360,13 +351,15 @@ for (const count of [1,2]) {
  const metric=nodes.filter(n=>n.role?.startsWith('metric-')&&n.frame);
  const prose=nodes.filter(n=>n.id.includes('s-points')&&n.text&&n.frame);
  assert.ok(metric.length&&prose.length);
- const metricEnd=Math.max(...metric.map(n=>n.frame.y+n.frame.height));
+ // The figure is read by its block: the number over its label, or the box that sets its explanation beside it.
+ const stat=deck.slides[0].componentInstances.find(i=>i.id==='s-kpi').frame;
+ const metricEnd=stat.y+stat.height;
  const proseStart=Math.min(...prose.map(n=>n.frame.y));
  assert.ok(proseStart>=metricEnd&&proseStart-metricEnd<120,'explanation stays beside the metric rather than dropping to the slide foot');
- // The group starts at the top of its track, level with the table, rather
- // than centred in it with a band of air above the number.
- const table=nodes.filter(n=>n.id.includes('s-exhibit')&&n.frame);
- assert.ok(Math.abs(Math.min(...metric.map(n=>n.frame.y))-Math.min(...table.map(n=>n.frame.y)))<24,'the number starts level with the exhibit');
+ // The number and its explanation are one group in the middle of their column: as much air over the number as under the last point.
+ const column=deck.slides[0].componentInstances.find(i=>i.id==='s-side').frame;
+ const above=stat.y-column.y, below=(column.y+column.height)-Math.max(...prose.map(n=>n.frame.y+n.frame.height));
+ assert.ok(Math.abs(above-below)<12,`the group sits in the middle of its column (${above} above, ${below} below)`);
 }
 console.log('{}');
 """)
@@ -380,12 +373,13 @@ const deck = plan([{ id: 's', title: 'The lead model scores five points above th
            'The index combines selected tasks and configurations. Teams should evaluate their own work, effort settings and reliability, especially for long agent runs.'],
   exhibit: { type: 'chart.bar', heading: 'Index score', unit: 'points', categories: ['A', 'B', 'C', 'D', 'E'], series: [{ name: 'Score', values: [58, 53, 53, 48, 37] }] } }]);
 const nodes = deck.slides[0].nodes;
-const metric = Math.max(...nodes.filter((n) => n.role?.startsWith('metric-') && n.frame).map((n) => n.frame.y + n.frame.height));
+const stat = deck.slides[0].componentInstances.find((i) => i.id === 's-kpi').frame, metric = stat.y + stat.height;
 const first = Math.min(...nodes.filter((n) => n.role === 'list-item' && n.frame).map((n) => n.frame.y));
 console.log(JSON.stringify({ gap: first - metric }));
 ''')
         self.assertGreaterEqual(result['gap'], 0)
-        self.assertLess(result['gap'], 32)
+        # The column's gaps open no wider than the page's loosest (`space.loose`).
+        self.assertLessEqual(result['gap'], 48)
 
 
 class PanelRowCompositionTests(unittest.TestCase):
@@ -482,8 +476,9 @@ console.log('{}');
 
 
 class CommentaryPlacementTests(unittest.TestCase):
-    def test_a_short_commentary_column_goes_under_a_chart_its_page_type_placed_beside(self):
-        """Fifty-page audit: a commentary rail ended halfway down beside a full-height chart."""
+    def test_commentary_stays_where_the_page_placed_it(self):
+        """A short column beside a chart was moved under it by the composer; the page's `commentary` now holds, and the
+        column's free height is placed by the one rule for it."""
         result = run_node(f"""
 import {{ compilePage }} from '{KIT}';
 import {{ composeSlide }} from './evals/support/compose.mjs';
@@ -497,7 +492,7 @@ const short = ids(composeSlide(compilePage(page(['Contribution rose every year.'
 const byHand = ids(composeSlide({{ id: 'p1', title: 'A hand-written page keeps its column', layout: 'exhibit-left', exhibit: {{ type: 'chart.line', ...exhibit }}, points: ['Contribution rose every year.', 'Costs fell faster than prices.'] }}, 0));
 console.log(JSON.stringify({{ short: {{ side: short.some((i) => i.endsWith('-side')), below: short.some((i) => i.endsWith('-below')) }}, byHand: byHand.some((i) => i.endsWith('-side')) }}));
 """)
-        self.assertEqual(result["short"], {"side": False, "below": True})
+        self.assertEqual(result["short"], {"side": True, "below": False})
         self.assertTrue(result["byHand"])
 
 

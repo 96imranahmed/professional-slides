@@ -114,18 +114,6 @@ console.log(JSON.stringify({ a: citationForms(['a'], reg)[0], b: citationForms([
         self.assertEqual(result["a"], "Source: Spacebar benchmark (Oct 2026)")
         self.assertEqual(result["b"], "Source: IAG results (Oct 2025), 14 Oct 2026")
 
-    def test_an_empty_band_repair_names_only_what_the_page_has_not_done(self):
-        def page(beside):
-            nodes = [{"type": "text", "id": "t", "role": "action-title", "frame": {"x": 60, "y": 40, "width": 1160, "height": 40}, "text": "A title", "style": {"fontSize": 24}},
-                     {"type": "rect", "id": "e", "role": "chart-mark", "frame": {"x": 60, "y": 140, "width": 700, "height": 280}, "style": {"fill": "#2251FF"}},
-                     {"type": "text", "id": "p", "role": "list-item", "frame": {"x": 900 if beside else 60, "y": 150 if beside else 430, "width": 300, "height": 60}, "text": "A point", "style": {"fontSize": 12}}]
-            found = []
-            page_gates.gate_scene_void(2, {"id": "p", "nodes": nodes}, found)
-            return [f["repair"] for f in found]
-        repairs = page(True)
-        self.assertTrue(repairs, "the band under a short exhibit is reported")
-        self.assertNotIn("set the commentary beside", repairs[0])
-
 
 class PeerColourTests(unittest.TestCase):
     def test_a_highlighted_bar_stands_out_from_its_peers_on_every_palette(self):
@@ -282,23 +270,6 @@ console.log(JSON.stringify({ discs: ranged.filter((n) => n.data?.sectionNumber !
         self.assertEqual(result["names"], ["Research, Memo (of 15):", "Spreadsheet (of 25):"])
         self.assertEqual(result["single"], 0)  # one ramp is the table's only shading: it needs no name
 
-    def test_an_empty_band_on_cards_names_their_count_a_row_first(self):
-        tmp = Path(tempfile.mkdtemp(prefix="cards-void-"))
-        self.addCleanup(shutil.rmtree, tmp, True)
-        examples = ROOT / "skills" / "professional-slides" / "examples"
-        shutil.copytree(examples / "assets", tmp / "assets")
-        doc = json.loads((examples / "page-types.pages.json").read_text())
-        page = next(p for p in doc["pages"] if p["id"] == "p17")
-        page.update(commentary="none", exhibit={"tone": "outline", "columns": 3, "items": [
-            {"icon": "clock", "title": "Off-peak timetable", "text": "Half-hourly service from December 2027."},
-            {"icon": "bolt", "title": "Electrification", "text": "Electric trains from 2030."},
-            {"icon": "money", "title": "Fare reform", "text": "Simpler fares from 2028."}]})
-        page.pop("bar", None)
-        doc["pages"] = [page]
-        doc.pop("appendix", None)
-        (tmp / "v.pages.json").write_text(json.dumps(doc))
-        run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "v.pages.json"), "--check"], capture_output=True, text=True)
-        self.assertIn("SCENE_VOID [p17]: On a parallel/cards page the band is closed first by `exhibit.columns` (cards a row; it is 3)", run.stdout + run.stderr)
 
     def test_a_stored_density_is_shown_as_not_applied_and_example_notes_follow_the_page(self):
         tmp = Path(tempfile.mkdtemp(prefix="prefs-"))

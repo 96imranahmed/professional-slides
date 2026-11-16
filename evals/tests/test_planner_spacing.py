@@ -35,7 +35,8 @@ const out=planSlide(plan).spec.composition;
 assert.equal(out.gap.tokenId,'space.3');
 assert.equal(out.children[0].composition.gap.tokenId,'space.2');
 for(const gap of [8,'color.ink','space.unknown'])assert.throws(()=>planSlide({...plan,gap}),/canonical spacing token/);
-assert.throws(()=>planSlide({...plan,layout:'grid'}),/only for row and column flows/);
+// A grid takes a gap as a flow does (a page's own grid names one); a stack of layers has none.
+assert.throws(()=>planSlide({...plan,layout:'overlay'}),/only for row and column flows and grids/);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])

@@ -1,0 +1,1496 @@
+[
+  {
+    "id": "profiles-people",
+    "type": "profiles",
+    "form": "people",
+    "commentary": "below",
+    "title": "Five founders cover the whole cake: recipe, oven, shops, brand and money",
+    "subtitle": "Founding team and what each owns, FY26",
+    "exhibit": {
+      "items": [
+        {
+          "name": "Amara Osei",
+          "role": "Head baker and recipes",
+          "points": [
+            "Invented the cumulus sponge after 212 flops",
+            "Owns all 14 recipes and the meringue ratio",
+            "Bakes 1,200 clouds a week with six bakers"
+          ]
+        },
+        {
+          "name": "Dev Raman",
+          "role": "Ovens and engineering",
+          "points": [
+            "Built the steam oven that holds the shape",
+            "Cut collapsed cakes from 9% to 2% of a bake",
+            "Second oven doubles output in March 2027"
+          ]
+        },
+        {
+          "name": "Niamh Kelly",
+          "role": "Shops and customers",
+          "points": [
+            "Opened three shops, each in profit in a year",
+            "Runs wedding orders, now 38% of sales",
+            "Opens the first shop abroad, Lisbon, in 2027"
+          ]
+        },
+        {
+          "name": "Malik Bennett",
+          "role": "Brand and design",
+          "points": [
+            "Drew the cloud logo and the sky-blue box",
+            "Grew the online following to 85,000",
+            "Runs the summer pop-up cart on the seafront"
+          ]
+        },
+        {
+          "name": "Walter Brandt",
+          "role": "Finance and suppliers",
+          "points": [
+            "Raised the €1.4m seed round from two angels",
+            "Fixes egg prices a year ahead with three farms",
+            "Owns the cash plan to break even in FY27"
+          ]
+        }
+      ]
+    },
+    "pointsHeading": "How five founders decide",
+    "points": [
+      "Each founder signs off their own layer; anything touching two layers goes to the Monday tasting.",
+      "They hold 20% of the shares each, and the casting vote passes to a different founder every quarter."
+    ],
+    "highlight": [
+      "Monday tasting",
+      "20% of the shares each"
+    ],
+    "takeaway": "When a cloud collapses, everyone knows whose oven it was and who paid for the eggs.",
+    "source": "Source: Synthetic demonstration • no real company data; the founders' flour-dusted org chart"
+  },
+  {
+    "id": "profiles-radar",
+    "type": "profiles",
+    "form": "radar",
+    "commentary": "none",
+    "title": "Sir Glide is as quick as the champion but stops for every lettuce leaf",
+    "subtitle": "Trainer ratings out of 10 on six racing attributes, top three snails, 2026 season",
+    "exhibit": {
+      "categories": [
+        "Top speed",
+        "Stamina",
+        "Cornering",
+        "Wet-track grip",
+        "Start reaction",
+        "Focus"
+      ],
+      "series": [
+        {
+          "name": "Sir Glide",
+          "values": [
+            9,
+            7,
+            6,
+            8,
+            7,
+            2
+          ]
+        },
+        {
+          "name": "Comet Crawl",
+          "values": [
+            9,
+            8,
+            7,
+            7,
+            8,
+            9
+          ]
+        },
+        {
+          "name": "Lady Lettuce",
+          "values": [
+            6,
+            9,
+            8,
+            6,
+            5,
+            7
+          ]
+        }
+      ],
+      "focusSeries": "Sir Glide",
+      "max": 10
+    },
+    "takeaway": "Sir Glide matches the champion on speed and beats her in the wet; racing blinkers, legal from 2027 at £12 a race, close his focus gap of 2 against 9.",
+    "source": "Source: Synthetic demonstration • no real company data"
+  },
+  {
+    "id": "ranking-aligned-bars",
+    "type": "ranking",
+    "form": "aligned-bars",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Crumpet Labs spills the least tea of seven makers, yet sells only fourth-most",
+    "subtitle": "Seven robot-butler makers, 2026 models, ordered from the fewest tea spills",
+    "bar": "Price, not polish, holds it back: at £15,000 it would undercut Tidywell and win the hotel trade",
+    "highlight": [
+      "£15,000"
+    ],
+    "exhibit": {
+      "categories": [
+        "Crumpet Labs",
+        "Pemberton Mechanicals",
+        "Tidywell",
+        "Butlertron",
+        "Brassington Bots",
+        "Valet-9",
+        "Bellhop Bots"
+      ],
+      "series": [
+        {
+          "name": "Tea spills",
+          "unit": "per 1,000 cups",
+          "values": [
+            2,
+            7,
+            9,
+            12,
+            15,
+            18,
+            21
+          ]
+        },
+        {
+          "name": "Butlers sold",
+          "unit": "thousand, 2026",
+          "values": [
+            27,
+            22,
+            33,
+            48,
+            9,
+            41,
+            15
+          ]
+        },
+        {
+          "name": "List price",
+          "unit": "£ thousand",
+          "values": [
+            19.8,
+            22,
+            17.2,
+            14.5,
+            12.4,
+            11.9,
+            8.9
+          ],
+          "valueFormat": {
+            "decimals": 1
+          }
+        }
+      ],
+      "highlights": [
+        {
+          "category": "Crumpet Labs"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the butlers' own pantry logs"
+  },
+  {
+    "id": "ranking-bar",
+    "type": "ranking",
+    "form": "bar",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "At 48 rescues, Granny Gravity doubles the agency average of 24",
+    "subtitle": "All ten heroes on the Capes on Call roster, Q3 2026",
+    "exhibit": {
+      "heading": "Rescues billed per hero, Q3 2026",
+      "unit": "rescues",
+      "categories": [
+        "Granny Gravity",
+        "Captain Kilowatt",
+        "Lady Lumen",
+        "The Velvet Gust",
+        "Magnet Marge",
+        "Doctor Drizzle",
+        "Sergeant Static",
+        "The Origami Kid",
+        "Turbo Tortoise",
+        "Mister Mist"
+      ],
+      "series": [
+        {
+          "name": "Rescues",
+          "values": [
+            48,
+            39,
+            33,
+            28,
+            24,
+            21,
+            18,
+            14,
+            9,
+            6
+          ]
+        }
+      ],
+      "categoryIcons": {
+        "Granny Gravity": "shield",
+        "Captain Kilowatt": "shield",
+        "Lady Lumen": "shield",
+        "The Velvet Gust": "shield",
+        "Magnet Marge": "shield",
+        "Doctor Drizzle": "shield",
+        "Sergeant Static": "shield",
+        "The Origami Kid": "shield",
+        "Turbo Tortoise": "shield",
+        "Mister Mist": "shield"
+      },
+      "highlights": [
+        {
+          "category": "Granny Gravity"
+        }
+      ],
+      "referenceLines": [
+        {
+          "value": 24,
+          "label": "Agency average 24"
+        }
+      ],
+      "annotations": [
+        {
+          "category": "Granny Gravity",
+          "text": "The only hero cleared for floods and kittens alike"
+        },
+        {
+          "category": "Captain Kilowatt",
+          "text": "Twelve of his 39 were blackouts he caused himself"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the dispatch desk's cape log"
+  },
+  {
+    "id": "ranking-boxplot",
+    "type": "ranking",
+    "form": "boxplot",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Leith jet-pack drops swing from 4 to 31 minutes as sea wind bites",
+    "subtitle": "Minutes from pickup to doorstep, seven Edinburgh districts, October 2026",
+    "exhibit": {
+      "heading": "Delivery time per parcel, October 2026",
+      "unit": "minutes",
+      "categories": [
+        "New Town",
+        "Old Town",
+        "Stockbridge",
+        "Morningside",
+        "Portobello",
+        "Granton",
+        "Leith"
+      ],
+      "boxes": [
+        {
+          "min": 5,
+          "q1": 6,
+          "median": 7,
+          "q3": 8,
+          "max": 11
+        },
+        {
+          "min": 5,
+          "q1": 7,
+          "median": 8,
+          "q3": 9,
+          "max": 12
+        },
+        {
+          "min": 6,
+          "q1": 8,
+          "median": 9,
+          "q3": 10,
+          "max": 13
+        },
+        {
+          "min": 7,
+          "q1": 9,
+          "median": 10,
+          "q3": 12,
+          "max": 15
+        },
+        {
+          "min": 6,
+          "q1": 9,
+          "median": 11,
+          "q3": 14,
+          "max": 19
+        },
+        {
+          "min": 5,
+          "q1": 10,
+          "median": 13,
+          "q3": 19,
+          "max": 27
+        },
+        {
+          "min": 4,
+          "q1": 9,
+          "median": 14,
+          "q3": 22,
+          "max": 31
+        }
+      ],
+      "yMin": 0,
+      "yMax": 40,
+      "highlights": [
+        {
+          "category": "Leith"
+        }
+      ]
+    },
+    "pointsStyle": "numbered",
+    "pointsHeading": false,
+    "points": [
+      "Leith runs from 4 to 31 minutes, while no inland district's middle half spans more than three minutes.",
+      "Gusts over 30 knots off the Firth of Forth pin pilots to the harbour wall for up to 20 minutes.",
+      "Granton, on the same shore, swings almost as far: its slowest drop took 27 minutes against a median of 13.",
+      "From November, routing every Leith drop inland through the sheltered Pilrig corridor should cap the slowest at 18 minutes."
+    ],
+    "highlight": [
+      "4 to 31 minutes",
+      "30 knots",
+      "27 minutes",
+      "18 minutes"
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the pilots' wind-burn diaries"
+  },
+  {
+    "id": "ranking-bullet",
+    "type": "ranking",
+    "form": "bullet",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "Five of eight targets met; rain-day deliveries are the soggy exception at 78%",
+    "subtitle": "SkySlice drone network, Q3 2026, each measure as a share of its own target",
+    "exhibit": {
+      "heading": "Operating measures against target, Q3 2026",
+      "unit": "% of target",
+      "categories": [
+        "Pizza hot on landing",
+        "Right balcony first time",
+        "Toppings intact",
+        "Drone uptime",
+        "Delivered in 15 minutes",
+        "Repeat orders",
+        "Night-time drops",
+        "Rain-day completion"
+      ],
+      "series": [
+        {
+          "name": "Actual",
+          "values": [
+            106,
+            103,
+            101,
+            100,
+            100,
+            96,
+            91,
+            78
+          ]
+        }
+      ],
+      "targets": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "ranges": [
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ],
+        [
+          80,
+          95,
+          110
+        ]
+      ]
+    },
+    "pointsHeading": false,
+    "points": [
+      "Rotors ice up in cold rain, so 22% of wet-day orders fall back to a delivery van and arrive lukewarm.",
+      "Dark balconies sink night drops: drones circle twice, then land next door. Glow tags go on trial in November.",
+      "Repeat orders slipped to 96% of target after August's pepperoni shortage and have not yet recovered.",
+      "Heat, toppings and aim, the three measures customers rate most, all beat target: the menu is not the problem."
+    ],
+    "highlight": [
+      "22% of wet-day orders",
+      "Glow tags",
+      "pepperoni shortage",
+      "beat target"
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the flight-control crust log"
+  },
+  {
+    "id": "ranking-column",
+    "type": "ranking",
+    "form": "column",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Headphones beat speakers as the Silent Disco Dome jumps to third place",
+    "subtitle": "Fernhill Fields festival, peak Saturday-night crowd by stage",
+    "bar": "For 2027, hand the headphone DJs the second-largest field and order 30,000 headsets, double this year's stock",
+    "exhibit": {
+      "heading": "Peak Saturday crowd per stage, 2026",
+      "unit": "thousand fans",
+      "categories": [
+        "Main Meadow",
+        "Big Top",
+        "Silent Disco Dome",
+        "Lakeside",
+        "Woodland Glade",
+        "The Cowshed",
+        "Busker's Barn",
+        "Kazoo Corner"
+      ],
+      "series": [
+        {
+          "name": "Peak crowd",
+          "values": [
+            42,
+            18.5,
+            12.4,
+            9.8,
+            6.1,
+            3.2,
+            2,
+            1.1
+          ]
+        }
+      ],
+      "valueFormat": {
+        "decimals": 1
+      },
+      "deltas": [
+        1.5,
+        -2,
+        7.9,
+        0.6,
+        -0.4,
+        0.3,
+        -0.2,
+        0.1
+      ],
+      "highlights": [
+        {
+          "category": "Silent Disco Dome"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the gate scanners and the headphone tent"
+  },
+  {
+    "id": "ranking-distribution",
+    "type": "ranking",
+    "form": "distribution",
+    "commentary": "beside",
+    "takeaway": false,
+    "title": "Our Margate flagship ranks 14th of 30 on takings per round; volcano courses lead",
+    "subtitle": "All thirty Putt Palace courses, June to August 2026",
+    "exhibit": {
+      "heading": "Takings per round, summer 2026",
+      "unit": "£",
+      "categories": [
+        "Blackpool",
+        "Skegness",
+        "Newquay",
+        "Brighton",
+        "Southend",
+        "Torquay",
+        "Scarborough",
+        "Bournemouth",
+        "Llandudno",
+        "Whitby",
+        "Weymouth",
+        "Southport",
+        "Hastings",
+        "Margate",
+        "Eastbourne",
+        "Great Yarmouth",
+        "Cleethorpes",
+        "Clacton",
+        "Bognor Regis",
+        "Morecambe",
+        "Bridlington",
+        "Tenby",
+        "Paignton",
+        "Filey",
+        "Rhyl",
+        "Minehead",
+        "Folkestone",
+        "Lowestoft",
+        "Ilfracombe",
+        "Aberystwyth"
+      ],
+      "series": [
+        {
+          "name": "Takings per round",
+          "values": [
+            11.2,
+            10.8,
+            10.5,
+            10.3,
+            10.1,
+            9.5,
+            9.4,
+            9.3,
+            9.2,
+            9.1,
+            9,
+            8.95,
+            8.92,
+            8.9,
+            8.8,
+            6.4,
+            6.3,
+            6.2,
+            6.1,
+            6,
+            5.9,
+            5.8,
+            5.7,
+            5.6,
+            5.5,
+            5.4,
+            5.3,
+            5.2,
+            5.1,
+            5
+          ]
+        }
+      ],
+      "highlights": [
+        {
+          "category": "Margate"
+        }
+      ],
+      "valueFormat": {
+        "decimals": 2
+      },
+      "referenceLines": [
+        {
+          "value": 7.6,
+          "label": "Median £7.60"
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "points": [
+      {
+        "lead": "Volcanoes top the table",
+        "text": "The six courses with an erupting volcano hole take £10.40 a round on average, against £7.00 for the other 24, as families pay for a second go just to watch it blow."
+      },
+      {
+        "lead": "The flagship sits mid-field",
+        "text": "Margate takes £8.90 a round, 14th of 30, in the top half of a field that splits at the median: no course takes between £6.40 and £8.80."
+      },
+      {
+        "lead": "A volcano is cheap to add",
+        "text": "A volcano hole costs £48,000 to build. At Margate's 110,000 rounds a year, a £1 lift per round repays it within six months."
+      }
+    ],
+    "highlight": [
+      "£10.40 a round",
+      "14th of 30",
+      "within six months"
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the windmill-hole till rolls"
+  },
+  {
+    "id": "ranking-dumbbell",
+    "type": "ranking",
+    "form": "dumbbell",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "Skua nets paid off: netted colonies fledged 65% more chicks, the rest flat",
+    "subtitle": "Chicks fledged per colony, 2024 and 2026; the top four were netted over winter 2025",
+    "exhibit": {
+      "heading": "Chicks fledged per colony",
+      "unit": "chicks",
+      "categories": [
+        "Pebble Cove",
+        "Tuxedo Point",
+        "Waddle Bay",
+        "Rockhopper Ridge",
+        "Krill Harbour",
+        "Icefloe Inlet",
+        "Slippery Steps",
+        "Brrr Bluff"
+      ],
+      "series": [
+        {
+          "name": "2024",
+          "values": [
+            310,
+            280,
+            240,
+            190,
+            260,
+            220,
+            170,
+            120
+          ]
+        },
+        {
+          "name": "2026",
+          "values": [
+            520,
+            450,
+            390,
+            320,
+            270,
+            215,
+            180,
+            115
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "category": "Tuxedo Point",
+          "series": "2026",
+          "text": "Four netted colonies: 1,020 to 1,680 chicks, up 65%"
+        },
+        {
+          "category": "Rockhopper Ridge",
+          "series": "2026",
+          "text": "Smallest netted colony, still up 130 chicks"
+        },
+        {
+          "category": "Icefloe Inlet",
+          "series": "2026",
+          "text": "Four without nets: 770 to 780 chicks"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the wardens' clipboard census"
+  },
+  {
+    "id": "ranking-lollipop",
+    "type": "ranking",
+    "form": "lollipop",
+    "commentary": "rail",
+    "takeaway": false,
+    "title": "City rooftop hives make nearly twice the honey of country ones",
+    "subtitle": "Twelve client hives, six on city roofs and six on farms, 2026 season",
+    "rail": "The six rooftop hives averaged 33.5 kg against 17.7 kg in the country. City gardens and street limes flower from March to October; an orchard blooms for three weeks. Next year's twenty new hives go on roofs, not farms.",
+    "highlight": [
+      "33.5 kg against 17.7 kg"
+    ],
+    "exhibit": {
+      "heading": "Honey harvested per hive, 2026 season",
+      "unit": "kg",
+      "categories": [
+        "Town hall roof",
+        "Library roof",
+        "Brewery roof",
+        "Hotel roof",
+        "Car-park roof",
+        "Theatre roof",
+        "Lavender farm",
+        "Cider orchard",
+        "Plum orchard",
+        "Rapeseed field",
+        "Golf course",
+        "Vineyard"
+      ],
+      "series": [
+        {
+          "name": "Honey",
+          "values": [
+            38,
+            36,
+            34,
+            33,
+            31,
+            29,
+            21,
+            19,
+            18,
+            17,
+            16,
+            15
+          ]
+        }
+      ],
+      "highlights": [
+        {
+          "category": "Town hall roof"
+        },
+        {
+          "category": "Library roof"
+        },
+        {
+          "category": "Brewery roof"
+        },
+        {
+          "category": "Hotel roof"
+        },
+        {
+          "category": "Car-park roof"
+        },
+        {
+          "category": "Theatre roof"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head beekeeper's jar count"
+  },
+  {
+    "id": "relationship-bubble",
+    "type": "relationship",
+    "form": "bubble",
+    "commentary": "rail",
+    "takeaway": false,
+    "title": "Baby triceratops beat the T. rex: 95% would revisit the petting pen",
+    "subtitle": "Ten attractions, summer 2026; bubble size shows riders a day",
+    "rail": "Guests queue 15 minutes to stroke a baby triceratops and 95% would do it again, against 91% after 75 minutes for the coaster. Two more pens would cost less than one new ride and shorten the coaster wait.",
+    "highlight": [
+      "95% would do it again"
+    ],
+    "exhibit": {
+      "heading": "Queue, revisit rate and riders, summer 2026",
+      "xLabel": "Average queue, minutes",
+      "yLabel": "Guests who would ride again, %",
+      "points": [
+        {
+          "name": "Baby Triceratops Pen",
+          "x": 15,
+          "y": 95,
+          "size": 480
+        },
+        {
+          "name": "T. rex Thunder",
+          "x": 75,
+          "y": 91,
+          "size": 5400
+        },
+        {
+          "name": "Fossil Dig Pit",
+          "x": 10,
+          "y": 86,
+          "size": 1000
+        },
+        {
+          "name": "Raptor Rapids",
+          "x": 55,
+          "y": 84,
+          "size": 3600
+        },
+        {
+          "name": "Pterodactyl Swing",
+          "x": 40,
+          "y": 78,
+          "size": 1900
+        },
+        {
+          "name": "Stegosaurus Safari",
+          "x": 30,
+          "y": 72,
+          "size": 3100
+        },
+        {
+          "name": "Volcano Drop",
+          "x": 50,
+          "y": 66,
+          "size": 1300
+        },
+        {
+          "name": "Brontosaurus Boats",
+          "x": 25,
+          "y": 61,
+          "size": 1600
+        },
+        {
+          "name": "Cretaceous Cinema",
+          "x": 20,
+          "y": 54,
+          "size": 800
+        },
+        {
+          "name": "Meteor Spinner",
+          "x": 35,
+          "y": 47,
+          "size": 320
+        }
+      ],
+      "focus": [
+        "Baby Triceratops Pen",
+        "T. rex Thunder"
+      ],
+      "xScale": {
+        "min": 0,
+        "max": 80,
+        "step": 20
+      },
+      "yScale": {
+        "min": 40,
+        "max": 100,
+        "step": 20
+      }
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the park rangers' clicker counts"
+  },
+  {
+    "id": "relationship-bubble-grid",
+    "type": "relationship",
+    "form": "bubble-grid",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Disco beats brunch: eighties night draws five times the Sunday skaters",
+    "subtitle": "Five rinks, autumn 2026: 1,350 skaters a week on Thursdays against 265 on Sundays",
+    "bar": "Swap Sunday brunch for a Wednesday rerun of the Thursday playlist and roll in about 800 more skaters a week",
+    "highlight": [
+      "about 800 more"
+    ],
+    "exhibit": {
+      "heading": "Average skaters per session, autumn 2026",
+      "unit": "skaters",
+      "rows": [
+        "Bristol",
+        "Leeds",
+        "Glasgow",
+        "Cardiff",
+        "Belfast"
+      ],
+      "columns": [
+        "Monday family",
+        "Thursday eighties",
+        "Friday glow",
+        "Saturday derby",
+        "Sunday brunch"
+      ],
+      "values": [
+        [
+          50,
+          340,
+          220,
+          150,
+          90
+        ],
+        [
+          40,
+          310,
+          260,
+          180,
+          60
+        ],
+        [
+          35,
+          280,
+          240,
+          210,
+          45
+        ],
+        [
+          30,
+          230,
+          200,
+          120,
+          40
+        ],
+        [
+          25,
+          190,
+          170,
+          160,
+          30
+        ]
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the skate-hire desk's tally"
+  },
+  {
+    "id": "relationship-scatter",
+    "type": "relationship",
+    "form": "scatter",
+    "commentary": "on-exhibit",
+    "takeaway": false,
+    "title": "Goldilocks rooms win: those half the teams escape earn the best reviews",
+    "subtitle": "Twelve rooms across the chain, January to September 2026",
+    "exhibit": {
+      "heading": "Escape rate against review score, 2026",
+      "xLabel": "Teams escaping within the hour, %",
+      "yLabel": "Average review, stars out of 5",
+      "points": [
+        {
+          "name": "Haunted Hairdresser",
+          "x": 12,
+          "y": 2.9
+        },
+        {
+          "name": "Quantum Cupboard",
+          "x": 18,
+          "y": 3.2
+        },
+        {
+          "name": "Pharaoh's Paperwork",
+          "x": 25,
+          "y": 3.6
+        },
+        {
+          "name": "Vault of Mild Peril",
+          "x": 33,
+          "y": 4
+        },
+        {
+          "name": "Clockwork Library",
+          "x": 41,
+          "y": 4.4
+        },
+        {
+          "name": "Detective Duck",
+          "x": 46,
+          "y": 4.6
+        },
+        {
+          "name": "Moon Base Mishap",
+          "x": 51,
+          "y": 4.7
+        },
+        {
+          "name": "The Missing Llama",
+          "x": 55,
+          "y": 4.8
+        },
+        {
+          "name": "Midnight Bakery",
+          "x": 63,
+          "y": 4.6
+        },
+        {
+          "name": "Pirate's Pantry",
+          "x": 74,
+          "y": 4.2
+        },
+        {
+          "name": "Lost Sock Drawer",
+          "x": 85,
+          "y": 3.8
+        },
+        {
+          "name": "Grandma's Attic",
+          "x": 92,
+          "y": 3.4
+        }
+      ],
+      "focus": [
+        "Clockwork Library",
+        "Detective Duck",
+        "Moon Base Mishap",
+        "The Missing Llama"
+      ],
+      "xScale": {
+        "min": 0,
+        "max": 100,
+        "step": 20
+      },
+      "yScale": {
+        "min": 2.5,
+        "max": 5,
+        "step": 0.5
+      },
+      "referenceLines": [
+        {
+          "value": 4,
+          "label": "Chain average 4.0"
+        }
+      ],
+      "annotations": [
+        {
+          "category": "Haunted Hairdresser",
+          "text": "Too hard: 12% escape, 2.9 stars"
+        },
+        {
+          "category": "The Missing Llama",
+          "text": "Best in the chain: 55% escape, 4.8 stars"
+        },
+        {
+          "category": "Grandma's Attic",
+          "text": "Too easy: most teams out in 25 minutes"
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the games masters' stopwatch sheets"
+  },
+  {
+    "id": "schedule-gantt",
+    "type": "schedule",
+    "form": "gantt",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "The whole winter tour hinges on an eight-day alpine crossing in February",
+    "subtitle": "Winter tour plan, Lyon to Milan to Vienna, November 2026 to April 2027",
+    "bar": "Book the February convoy slots over the pass this month: a missed window costs Vienna's premiere and 30 shows.",
+    "highlight": [
+      "30 shows"
+    ],
+    "exhibit": {
+      "periods": [
+        "Nov 2026",
+        "Dec 2026",
+        "Jan 2027",
+        "Feb 2027",
+        "Mar 2027",
+        "Apr 2027"
+      ],
+      "groups": [
+        {
+          "name": "Shows",
+          "rows": [
+            {
+              "label": "Lyon run",
+              "from": 0,
+              "to": 1.5,
+              "text": "41 shows, 1,800 seats",
+              "milestones": [
+                {
+                  "at": 1.5,
+                  "label": "Final show"
+                }
+              ]
+            },
+            {
+              "label": "Milan run",
+              "from": 1.8,
+              "to": 3.2,
+              "text": "36 shows at the tram depot",
+              "milestones": [
+                {
+                  "at": 3.2,
+                  "label": "Strike the tent"
+                }
+              ]
+            },
+            {
+              "label": "Vienna run",
+              "from": 3.5,
+              "to": 6,
+              "text": "Premiere, then 30 shows on the Prater"
+            }
+          ]
+        },
+        {
+          "name": "Big top moves",
+          "rows": [
+            {
+              "label": "Lyon to Milan by rail",
+              "from": 1.5,
+              "to": 1.8
+            },
+            {
+              "label": "Snow chains for 40 trucks",
+              "from": 2.4,
+              "to": 3.2,
+              "text": "Fit and test"
+            },
+            {
+              "label": "Alpine crossing to Vienna",
+              "from": 3.2,
+              "to": 3.5,
+              "text": "Critical path: eight days"
+            }
+          ]
+        },
+        {
+          "name": "Behind the scenes",
+          "rows": [
+            {
+              "label": "Winterise 60 trailers",
+              "from": 0,
+              "to": 1,
+              "text": "Heaters and lagging"
+            },
+            {
+              "label": "Clown school winter term",
+              "from": 0.5,
+              "to": 2.5,
+              "text": "A new act for Vienna"
+            },
+            {
+              "label": "Austrian visas, 24 acrobats",
+              "from": 0.5,
+              "to": 3,
+              "text": "Paperwork in Vienna",
+              "milestones": [
+                {
+                  "at": 3,
+                  "label": "Issued"
+                }
+              ]
+            },
+            {
+              "label": "Spring tour bookings",
+              "from": 4,
+              "to": 6,
+              "text": "Prague and Berlin"
+            }
+          ]
+        }
+      ],
+      "today": 0.3
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the ringmaster's ledger"
+  },
+  {
+    "id": "schedule-horizons-curves",
+    "type": "schedule",
+    "form": "horizons",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "Beginner lessons pay the yetis' wages today; night skiing and summer camps come next",
+    "subtitle": "Growth horizons, winter 2026 to 2030",
+    "exhibit": {
+      "variant": "curves",
+      "xLabel": "Time",
+      "yLabel": "Revenue",
+      "horizons": [
+        {
+          "id": "h1",
+          "start": 0,
+          "end": 0.6,
+          "colorIndex": 0,
+          "label": "Horizon 1",
+          "title": "Fill the bunny slopes",
+          "description": "Weekend classes taught by instructors in full yeti suits, every Saturday from December."
+        },
+        {
+          "id": "h2",
+          "start": 0.2,
+          "end": 0.8,
+          "colorIndex": 1,
+          "label": "Horizon 2",
+          "title": "Ski with the yetis by night",
+          "description": "Floodlit runs with glowing yeti footprints, from 2027 at £45 a head."
+        },
+        {
+          "id": "h3",
+          "start": 0.4,
+          "end": 1,
+          "colorIndex": 2,
+          "label": "Horizon 3",
+          "title": "Summer yeti camps",
+          "description": "Grass-skiing and glacier hikes from 2029, so yetis earn in July too."
+        }
+      ]
+    },
+    "pointsHeading": false,
+    "points": [
+      "Beginners fund the rest: they bring £1.7m of this winter's £2.4m, and half of them come back for a second week.",
+      "Night skiing needs £300,000 of floodlights, paid for out of the bunny-slope surplus in time for the 2027 season.",
+      "Night skiing breaks even at 60 skiers a night, and the two trial slopes already sell 45 a night without advertising.",
+      "Summer camps keep all 40 yetis on the payroll in July, so the school stops losing its best instructors each spring."
+    ],
+    "highlight": [
+      "£1.7m",
+      "£300,000",
+      "60 skiers a night",
+      "40 yetis"
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the head yeti's snow-stained ledger"
+  },
+  {
+    "id": "schedule-horizons-stepped-bands",
+    "type": "schedule",
+    "form": "horizons",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Bike-delivered donuts earn £1.1m today; office boxes and franchising come next",
+    "subtitle": "Growth horizons, revenue and margin at maturity",
+    "bar": "Keep the city-centre bikes busy first: their profit buys the 28 extra bikes that office boxes need, and franchisees want a proven brand",
+    "exhibit": {
+      "variant": "stepped-bands",
+      "horizons": [
+        {
+          "id": "h1",
+          "label": "Now · 2026",
+          "title": "Pedal the city centre",
+          "description": "Twelve cargo bikes carry glazed rings to doors within 20 minutes of the fryer, across a 3 km radius: 1,800 dozen a week, two thirds of them on Saturday and Sunday mornings.",
+          "details": [
+            {
+              "label": "Revenue",
+              "value": "£1.1m"
+            },
+            {
+              "label": "Margin",
+              "value": "18%"
+            },
+            {
+              "label": "Payback",
+              "value": "9 months"
+            }
+          ]
+        },
+        {
+          "id": "h2",
+          "label": "Next · 2027-28",
+          "title": "Office breakfast boxes",
+          "description": "Standing orders for 400 offices, delivered by 9am in heated panniers: steadier than weekend cravings, planned a week ahead and paid monthly on a single invoice, coffee not included.",
+          "details": [
+            {
+              "label": "Revenue",
+              "value": "£3.2m"
+            },
+            {
+              "label": "Margin",
+              "value": "24%"
+            },
+            {
+              "label": "Payback",
+              "value": "14 months"
+            }
+          ]
+        },
+        {
+          "id": "h3",
+          "label": "Later · 2029 on",
+          "title": "Franchise the fryer",
+          "description": "License the recipe, the bikes and the ordering app to bakeries in six cities, earning a royalty on every dozen they sell, while the bakeries pay for their own flour, oil and fryers.",
+          "details": [
+            {
+              "label": "Revenue",
+              "value": "£5.0m"
+            },
+            {
+              "label": "Margin",
+              "value": "60%"
+            },
+            {
+              "label": "Payback",
+              "value": "Under 6 months"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head fryer's sticky order book"
+  },
+  {
+    "id": "schedule-roadmap-process",
+    "type": "schedule",
+    "form": "roadmap",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "Six stages take the robot gardeners from one test street to 4,000 gardens",
+    "subtitle": "Rollout plan, 2026 to 2029",
+    "bar": "Protect the weed swarm: it lifts the monthly plan from £39 to £58, and the 3,200-garden break-even rests on that price",
+    "exhibit": {
+      "orientation": "down",
+      "items": [
+        {
+          "label": "Mow the test street",
+          "period": "2026",
+          "text": "Twelve robot mowers keep 40 Leeds lawns striped all summer. Not one garden gnome is lost in action, and the neighbours start asking for a robot of their own."
+        },
+        {
+          "label": "Teach the hedge bot",
+          "period": "H1 2027",
+          "text": "The trimmer learns nine hedge shapes, from box to beech. Topiary peacocks stay an optional extra at £6 a bird, and they sell out by the end of May."
+        },
+        {
+          "label": "Open three cities",
+          "period": "H2 2027",
+          "text": "Leeds, York and Bristol reach 600 gardens on a £39 monthly plan, each city run from one charging shed staffed by two humans and a well-used kettle."
+        },
+        {
+          "label": "Release the weed swarm",
+          "period": "H1 2028",
+          "text": "Palm-sized weeders patrol the beds overnight and cut herbicide use by 90%. Gardeners pay for the quiet, and the plan rises from £39 to £58 a month."
+        },
+        {
+          "label": "Add autumn leaf duty",
+          "period": "H2 2028",
+          "text": "Leaf-blowing drones clear every lawn on Tuesdays from October, keeping the fleet earning through the winter months when the mowers would sit idle."
+        },
+        {
+          "label": "Reach 4,000 gardens",
+          "period": "2029",
+          "text": "Nine cities pass the 3,200-garden break-even with a year to spare, and the robot fleet now mows its own depot lawn on cheap overnight power."
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the head gardener's charging-shed whiteboard"
+  },
+  {
+    "id": "schedule-roadmap-wave-columns",
+    "type": "schedule",
+    "form": "roadmap",
+    "commentary": "below",
+    "takeaway": false,
+    "title": "Four waves turn one moored barge into a twelve-boat floating market by 2028",
+    "subtitle": "Growth plan by wave, spring 2026 to 2028",
+    "exhibit": {
+      "variant": "wave-columns",
+      "items": [
+        {
+          "heading": "Moor the first barge",
+          "range": "Spring 2026",
+          "activities": [
+            "Lease a canal berth at £1,200 a month",
+            "Sign eight growers and a cheesemonger",
+            "Rig awnings that survive a gale",
+            "Teach every trader to tie a bowline"
+          ],
+          "deliverables": [
+            "One barge trading on Saturdays",
+            "400 shoppers a week by June"
+          ]
+        },
+        {
+          "heading": "Lash on the rafts",
+          "range": "Autumn 2026",
+          "activities": [
+            "Tie two produce rafts alongside",
+            "Trial rowing-boat deliveries",
+            "Add Sunday trading from September",
+            "Hire a deckhand for the gangplank"
+          ],
+          "deliverables": [
+            "Three boats and 24 stalls",
+            "1,100 shoppers a week"
+          ]
+        },
+        {
+          "heading": "Light the night market",
+          "range": "2027",
+          "activities": [
+            "String lanterns along the towpath",
+            "Bring in six hot-food punts",
+            "License a floating cider bar",
+            "Agree a 10pm curfew with the swans"
+          ],
+          "deliverables": [
+            "Friday night trading",
+            "£9,000 of takings a night"
+          ]
+        },
+        {
+          "heading": "Float the fleet",
+          "range": "2028",
+          "activities": [
+            "Commission five electric barges",
+            "Open a second basin upriver",
+            "Run a solar ferry between basins",
+            "Train eight new skippers"
+          ],
+          "deliverables": [
+            "Twelve boats and 90 stalls",
+            "5,000 shoppers a week"
+          ]
+        }
+      ]
+    },
+    "pointsHeading": "Why this order",
+    "points": [
+      "The night market pays for the fleet: £9,000 a night covers the five electric barges in 14 months.",
+      "Rafts come before barges: a raft costs £4,000 and a barge £60,000, so the cheap wave proves the crowd first."
+    ],
+    "highlight": [
+      "£9,000 a night",
+      "£4,000"
+    ],
+    "source": "Source: Synthetic demonstration • no real company data; the harbourmaster's soggy clipboard"
+  },
+  {
+    "id": "schedule-timeline",
+    "type": "schedule",
+    "form": "timeline",
+    "commentary": "so-what-bar",
+    "takeaway": false,
+    "title": "First guests circle an asteroid in December 2028, if the heat shield passes",
+    "subtitle": "Six dates from hangar to maiden cruise, March 2027 to December 2028",
+    "bar": "Fund a second heat shield now: it costs less than a year's delay and protects the December 2028 date.",
+    "highlight": [
+      "second heat shield"
+    ],
+    "exhibit": {
+      "orientation": "down",
+      "active": 1,
+      "items": [
+        {
+          "date": "Mar 2027",
+          "label": "Hull fitted out",
+          "text": "The cruiser gets 40 cabins with round windows, a glass viewing deck and a galley where the soup stays in the bowl."
+        },
+        {
+          "date": "Sep 2027",
+          "label": "Heat shield test",
+          "text": "Three re-entry burns in a row at full heat. A single crack sends the shield back to the workshop for a year, and the launch with it."
+        },
+        {
+          "date": "Feb 2028",
+          "label": "Crew certified",
+          "text": "Twelve pilots and guides log 200 hours each in the zero-g simulator, including the drill for a guest who will not stop somersaulting."
+        },
+        {
+          "date": "Jun 2028",
+          "label": "Sea trials, in space",
+          "text": "An empty loop round the Moon proves the route, the oxygen budget and the coffee machine, with a test dummy in every cabin."
+        },
+        {
+          "date": "Oct 2028",
+          "label": "Tickets go on sale",
+          "text": "120 seats a month at launch prices, enough to sell out the first season inside a week if the trial footage looks good."
+        },
+        {
+          "date": "Dec 2028",
+          "label": "Maiden cruise",
+          "text": "Nine days out, two slow laps of a small asteroid at a safe distance, and home in time for New Year's Eve."
+        }
+      ]
+    },
+    "source": "Source: Synthetic demonstration • no real company data; the flight director's wall calendar"
+  }
+]

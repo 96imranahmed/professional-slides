@@ -165,16 +165,16 @@ console.log(JSON.stringify({
   hero:find(hero.items,i=>i.id==='s01-side').leftover??null,
   sidebar:find(sidebar.items,i=>i.id==='s01-document').leftover??null,
   beside:find(beside.items,i=>i.id==='s01-side').leftover??null,
-  besideList:find(beside.items,i=>i.id==='s01-points').props.centre??null,
+  besideList:find(beside.items,i=>i.id==='s01-points-0').size.height,
   middle:find(middle.items,i=>i.id==='s01-side').leftover??null,
-  text:text.items.find(i=>i.component==='bullet-list').props.centre}));
+  text:text.items.find(i=>i.component==='bullet-list').size.height}));
 """)
-        self.assertIsNone(result["hero"], "the number and its points start level with the exhibit")
+        self.assertEqual(result["hero"], "spread", "the number and its points open their gaps to the loosest, then sit as one group in the middle of their column")
         self.assertIsNone(result["sidebar"], "the copy starts level with the panel")
-        self.assertIsNone(result["beside"])
-        self.assertIs(result["besideList"], True, "a list that owns its column beside a chart centres in it")
+        self.assertEqual(result["beside"], "spread", "a column beside a chart opens its gaps to the loosest, then sets its blocks as one group in the middle")
+        self.assertEqual(result["besideList"], "hug", "a point is as tall as its words; its column places it")
         self.assertEqual(result["middle"], "center", "the author can still ask for the middle")
-        self.assertIs(result["text"], False)
+        self.assertEqual(result["text"], "hug")
 
 
 class NaturalSizeFigureTests(unittest.TestCase):

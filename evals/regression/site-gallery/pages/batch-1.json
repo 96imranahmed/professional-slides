@@ -1,0 +1,956 @@
+[
+ {
+  "id": "argument-memo",
+  "type": "argument",
+  "form": "memo",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Sell the ghosts by night and keep the haunted wing free by day",
+  "highlight": [
+   "halving the crowd costs £26,250",
+   "at 90% occupancy, £118,800 a year"
+  ],
+  "paragraphs": [
+   "Hollowmere's haunted wing attracted 41,000 visitors last year, and the trustees naturally want their share of the takings. So what should they charge for: the doorway, or the darkness?",
+   "A £5 admission charge looks simplest. October's pilot weekend halved attendance, yet the remaining 20,500 paying visitors would still contribute £102,500 a year, before counting what the library loses.",
+   "But ghost-hunters are enthusiastic borrowers. Six in ten leave carrying a book, the council reimburses the library £2.10 per loan, and halving the crowd costs £26,250 of that grant.",
+   "The ghost, meanwhile, keeps library opening hours in reverse. The Grey Archivist appears after closing time in nine sightings out of ten, precisely when nobody is paying a penny.",
+   "So sell what daytime visitors never witness: a £22 after-dark tour. Thirty places, four evenings weekly across 50 weeks, gives 6,000 places; at 90% occupancy, £118,800 a year.",
+   "The tour leaves the free wing, its 25,000 loans and the council's grant precisely where they are, and requires two volunteer guides, steady nerves and generous supplies of torches."
+  ],
+  "panel": {
+   "kicker": "The recommendation",
+   "tone": "tint",
+   "text": "Keep the haunted wing free and sell a £22 after-dark tour: 30 places, four nights a week. At 90% full it earns £118,800 a year; a £5 door charge nets £76,250 and costs the library half its loans."
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the head librarian's sightings log"
+ },
+ {
+  "id": "argument-sidebar",
+  "type": "argument",
+  "form": "sidebar",
+  "commentary": "none",
+  "takeaway": false,
+  "title": "Gearpaw should open a firmware hotline before it builds a second repair bay",
+  "highlight": [
+   "64% were firmware faults",
+   "8,200 visits a year off the bench",
+   "from 11 days to 4"
+  ],
+  "paragraphs": [
+   {
+    "lead": "Most robot pets are not broken",
+    "text": "Of Gearpaw's 18,400 visits in 2026, 64% were firmware faults: a dog that fetches the wrong slipper, a cat stuck in a purr loop, a parrot that only speaks in error codes. Only 36% needed a spanner."
+   },
+   {
+    "lead": "A second bay treats the wrong patient",
+    "text": "The £480,000 bay adds 5,200 bench visits a year, yet most of them would go to firmware faults that occupy a welder's bench for 22 minutes and never need a welding torch."
+   },
+   {
+    "lead": "A hotline fixes pets where they sleep",
+    "text": "Remote diagnostics clear seven in ten firmware faults in 9 minutes over the owner's home network, with no carry case in sight. That takes 8,200 visits a year off the bench for £120,000."
+   },
+   {
+    "lead": "Welders go back to welding",
+    "text": "With firmware off the bench, the wait for a slot drops from 11 days to 4, and the three welders spend their shifts on hips, tails and hinges, not resets."
+   },
+   {
+    "lead": "The bay can wait until 2030",
+    "text": "Mechanical cases grow about 15% a year, so the bench fills up again around 2030. That is the year to build the second bay, when there is real welding to put in it."
+   }
+  ],
+  "panel": {
+   "kicker": "The arithmetic",
+   "tone": "dark",
+   "highlight": "from 11 days to 4",
+   "text": "A £120,000-a-year hotline frees 8,200 bench visits, while a £480,000 second bay adds only 5,200. The hotline also cuts the wait for a bench slot from 11 days to 4."
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the clinic's bench diary"
+ },
+ {
+  "id": "bridge-waterfall",
+  "type": "bridge",
+  "form": "waterfall",
+  "commentary": "on-exhibit",
+  "takeaway": false,
+  "title": "The robots cut €1.8m of wages, then spent most of it on themselves",
+  "subtitle": "Operating profit bridge from the last human-chef year to the first full robot year, € million",
+  "exhibit": {
+   "heading": "Operating profit, FY24 to FY26",
+   "unit": "€ million",
+   "categories": [
+    "FY24",
+    "Kitchen wages",
+    "Less food waste",
+    "Robot leases",
+    "Repairs",
+    "Lost regulars",
+    "FY26"
+   ],
+   "values": [
+    1.2,
+    1.8,
+    0.6,
+    -1.1,
+    -0.5,
+    -0.4,
+    1.6
+   ],
+   "totals": [
+    0,
+    6
+   ],
+   "annotations": [
+    {
+     "category": "Kitchen wages",
+     "text": "Two robots replaced nine line cooks"
+    },
+    {
+     "category": "Robot leases",
+     "text": "€550k a year for each robot"
+    },
+    {
+     "category": "Lost regulars",
+     "text": "Regulars missed yelling at the chef"
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the robots' own maintenance logs"
+ },
+ {
+  "id": "composition-donut",
+  "type": "composition",
+  "form": "donut",
+  "commentary": "beside-left",
+  "takeaway": false,
+  "title": "The volcano heats the springs for free, and they earn 48% of revenue",
+  "subtitle": "Spa revenue by treatment line, FY26, €20m in total",
+  "pointsHeading": "What each line costs to run",
+  "points": [
+   {
+    "text": "The crater springs earn €9.6m of the €20m and need no boiler: the volcano does all the heating.",
+    "highlight": "no boiler"
+   },
+   {
+    "text": "Mud baths add €5.4m; the mud is dug on site, so their margin is nearly as fat as the springs'.",
+    "highlight": "dug on site"
+   },
+   {
+    "text": "Lava-stone massage brings in €3.6m but needs 40 trained therapists, the largest single payroll line in the resort.",
+    "highlight": "40 trained therapists"
+   },
+   {
+    "text": "Ash facials earn only €1.4m, and the salon has to close for the day every time the mountain coughs.",
+    "highlight": "the mountain coughs"
+   },
+   {
+    "text": "Together the two lines the volcano powers, springs and mud, bring in €15m, three quarters of the total.",
+    "highlight": "three quarters of the total"
+   }
+  ],
+  "exhibit": {
+   "heading": "Spa revenue by treatment, FY26",
+   "unit": "€ million",
+   "labels": [
+    "Sulphur mud baths",
+    "Crater hot springs",
+    "Lava-stone massage",
+    "Ash facials"
+   ],
+   "values": [
+    5.4,
+    9.6,
+    3.6,
+    1.4
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the resort's seismograph and till rolls"
+ },
+ {
+  "id": "composition-marimekko",
+  "type": "composition",
+  "form": "marimekko",
+  "commentary": "beside",
+  "takeaway": false,
+  "title": "Cocktail bars buy 46% of all artisanal ice, and they want it round",
+  "subtitle": "Spend on artisanal ice by buyer and cube type, 2026, €100m in total",
+  "pointsHeading": "Who buys which cube",
+  "points": [
+   {
+    "lead": "Bars want it round",
+    "text": "Spheres are 57% of what cocktail bars spend on ice, and the bars buy two thirds of every sphere sold. They pay €2 a sphere because it melts slowly.",
+    "highlight": "two thirds of every sphere"
+   },
+   {
+    "lead": "Kitchens buy the square ones",
+    "text": "Fine dining and hotels spend €39m between them, mostly on clear cubes for water and wine buckets. They buy on reliability of delivery, not on shape.",
+    "highlight": "mostly on clear cubes"
+   },
+   {
+    "lead": "Home bars like a flavour",
+    "text": "Home bartenders spend only €10m, but 40% of it on flavoured cubes, a line the bars barely touch. That is a supermarket product, not a bar one.",
+    "highlight": "40% of it on flavoured cubes"
+   }
+  ],
+  "exhibit": {
+   "heading": "Spend by buyer and cube type, 2026",
+   "unit": "€ million",
+   "categories": [
+    "Cocktail bars",
+    "Fine dining",
+    "Hotels",
+    "Home bars",
+    "Events"
+   ],
+   "series": [
+    {
+     "name": "Spheres",
+     "values": [
+      26.22,
+      6,
+      3,
+      3,
+      1
+     ]
+    },
+    {
+     "name": "Clear cubes",
+     "values": [
+      13.8,
+      10.08,
+      7.95,
+      2,
+      1
+     ]
+    },
+    {
+     "name": "Crushed glacier",
+     "values": [
+      4.14,
+      6,
+      3,
+      1,
+      2
+     ]
+    },
+    {
+     "name": "Flavoured",
+     "values": [
+      1.84,
+      1.92,
+      1.05,
+      4,
+      1
+     ]
+    }
+   ],
+   "valueFormat": {
+    "decimals": 0
+   }
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the freezer-room order book"
+ },
+ {
+  "id": "composition-pictogram",
+  "type": "composition",
+  "form": "pictogram",
+  "commentary": "beside",
+  "takeaway": false,
+  "title": "Eight in ten residents could outrun a zombie; only two have a plan to regroup",
+  "subtitle": "Residents out of ten meeting each readiness test, Manchester survey of 2,000, 2026",
+  "pointsHeading": "Where to spend first",
+  "points": [
+   {
+    "icon": "people",
+    "text": "Fitness is not the gap: eight in ten can already outrun a slow zombie over 100 metres.",
+    "highlight": "not the gap"
+   },
+   {
+    "icon": "map-pin",
+    "text": "Only three in ten know their nearest high ground, so signpost the hills before buying anything.",
+    "highlight": "signpost the hills"
+   },
+   {
+    "icon": "flag",
+    "text": "Two in ten have a regroup plan; a fridge-magnet plan card costs us 12p a household.",
+    "highlight": "12p a household"
+   },
+   {
+    "icon": "cart",
+    "text": "Food is the dearest fix: three days of tins in every home would cost us £4m in all.",
+    "highlight": "£4m"
+   }
+  ],
+  "exhibit": {
+   "of": 10,
+   "rows": [
+    {
+     "label": "Outrun a zombie",
+     "value": 8,
+     "text": "could cover 100 m faster than a shuffle"
+    },
+    {
+     "label": "Own a blunt object",
+     "value": 6,
+     "text": "keep a bat, a spade or a frying pan"
+    },
+    {
+     "label": "Stock three days of food",
+     "value": 4,
+     "text": "have tins and a working tin opener"
+    },
+    {
+     "label": "Know the high ground",
+     "value": 3,
+     "text": "can name their nearest hill or tower"
+    },
+    {
+     "label": "Have a regroup plan",
+     "value": 2,
+     "text": "agreed a meeting point with family"
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; door-to-door survey, daylight hours only"
+ },
+ {
+  "id": "composition-pie",
+  "type": "composition",
+  "form": "pie",
+  "commentary": "rail",
+  "takeaway": false,
+  "title": "Black liquorice is 52% of the beans left at the bottom of the jar",
+  "subtitle": "Beans left uneaten in 1,200 returned tasting jars, by flavour, 2026",
+  "highlight": "sell it alone in a black tin",
+  "rail": "Take liquorice out of the mixed jar and sell it alone in a black tin. Its fans will pay double for it, and the 52% we now sweep up stops being waste.",
+  "exhibit": {
+   "heading": "Beans left uneaten, by flavour, 2026",
+   "unit": "% of beans",
+   "labels": [
+    "Buttered popcorn",
+    "Black liquorice",
+    "Cinnamon",
+    "All other flavours"
+   ],
+   "values": [
+    21,
+    52,
+    15,
+    12
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the quality team, who ate the rest"
+ },
+ {
+  "id": "composition-stacked-bar",
+  "type": "composition",
+  "form": "stacked-bar",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Families pick the Jurassic; retirees pick Rome, where nothing tries to eat them",
+  "subtitle": "Share of FY26 departures by era visited, by traveller segment",
+  "bar": "Sell the Jurassic through schools and Rome through retirement clubs; one brochure for every era wastes half the print run.",
+  "exhibit": {
+   "heading": "Departures by era visited, FY26",
+   "unit": "% of departures",
+   "categories": [
+    "Families",
+    "School trips",
+    "Corporate retreats",
+    "Honeymooners",
+    "Retirees"
+   ],
+   "series": [
+    {
+     "name": "Jurassic",
+     "values": [
+      48,
+      41,
+      15,
+      10,
+      9
+     ]
+    },
+    {
+     "name": "Ancient Rome",
+     "values": [
+      18,
+      27,
+      22,
+      38,
+      52
+     ]
+    },
+    {
+     "name": "Medieval",
+     "values": [
+      22,
+      24,
+      13,
+      18,
+      27
+     ]
+    },
+    {
+     "name": "Far future",
+     "values": [
+      12,
+      8,
+      50,
+      34,
+      12
+     ]
+    }
+   ],
+   "valueFormat": {
+    "suffix": "%"
+   }
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the departures log, all timelines"
+ },
+ {
+  "id": "composition-stacked-column",
+  "type": "composition",
+  "form": "stacked-column",
+  "commentary": "on-exhibit",
+  "takeaway": false,
+  "title": "Sleeping 40 metres down doubles the bill, and the submarine ride is half the premium",
+  "subtitle": "Revenue per guest-night by room depth, FY26",
+  "exhibit": {
+   "heading": "Revenue per guest-night, FY26",
+   "unit": "€",
+   "categories": [
+    "Lagoon rooms",
+    "Reef rooms",
+    "Twilight suites",
+    "Abyss suites"
+   ],
+   "categoryNotes": [
+    "4 m down",
+    "12 m down",
+    "25 m down",
+    "40 m down"
+   ],
+   "series": [
+    {
+     "name": "Room",
+     "values": [
+      320,
+      380,
+      450,
+      530
+     ]
+    },
+    {
+     "name": "Dining",
+     "values": [
+      100,
+      115,
+      135,
+      150
+     ]
+    },
+    {
+     "name": "Submarine transfer",
+     "values": [
+      40,
+      105,
+      205,
+      300
+     ]
+    },
+    {
+     "name": "Excursions",
+     "values": [
+      40,
+      60,
+      90,
+      40
+     ]
+    }
+   ],
+   "annotations": [
+    {
+     "category": "Lagoon rooms",
+     "text": "The submarine ride costs €40 up here and €300 down in the abyss"
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the front desk's tide tables"
+ },
+ {
+  "id": "composition-treemap",
+  "type": "composition",
+  "form": "treemap",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Party games are 28% of 65,000 loans; the four-hour wargames gather dust",
+  "subtitle": "Loans by game genre, 2026, thousand loans and share of all loans",
+  "bar": "Put party games by the front door and move the wargames to the back room, where their twelve devoted players already sit.",
+  "exhibit": {
+   "heading": "Loans by game genre, 2026",
+   "unit": "thousand loans",
+   "items": [
+    {
+     "label": "Party games",
+     "value": 18.4
+    },
+    {
+     "label": "Co-op adventures",
+     "value": 12.2
+    },
+    {
+     "label": "Deck builders",
+     "value": 8.1
+    },
+    {
+     "label": "Trivia",
+     "value": 6.5
+    },
+    {
+     "label": "Word games",
+     "value": 5.2
+    },
+    {
+     "label": "Dexterity",
+     "value": 4.1
+    },
+    {
+     "label": "Two-player duels",
+     "value": 3.6
+    },
+    {
+     "label": "Heavy strategy",
+     "value": 3
+    },
+    {
+     "label": "Roll-and-move classics",
+     "value": 2.7
+    },
+    {
+     "label": "Wargames",
+     "value": 1.2
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the lending desk, minus two missing dice"
+ },
+ {
+  "id": "composition-waffle",
+  "type": "composition",
+  "form": "waffle",
+  "commentary": "rail",
+  "takeaway": "Seven guests thought they had booked alpacas; not one of them asked for a refund.",
+  "title": "46 of every 100 guests come for the llamas; the Andes are a bonus",
+  "subtitle": "Main reason for booking, survey of 100 guests, Sacred Valley, 2026 season",
+  "highlight": "46 guests in 100",
+  "rail": "Lead the brochure with the llamas, not the summit: 46 guests in 100 booked for the animals and only 22 for the views.",
+  "exhibit": {
+   "heading": "Main reason for booking, 2026",
+   "unit": "guests",
+   "categories": [
+    "The llamas",
+    "The mountain views",
+    "A friend's dare",
+    "A gift voucher",
+    "Thought it was alpacas"
+   ],
+   "series": [
+    {
+     "name": "Guests",
+     "values": [
+      46,
+      22,
+      14,
+      11,
+      7
+     ]
+    }
+   ]
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the llamas were not consulted"
+ },
+ {
+  "id": "divider-agenda",
+  "kind": "agenda",
+  "title": "Agenda",
+  "style": "columns",
+  "active": 2,
+  "items": [
+   {
+    "label": "Who is bidding",
+    "detail": "Private collectors now win six lots in ten, up from three in 2019, and bid mostly online"
+   },
+   {
+    "label": "What sells",
+    "detail": "Complete skulls fetch nine times the price of loose teeth, kilo for kilo"
+   },
+   {
+    "label": "When to sell",
+    "detail": "Two themed evening sales replace the spring sale from 2027"
+   },
+   {
+    "label": "Where buyers are",
+    "detail": "Two in three winning bids now come from outside Europe, led by Singapore and Dubai"
+   },
+   {
+    "label": "What to change",
+    "detail": "Shoot every lot in 3D and ship the catalogue a fortnight earlier for overseas bidders"
+   }
+  ]
+ },
+ {
+  "id": "divider-section",
+  "kind": "section",
+  "number": 2,
+  "title": "What sells",
+  "image": {
+   "path": "assets/coast.jpg",
+   "alt": "Illustration of a coast",
+   "credit": "An illustration drawn for this example"
+  },
+  "summary": "Complete skulls fetch nine times the price of loose teeth, kilo for kilo"
+ },
+ {
+  "id": "lookup-measure-table",
+  "type": "lookup",
+  "form": "measure-table",
+  "commentary": "in-exhibit",
+  "takeaway": "Glasgow fills its slots with birthday parties; Belfast and Norwich have the space but sell it one jumper at a time.",
+  "title": "Glasgow bounces hardest, with 2,600 jumpers per trampoline, 30% above the chain",
+  "subtitle": "Eight parks, financial year 2026",
+  "highlight": "birthday parties",
+  "exhibit": {
+   "columns": [
+    "Park",
+    {
+     "label": "Trampolines",
+     "unit": "count"
+    },
+    {
+     "label": "Jumpers",
+     "unit": "thousand"
+    },
+    {
+     "label": "Jumpers per trampoline",
+     "unit": "jumpers",
+     "bar": true
+    },
+    {
+     "label": "Spend per visit",
+     "unit": "£"
+    },
+    {
+     "label": "Party bookings",
+     "unit": "% of visits"
+    },
+    {
+     "label": "Sprained ankles",
+     "unit": "per 10k jumps"
+    }
+   ],
+   "rows": [
+    [
+     "Glasgow",
+     "120",
+     "312",
+     "2,600",
+     "18.40",
+     "34",
+     "1.1"
+    ],
+    [
+     "Manchester",
+     "150",
+     "330",
+     "2,200",
+     "17.80",
+     "30",
+     "1.3"
+    ],
+    [
+     "Leeds",
+     "140",
+     "294",
+     "2,100",
+     "16.90",
+     "27",
+     "1.4"
+    ],
+    [
+     "Bristol",
+     "110",
+     "231",
+     "2,100",
+     "17.20",
+     "29",
+     "1.2"
+    ],
+    [
+     "Newcastle",
+     "100",
+     "180",
+     "1,800",
+     "16.10",
+     "24",
+     "1.5"
+    ],
+    [
+     "Cardiff",
+     "90",
+     "162",
+     "1,800",
+     "15.60",
+     "22",
+     "1.6"
+    ],
+    [
+     "Norwich",
+     "80",
+     "128",
+     "1,600",
+     "14.80",
+     "18",
+     "1.3"
+    ],
+    [
+     "Belfast",
+     "100",
+     "143",
+     "1,430",
+     "15.10",
+     "16",
+     "1.9"
+    ],
+    {
+     "style": "total",
+     "cells": [
+      "Chain",
+      "890",
+      "1,780",
+      "2,000",
+      "16.90",
+      "27",
+      "1.4"
+     ]
+    }
+   ],
+   "highlightRow": "Glasgow",
+   "total": false
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the ticket-desk till rolls and the first-aid logbook"
+ },
+ {
+  "id": "lookup-table",
+  "type": "lookup",
+  "form": "table",
+  "commentary": "so-what-bar",
+  "takeaway": false,
+  "title": "Six of eight caves ripen for Christmas; damp Drip Hollow runs three weeks late",
+  "subtitle": "Wheels in each cave against the 1 December 2026 shipping cut-off",
+  "highlight": "980 cheddars",
+  "bar": "Move Drip Hollow's 980 cheddars to drier Lantern Cave in October and all eight caves make the cut-off.",
+  "exhibit": {
+   "columns": [
+    "Cave",
+    "Cheese",
+    {
+     "label": "Wheels ageing",
+     "unit": "count"
+    },
+    {
+     "label": "Age at sale",
+     "unit": "months"
+    },
+    {
+     "label": "Humidity",
+     "unit": "%"
+    },
+    "Ready by",
+    {
+     "label": "Christmas order book",
+     "type": "rag"
+    }
+   ],
+   "rows": [
+    [
+     "Cathedral Cave",
+     "Clothbound cheddar",
+     "1,240",
+     "12",
+     "92",
+     "14 Nov 2026",
+     {
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Wishing Well",
+     "Washed-rind",
+     "450",
+     "3",
+     "93",
+     "18 Nov 2026",
+     {
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Lantern Cave",
+     "Alpine-style tomme",
+     "860",
+     "9",
+     "89",
+     "20 Nov 2026",
+     {
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Badger's Larder",
+     "Washed-rind",
+     "540",
+     "3",
+     "95",
+     "25 Nov 2026",
+     {
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Moonmilk Grotto",
+     "Cave-aged blue",
+     "610",
+     "6",
+     "94",
+     "28 Nov 2026",
+     {
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "The Undercroft",
+     "Smoked tomme",
+     "380",
+     "8",
+     "88",
+     "30 Nov 2026",
+     {
+      "value": "on-track",
+      "text": "On track"
+     }
+    ],
+    [
+     "Old Smuggler's",
+     "Goat's-milk log",
+     "720",
+     "2",
+     "91",
+     "5 Dec 2026",
+     {
+      "value": "behind",
+      "text": "Four days late"
+     }
+    ],
+    [
+     "Drip Hollow",
+     "Clothbound cheddar",
+     "980",
+     "12",
+     "98",
+     "22 Dec 2026",
+     {
+      "value": "at-risk",
+      "text": "Three weeks late"
+     }
+    ]
+   ],
+   "treatment": "open"
+  },
+  "source": "Source: Synthetic demonstration • no real company data; the cave master's chalkboard, October 2026"
+ },
+ {
+  "id": "matrix-findings-matrix",
+  "type": "matrix",
+  "form": "findings-matrix",
+  "commentary": "in-exhibit",
+  "takeaway": false,
+  "title": "Guests pay for the history, not the screams; rain is the real fright",
+  "subtitle": "What 1,240 guests told the 2026 post-walk survey in York and Edinburgh",
+  "highlight": [
+   "62%",
+   "28%",
+   "71%",
+   "84%",
+   "34%"
+  ],
+  "columns": [
+   "Finding",
+   "What guests told us",
+   "What it means for next season"
+  ],
+  "rows": [
+   {
+    "label": "Stories beat scares",
+    "icon": "lightbulb",
+    "cells": [
+     [
+      "62% rate the history above the jump-scares",
+      "Only 9% asked for more frights"
+     ],
+     "Rewrite the scripts around the cities' true tales; keep one scare per walk"
+    ]
+   },
+   {
+    "label": "Rain is the real ghost",
+    "icon": "cloud",
+    "cells": [
+     [
+      "28% of no-shows blame the weather",
+      "The covered vault walk sells out on wet nights"
+     ],
+     "Open a second underground route for wet evenings at the same fare"
+    ]
+   },
+   {
+    "label": "Groups book late",
+    "icon": "calendar",
+    "cells": [
+     [
+      "71% of hen and stag parties book within 48 hours",
+      "Couples book 11 days ahead on average"
+     ],
+     "Hold a fifth of the 10pm slots back for last-minute group sales"
+    ]
+   },
+   {
+    "label": "Guides are the brand",
+    "icon": "people",
+    "cells": [
+     [
+      "84% of five-star reviews name the guide",
+      "Guests who meet the same guide rebook twice as often"
+     ],
+     "Put each guide's name and portrait on the booking page"
+    ]
+   },
+   {
+    "label": "Families miss out",
+    "icon": "person",
+    "cells": [
+     [
+      "34% of family enquiries fail the 16-plus age limit",
+      "Half of them ask about school holidays"
+     ],
+     "Launch a 6pm not-too-spooky walk for families in the holidays"
+    ]
+   }
+  ],
+  "source": "Source: Synthetic demonstration • no real company data; the post-walk survey, collected by lantern-light"
+ }
+]
