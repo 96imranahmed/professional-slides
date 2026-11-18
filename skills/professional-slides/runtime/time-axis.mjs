@@ -5,9 +5,9 @@
 // observations happen to bunch rather than where the growth does. A line or an
 // area is a statement about rate, and its horizontal axis is elapsed time: the
 // chart reads the labels as dates and places each observation where it falls
-// (chart-line.mjs); a column chart, whose slots are categories, is refused
-// irregular dates at compile unless its heading says they are snapshots
-// (page-types.mjs).
+// (chart-line.mjs). A column chart, whose slots are categories, keeps one slot
+// a period and breaks its axis with a "//" after each long gap (gapBreaks,
+// chart-categorical.mjs), or with `timeSpaced` stands where the dates fall.
 //
 // Only forms that read one way are parsed: a year (2025, 2025E, FY25), a
 // quarter or half (Q1 2025, 1Q25, H2 2025), a month with its year (Jan 2025,

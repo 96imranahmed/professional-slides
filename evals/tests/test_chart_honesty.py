@@ -146,25 +146,53 @@ class AreaBaselineGateTests(unittest.TestCase):
         self.assertEqual(clean, [])
 
 
-class TimeSpacedColumnTests(unittest.TestCase):
-    def test_columns_over_uneven_years_stand_where_the_years_fall(self):
-        """BA retest sh07: columns for 2019, 2024 and the 2027 plan stood one slot apart, five years and three alike."""
-        result = run_node(DRAW + """
-const centres = (id, categories) => {
-  const drawn = render(id, { categories, series: [{ name: 'Leisure', values: [46, 51, 61] }, { name: 'Other', values: [54, 49, 39] }] });
+CENTRES = """
+const centres = (id, categories, extra = {}) => {
+  const drawn = render(id, { categories, series: [{ name: 'Leisure', values: [46, 51, 61] }, { name: 'Other', values: [54, 49, 39] }], ...extra });
   const marks = drawn.nodes.filter((n) => n.role === 'chart-mark' && n.data?.series === 'Leisure');
-  return { x: marks.map((n) => n.frame.x + n.frame.width / 2), widths: marks.map((n) => n.frame.width), native: nativeChartSpec(id, drawn.props, frame, drawn.nodes) !== null };
+  return { x: marks.map((n) => n.frame.x + n.frame.width / 2), widths: marks.map((n) => n.frame.width),
+    breaks: drawn.nodes.filter((n) => n.role === 'chart-break').map((n) => n.data.after),
+    native: nativeChartSpec(id, drawn.props, frame, drawn.nodes) !== null };
 };
+const evenSteps = (c) => Math.abs((c.x[2] - c.x[1]) - (c.x[1] - c.x[0])) < 0.5;
+"""
+
+
+class UnevenColumnTests(unittest.TestCase):
+    def test_columns_over_uneven_years_keep_their_slots_and_break_the_axis_at_each_gap(self):
+        """BA retest sh07 set 2019, 2024 and the 2027 plan one slot apart unmarked; the Retell deck set 2013-2015 and 2025
+        where they fall, which left most of the plot empty. Each column keeps a slot and a // says where the axis skips."""
+        result = run_node(DRAW + CENTRES + """
 const uneven = centres('chart.stacked-column', ['2019', '2024', '2027']), even = centres('chart.stacked-column', ['2019', '2020', '2021']);
-const broken = render('chart.stacked-column', { categories: ['2019', '2024', '2027'], categoryBreaks: ['2019'], series: [{ name: 'Leisure', values: [46, 51, 61] }] }).nodes.filter((n) => n.role === 'chart-mark').map((n) => n.frame.x);
-console.log(JSON.stringify({ ratio: (uneven.x[2] - uneven.x[1]) / (uneven.x[1] - uneven.x[0]), even: Math.abs((even.x[2] - even.x[1]) - (even.x[1] - even.x[0])) < 0.5,
-  overlap: uneven.x[1] - uneven.x[0] < uneven.widths[0], native: [uneven.native, even.native], brokenEven: Math.abs((broken[2] - broken[1]) - (broken[1] - broken[0])) < 0.5 }));
+const broken = centres('chart.stacked-column', ['2019', '2024', '2027'], { categoryBreaks: ['2019'] });
+const twilio = centres('chart.column', ['2013', '2014', '2015', '2025'], { series: [{ name: 'Leisure', values: [50, 89, 167, 520] }] });
+console.log(JSON.stringify({ unevenSlots: evenSteps(uneven), unevenBreaks: uneven.breaks, evenSlots: evenSteps(even), evenBreaks: even.breaks,
+  brokenBreaks: broken.breaks, twilioBreaks: twilio.breaks, twilioSlots: Math.abs((twilio.x[3] - twilio.x[2]) - (twilio.x[1] - twilio.x[0])) < 0.5,
+  native: [uneven.native, even.native] }));
+""")
+        self.assertTrue(result["unevenSlots"])
+        self.assertEqual(result["unevenBreaks"], ["2019"])  # 2024 to 2027 is the run's own step
+        self.assertTrue(result["evenSlots"])
+        self.assertEqual(result["evenBreaks"], [])
+        self.assertEqual(result["brokenBreaks"], ["2019"])
+        self.assertEqual(result["twilioBreaks"], ["2015"])
+        self.assertTrue(result["twilioSlots"])
+        self.assertEqual(result["native"], [False, True])  # a native chart cannot draw the //
+
+    def test_time_spaced_columns_stand_where_the_years_fall(self):
+        """`timeSpaced: true` keeps the elapsed-time placement for a run where the spacing is the point."""
+        result = run_node(DRAW + CENTRES + """
+const spaced = centres('chart.stacked-column', ['2019', '2024', '2027'], { timeSpaced: true });
+let refused = null;
+try { centres('chart.column', ['2019', '2024', '2027'], { timeSpaced: 'yes' }); } catch (e) { refused = e.message; }
+console.log(JSON.stringify({ ratio: (spaced.x[2] - spaced.x[1]) / (spaced.x[1] - spaced.x[0]), overlap: spaced.x[1] - spaced.x[0] < spaced.widths[0],
+  breaks: spaced.breaks, native: spaced.native, refused }));
 """)
         self.assertAlmostEqual(result["ratio"], 3 / 5, places=2)
-        self.assertTrue(result["even"])
         self.assertFalse(result["overlap"])
-        self.assertEqual(result["native"], [False, True])  # PowerPoint would set them one slot apart again
-        self.assertTrue(result["brokenEven"])  # an axis that marks its break keeps its slots
+        self.assertEqual(result["breaks"], [])
+        self.assertFalse(result["native"])  # PowerPoint would set them one slot apart again
+        self.assertIn("timeSpaced is true or false", result["refused"])
 
 
 class TimelineStepTests(unittest.TestCase):

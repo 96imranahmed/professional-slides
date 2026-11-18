@@ -54,6 +54,7 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 - **Show what was measured, no more.** Only a start and an end known: two bars or a slope, not a line with invented points. A rate repeated over years is a scenario, not a trend.
 - **A scenario shows its drivers.** Market × share × price → volume and revenue, as a table of scenarios or a bridge, not one input times three assumed rates.
 - **Keep kinds apart.** Actuals, estimates, forecasts and targets look different (`forecastFrom`, `assumedFrom`, `targets`); say the basis of each in the heading or a note.
+- **Skipped periods are marked, not spaced out.** Columns over uneven dates - 2013, 2014, 2015 and 2025, or Aug 2024 to Nov 2026 at whatever dates the record has - keep one slot each, and the runtime draws a "//" on the axis after every long gap, as a consulting deck does; a line keeps elapsed time, since its slope is a rate, and leaves a missing period undrawn. Set `timeSpaced: true` only where the spacing itself is the point. One period far larger than the rest (2025's $5.1B beside 2015's $167M) takes a cut in the value axis, `valueBreak: { from, to }`, so the early columns keep their height.
 - **Round for display, not before.** Compute from unrounded inputs; a total that disagrees with its parts as published keeps the published figures and a note.
 - **Totals are the runtime's.** A waterfall bound to a measure marks its first and last members as totals; stacked charts print each stack's total unless `stackTotals: false`.
 
@@ -63,7 +64,7 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 - **Put the number on the chart** where it carries the claim: a growth rate (`cagr`), a change bracketed (`changeAnnotations`), a target line (`referenceLines`), a band (`bands`). A sentence callout (`annotations`) explains a mechanism at a mark; a chart holds three.
 - **Treat a table's columns by what they hold.** A column of one kind of figure the rows are compared on - a CAGR, a margin, a growth rate - sits in matching bubbles (`columns[].bubble: true`); a column of amounts takes bars in its cells (`bar: true`); a grid of scores takes heat (`heat`); a closing "what it means" column is `implication: true`. `--schema lookup/table` lists every column treatment.
 - **Colour means something.** Status red, amber and green mark a state or a verdict - on track, behind, met, missed - in a pill, a light, a check or a cross. Never colour a chart series, a player or a surface by status. A delta and a trend arrow are coloured by whether the move is good news: set `better: "down"` for a cost, churn or a wait.
-- **Players carry their marks.** Declare the companies, places or products the deck compares in `players` on `deck`; a table cell naming one is drawn as its logo, outline or photograph.
+- **Players carry their marks.** Declare the companies, places or products the deck compares in `players` on `deck`; a table cell naming one is drawn as its logo, outline or photograph, and bars or columns whose categories are all players carry their marks on the category axis - a wordmark in place of the name (`categoryIcons: false` keeps the names alone). A table column of figures the rows are compared on is advised its bubble or bar where it is left plain (`TABLE_FIGURES_PLAIN`).
 
 ## Where the words go
 

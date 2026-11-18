@@ -86,10 +86,13 @@ const page = { id: 'p', type: 'trend', form: 'column', commentary: 'on-exhibit',
   title: 'Journeys in FY26 are twice FY10s and a fifth above FY19s',
   exhibit: { categories: ['FY10', 'FY15', 'FY19', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'],
     series: [{ name: 'Journeys', values: [24, 33, 40, 42, 45, 46, 47, 48] }], change: { from: 'FY10', to: 'FY26' } } };
-assert.doesNotThrow(() => compilePage(page), 'unmarked, the columns are drawn where the dates fall (chart-categorical.mjs rowLabelling)');
+const after = (nodes) => nodes.filter((n) => n.role === 'chart-break').map((n) => n.data.after);
+// Unmarked, the columns keep their slots and the axis is broken at every long gap (chart-categorical.mjs rowLabelling).
+const unmarked = compilePage(page);
+assert.deepEqual(after(render('chart.column', { ...unmarked.exhibit, change: undefined })), ['FY10', 'FY15', 'FY19']);
+assert.deepEqual(after(render('chart.column', { ...unmarked.exhibit, change: undefined, timeSpaced: true })), [], 'timeSpaced stands them where the dates fall');
 // One gap left unmarked on an axis broken at the others: the runtime breaks it too, as it does under a data table.
 const partial = compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15'] } });
-const after = (nodes) => nodes.filter((n) => n.role === 'chart-break').map((n) => n.data.after);
 assert.deepEqual(after(render('chart.column', { ...partial.exhibit, change: undefined })), ['FY10', 'FY15', 'FY19']);
 assert.deepEqual(after(render('chart.column', { ...page.exhibit, change: undefined, categoryColumns: { label: 80 } })), ['FY10', 'FY15', 'FY19'], 'a data table under the columns');
 const slide = compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15', 'FY19'] } });

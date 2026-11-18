@@ -74,6 +74,7 @@ Each check is about one page or about the saved file. A blocking finding stops t
 | The page cannot be drawn | `COMPILE`, `EXHIBIT_KEY_UNREAD`, `PAGE_DOES_NOT_COMPOSE`, `TITLE_LINES`, `HEADING_WRAPS`, `TOTAL_ROW_BLANK`; `PAGE_SPLITS` and `PAGE_ADJUSTED` advised |
 | Overlap and legibility | `TEXT_ON_TEXT`, `TEXT_OFF_GROUND`, `TEXT_ON_LINE`, `TEXT_ON_EDGE`, `DESCENDER_ON_RULE`, `MAP_LABEL_ASTRAY`, `GROUND_CONTRAST`, `RENDER_CONTRAST`, `TYPE_RANGE`, `SCATTER_UNKEYED` |
 | A chart drawn wrongly | `AREA_BASELINE`, `RANK_FILLED`, `UNSCALED_FIGURE` |
+| A table drawn plainly | `TABLE_FIGURES_PLAIN` advised: a column of one figure a row with no bubble or bar (table-taste.mjs) |
 | Points over a chart or table with no placement | `COMMENTARY_UNCHOSEN` (page-types.mjs defaultCommentary) |
 | A chart that compares nothing | `NO_COMPARISON` (also a treemap of near-equal parts), `SERIES_FLAT`, `ONE_COMPARISON` (chart-sense.mjs) |
 | The saved file differs from the scene | the readback codes (`MISSING_SHAPE`, `FRAME_DRIFT`, `TEXT_MISMATCH`, `SLIDE_COUNT`, ...), `TEXT_EXPORT_LOST`, `TEXT_EXPORT_PAGE_COUNT`, `TEXT_PLAN_PAGINATION`, `TEXT_PLAN_INCOMPLETE`, `MISSING_RENDER`, `RENDER_DRIFT`, `CONTENT_LOST`, `MISSING_VISUAL_INTENT` |
@@ -101,6 +102,7 @@ deck-keys.mjs        the keys `deck` takes
 pages-file.mjs       the pages file read whole, its parts (`include`) spliced in
 measures.mjs         the insight log's measures; bind.mjs numbers by reference; printed-numbers.mjs numbers read off text
 page-numbers.mjs     a page's typed numbers traced to the record (NUMBER_UNTRACED) and the citations its numbers need
+table-taste.mjs      a table column of figures left as plain text, and the bubble or bar it wants (TABLE_FIGURES_PLAIN)
 sources-registry.mjs the `sources` registry and the citation line written from it
 players.mjs          the entities a deck compares, and the mark each is drawn by
 evidence.mjs         tables and cells read without the layout engine; how many values an exhibit plots

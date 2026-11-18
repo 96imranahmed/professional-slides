@@ -51,6 +51,7 @@ import { exhibitKinds, formFields, kindFields, unreadKeys } from "./form-fields.
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { insightLogRefusal, measureConflicts, measureRegistry, readInsightLog } from "./measures.mjs";
 import { metricsOf, primaryCitations, requiredCitations, untracedFindings } from "./page-numbers.mjs";
+import { tableTasteFindings } from "./table-taste.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { buildDeck } from "./build-deck.mjs";
 import { isRefusal } from "./errors.mjs";
@@ -269,6 +270,8 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
     add([{ code: "REVISION_INVENTORY_MISSING", severity: "blocker", repair: `The deck records its source inventory as "${spec.inventory}", which is not beside the pages file; run runtime/import-deck.py again or correct the path` }]);
   add([...(baseDir ? carriedFindings(spec, imported, baseDir) : []), ...revisionRecordFindings(spec)]);
   add(insights?.conflicts ?? []);
+  // A table column of figures left as plain text: advised, with the bubble or bar it wants (table-taste.mjs).
+  add(tableTasteFindings(spec));
   // A number typed on a page that no measure of the log holds: advised, with the token that prints the recorded one.
   if (insights) add(untracedFindings(doc, insights));
   const revised = imported ? revisionChanges(spec, imported) : null;
