@@ -237,7 +237,9 @@ console.log(JSON.stringify({ gutter: wide.filter((n) => n.role === 'axis-label')
         self.assertLess(result["combo"]["named"], 24)
         self.assertEqual(result["dated"]["findings"], [])
         self.assertIn("2015", result["dated"]["named"])
-        self.assertLess(len(result["dated"]["named"]), 7)
+        # Each dated column keeps a slot with a // at each gap, so every year is named clear of its neighbours; set where
+        # the dates fell, 2017-2019 and 2023-2025 bunched and lost labels.
+        self.assertEqual(len(result["dated"]["named"]), 7)
 
 
 class GapTests(unittest.TestCase):

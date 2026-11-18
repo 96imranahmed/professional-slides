@@ -1320,8 +1320,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // A native area carries no value labels in the saved file (LibreOffice drops them), and the probe's area of slot sales
   // lost every figure it printed (TEXT_EXPORT_LOST): an area that prints its values stays drawn.
   if (type === "area" && renderedNodes?.some((node) => node.role === "data-label")) return null;
-  // So are columns over uneven dates (chart-categorical.mjs rowLabelling), unless a broken axis or a data table keeps their slots.
-  if (["column", "stacked-column"].includes(type) && !props.categoryColumns && !(props.categoryBreaks || []).length && timePositions(props.categories)) return null;
+  // So are columns over uneven dates (chart-categorical.mjs rowLabelling): their axis is broken with a "//" after each long
+  // gap, or with `timeSpaced` they stand where the dates fall, and a native chart can draw neither. A data table keeps its own.
+  if (["column", "stacked-column"].includes(type) && !props.categoryColumns && timePositions(props.categories)) return null;
   // A rank's line runs with 1 at the top, which the native line's axis does not say (chart-line.mjs): that chart stays drawn.
   if (Array.isArray(props.series) && props.series.some((item) => item?.rank === true)) return null;
   // A series that says it is assumed or a reference is drawn dashed, lighter or as a reference line (chart-decorations.mjs

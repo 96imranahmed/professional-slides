@@ -80,7 +80,7 @@ const attachedLabelText = (primary,secondary,props) => secondary
  * category order.
  */
 function normalizeCategoryIcons(props, categories) {
-  if (props.categoryIcons === undefined || props.categoryIcons === null) return null;
+  if (props.categoryIcons === undefined || props.categoryIcons === null || props.categoryIcons === false) return null;
   const source = props.categoryIcons;
   if (typeof source !== "object") throw new Error("categoryIcons takes a map from category to icon, or an array in category order");
   const entries = Array.isArray(source) ? source.map((entry, index) => [categories[index], entry]) : Object.entries(source);
@@ -732,17 +732,19 @@ function categoricalAxes(chart) {
 function rowLabelling(chart) {
   const { horizontal, stacked, categories, barHighlighted, axisFont, plot } = chart;
   let { props } = chart;
-  // Columns over dates at uneven gaps stand where the dates fall (time-axis.mjs timePositions): the BA retest set 2019, 2024
-  // and a 2027 plan one slot apart, so five years and three drew as one step each. Each lane is as wide as the closest two
-  // dates allow, and the even run is the case where every lane is a plot's width over the count. A data table's columns
-  // and a broken axis (`categoryBreaks`, which says outright that it skips) keep their slots.
-  // A data table under the columns sets its periods one slot each, so dates at uneven gaps cannot stand where they fall, and
-  // an axis broken at some gaps sets the rest one slot apart: either way the axis is broken after every long gap (time-axis.mjs
-  // gapBreaks), which says outright that it skips.
-  if (!horizontal && (props.categoryColumns || (props.categoryBreaks || []).length) && timePositions(categories)) {
+  // Columns over dates at uneven gaps keep one slot each and break the axis with a "//" after every long gap (time-axis.mjs
+  // gapBreaks), as a consulting deck draws 2013, 2014, 2015 and 2025: the BA retest set 2019, 2024 and a 2027 plan one slot
+  // apart with nothing to say five years and three were not one step each, and the Retell deck drew them where the dates
+  // fall, which left most of the plot empty and the early columns a sliver wide. The break says outright that the axis
+  // skips, so every column keeps a full lane. A data table under the columns and an axis the author broke at some gaps are
+  // broken at every long gap the same way. `timeSpaced: true` sets the columns where the dates fall instead, each lane as
+  // wide as the closest two dates allow - for a run where the spacing itself is the point.
+  const timeSpaced = props.timeSpaced === true && !props.categoryColumns && !(props.categoryBreaks || []).length;
+  if (props.timeSpaced !== undefined && typeof props.timeSpaced !== "boolean") throw new Error("timeSpaced is true or false: whether columns over uneven dates stand where the dates fall");
+  if (!horizontal && !timeSpaced && timePositions(categories)) {
     chart.props = props = { ...props, categoryBreaks: slotBreaks(categories, props.categoryBreaks) };
   }
-  const spacing = !horizontal && !props.categoryColumns && !(props.categoryBreaks || []).length ? timePositions(categories) : null;
+  const spacing = !horizontal && timeSpaced ? timePositions(categories) : null;
   const closest = spacing ? Math.min(...spacing.slice(1).map((at, i) => at - spacing[i])) : 0;
   const categorySpan = spacing ? plot.width * closest / (1 + closest) : (horizontal ? plot.height : plot.width) / categories.length;
   const slotStart = (index) => (spacing ? plot.x + spacing[index] * (plot.width - categorySpan) : (horizontal ? plot.y : plot.x) + index * categorySpan);
@@ -1123,6 +1125,9 @@ function drawStackTotal(chart, category, categoryStart) {
   }
 }
 
+// How wide a logo runs, against its height, before it reads as a wordmark that spells the name.
+const WORDMARK_ASPECT = 2.5;
+
 /** The category's label and its note. */
 function drawCategoryLabel(chart, category, categoryIndex, categoryStart) {
   const { id, frame, horizontal, regionHighlight, hideCategoryLabels, iconSlot, noteWidth, noteColumn, horizontalCategoryLabelWidth,
@@ -1171,7 +1176,11 @@ function drawCategoryLabel(chart, category, categoryIndex, categoryStart) {
   const rowWrap = horizontal && !barLabelLayout && !hideCategoryLabels ? measureText(String(category), horizontalCategoryLabelWidth - iconSlot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(rowSize) }) : null;
   const wrapped = rowWrap && rowWrap.lines.length > 1 ? rowWrap : null;
   const blockLayout = barLabelLayout ?? wrapped;
-  if (!hideCategoryLabels && (horizontal ? rowShown(categoryIndex) : labelShown(categoryIndex))) nodes.push(textPrimitive({
+  // A declared player's wordmark spells its name, so the name is not set beside it again ("Parloa" by Parloa's logo); a
+  // square mark or a glyph (a cloud, a knot) keeps its name. The mark's alt text still names it.
+  const mark = chart.categoryIcons?.get(category);
+  const spelled = Boolean(mark?.player && mark.image && !isFlag(mark.image) && markDrawable(mark.image) && mark.image.width / mark.image.height >= WORDMARK_ASPECT);
+  if (!hideCategoryLabels && !spelled && (horizontal ? rowShown(categoryIndex) : labelShown(categoryIndex))) nodes.push(textPrimitive({
     id: stableId(id, "category", category),
     role: "category-label",
     frame: horizontal

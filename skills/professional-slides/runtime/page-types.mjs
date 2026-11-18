@@ -1339,6 +1339,9 @@ function withPageType({ page, slide, adjusted }) {
  * photograph, fetched with the deck's photographs. Until a file is there the
  * cell keeps the name.
  */
+// The charts that draw a mark beside each category's label (chart-categorical.mjs categoryIcons).
+const CATEGORY_MARK_CHARTS = new Set(["chart.bar", "chart.column", "chart.stacked-bar", "chart.stacked-column"]);
+
 export function markPlayerCells(slide, players) {
   const names = playerNames(players);
   const entries = new Map(playerEntries(players).map((entry) => [entry.name, entry]));
@@ -1379,6 +1382,14 @@ export function markPlayerCells(slide, players) {
     ex.rows = ex.rows.map((row) => Array.isArray(row) ? row.map((cell, c) => c === 0 ? cell : mark(cell))
       : row && Array.isArray(row.cells) ? { ...row, cells: row.cells.map((cell, c) => c === 0 && row.label === undefined ? cell : mark(cell)) } : row);
     if (Array.isArray(ex.columns)) ex.columns = markHeaders(ex.columns, 1);
+  }
+  // Bars or columns whose categories are all declared players carry each player's mark beside its name (`categoryIcons`),
+  // as a table's cells do: the reader knows Sierra's mark before its name, and a ranking of companies reads at a glance.
+  // A page that sets its own `categoryIcons` keeps them; `categoryIcons: false` keeps the names alone.
+  for (const ex of exhibitsOf(slide).filter((e) => CATEGORY_MARK_CHARTS.has(e.type))) {
+    if (ex.categoryIcons !== undefined || !Array.isArray(ex.categories) || ex.categories.length < 2) continue;
+    const named = ex.categories.map((category) => names.get(String(category).trim().toLowerCase()));
+    if (named.every(Boolean)) ex.categoryIcons = Object.fromEntries(ex.categories.map((category, i) => [category, { image: markOf(named[i]), player: named[i] }]));
   }
   // A findings matrix heads its columns at the page's level ("Anthropic",
   // "OpenAI route"): a column headed by a player carries the mark as a

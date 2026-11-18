@@ -20,7 +20,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { isMain, parseCli, pythonBin, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { spawn } from "node:child_process";
-import { logoPlayers } from "./players.mjs";
+import { logoPlayers, playerEntries } from "./players.mjs";
 
 export const UA = "professional-slides/1.0 (deck logo fetch; https://www.mediawiki.org/wiki/API:Etiquette)";
 const API = "https://en.wikipedia.org/w/api.php";
@@ -136,7 +136,11 @@ export function fillLogos(spec, fetched, baseDir) {
  */
 export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true } = {}) {
   const players = logoPlayers(spec.players);
-  if (!players.length) return { filled: 0, fetched: [], failed: [] };
+  // A player that names its own logo file needs nothing fetched, but every mark planned under its name - a table cell, a
+  // chart category, a logos member, each `{ alt: "<Name> logo" }` - is filled from that file all the same.
+  const declared = playerEntries(spec.players).filter((entry) => entry.kind === "logo" && typeof entry.logo?.path === "string")
+    .map((entry) => ({ name: entry.name, path: path.resolve(baseDir, entry.logo.path), credit: entry.logo.credit ?? `${entry.name} logo` }));
+  if (!players.length) return { filled: declared.length ? fillLogos(spec, declared, baseDir) : 0, fetched: [], failed: [] };
   const directory = path.join(baseDir, "assets", "logos");
   const records = new Map(((await readJson(path.join(directory, "sources.json"), { optional: true })) ?? []).map((r) => [r.name, r]));
   const results = [];
@@ -155,7 +159,7 @@ export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true }
     for (const { path: p, ...rest } of fresh) records.set(rest.name, { ...rest, saved: path.relative(baseDir, p) });
     await writeJsonWhole(path.join(directory, "sources.json"), [...records.values()]);
   }
-  return { filled: fillLogos(spec, results, baseDir), fetched: results.filter((r) => r.path).map((r) => r.name), failed: results.filter((r) => !r.path).map((r) => `${r.name}: ${r.error}`) };
+  return { filled: fillLogos(spec, [...declared, ...results], baseDir), fetched: results.filter((r) => r.path).map((r) => r.name), failed: results.filter((r) => !r.path).map((r) => `${r.name}: ${r.error}`) };
 }
 
 const USAGE = "Usage: fetch-logos.mjs <id>.deck.json [--hint word] [--dry-run]";
